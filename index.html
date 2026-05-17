@@ -4831,7 +4831,7 @@ async function testGeminiKey(){
   const key=getGeminiKey();
   if(!key){notify('Paste your API key first');return;}
   notify('Testing key…');
-  const models=['gemini-2.0-flash','gemini-2.0-flash-exp','gemini-1.5-flash','gemini-1.5-flash-8b'];
+  const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
   const errors=[];
   for(const model of models){
     try{
@@ -4923,7 +4923,7 @@ async function callGemini(prompt){
   const key=getGeminiKey();
   if(!key) return null;
   // Try models in order of preference — free tier availability varies
-  const models=['gemini-2.0-flash','gemini-2.0-flash-exp','gemini-1.5-flash','gemini-1.5-flash-latest','gemini-1.5-flash-8b'];
+  const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
   for(const model of models){
     try{
       const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{
@@ -4931,7 +4931,7 @@ async function callGemini(prompt){
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           contents:[{parts:[{text:prompt}]}],
-          generationConfig:{temperature:0.85,maxOutputTokens:1400}
+          generationConfig:{temperature:0.85,maxOutputTokens:1400,thinkingConfig:{thinkingBudget:0}}
           // Note: NOT using responseMimeType — causes failures on some models/keys
         })
       });
