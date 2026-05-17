@@ -3,7 +3,7 @@
 
 A fully-featured Survivor-style reality competition simulator. Cast contestants, configure tribes, run challenges, reveal votes, and generate episode scripts — all in your browser, no install needed.
 
-**[▶ Play Now][(](https://garryrobson85.github.io/No-Signal)**
+**[▶ Play Now](https://garryrobson85.github.io/No-Signal)**
 
 ---
 
