@@ -946,3 +946,22 @@ function renderFinaleNoJury(winner,finalists){
 
 // ===== EXPORTS =====
 export { buildBadge, buildPlayerChip, buildEventCard, buildNotice, renderStage, buildEpisodeHeader, buildStageCampLife, buildStageChallenge, buildChallengeChooser, buildStageTribal, buildStageElimination, buildStageNav, initVoteReveal, flipVote, revealAllVotes, updateRunningTally, revealElimination, showPlayerDetail, showJuryPanel, showSeasonStats, addDramaEvent, hostPlantIdol, hostGrantImmunity, applyHostImmunity, answerTribalQuestion };
+
+
+window.toggleDarkMode=function(){
+  document.body.classList.toggle('light-mode');
+  const isLight=document.body.classList.contains('light-mode');
+  localStorage.setItem('ns-theme', isLight ? 'light':'dark');
+
+  const btn=document.getElementById('dark-toggle-btn');
+  if(btn) btn.textContent=isLight ? '☀️':'🌙';
+};
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const saved=localStorage.getItem('ns-theme');
+  if(saved==='light'){
+    document.body.classList.add('light-mode');
+    const btn=document.getElementById('dark-toggle-btn');
+    if(btn) btn.textContent='☀️';
+  }
+});

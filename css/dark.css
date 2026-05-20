@@ -220,3 +220,38 @@ html.dark ::-webkit-scrollbar-thumb { background: var(--surface3); }
 .v19-rel-fill{height:7px;border-radius:10px;background:var(--fire2)}
 .v19-help{font-size:12px;color:var(--text2);line-height:1.55;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin:12px 0}
 .v19-modal-wide{max-width:850px!important}
+
+
+/* ===== Theme Variables ===== */
+
+body{
+  background:var(--night);
+  color:#f5f5f5;
+  transition:background .2s,color .2s;
+}
+
+body.light-mode{
+  background:#f6f3ee;
+  color:#151515;
+}
+
+body.light-mode .app-header,
+body.light-mode .setup-sidebar{
+  background:#ffffff;
+  border-color:rgba(0,0,0,0.08);
+}
+
+body.light-mode .setup-nav-item{
+  color:#333;
+}
+
+body.light-mode .setup-content{
+  background:#f6f3ee;
+}
+
+.dark-toggle-btn{
+  border:none;
+  border-radius:10px;
+  padding:8px 12px;
+  cursor:pointer;
+}
