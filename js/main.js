@@ -3,41 +3,32 @@
 
 // ===== IMPORTS =====
 // ES module imports — load order is handled by the module system
-import { TWISTS_DATA, ARCHETYPES, PERSONALITIES, CHALLENGE_DATA, DRAMA_EVENTS,
-         CONFESSIONAL_TEMPLATES, CONFESSIONAL_IDOL_TEMPLATES,
-         INTERACTION_TEMPLATES_NEUTRAL, INTERACTION_TEMPLATES_IDOL,
-         INTERACTION_TEMPLATES_ADVANTAGE, HOST, HOST_LINES, ACTION_BANK,
-         DIALOGUE_BANK, VOTE_REASONS,
-         buildConfessionalText, buildInteractionText, buildDramaText } from './data.js';
-
-import { generatePortrait, updateContestantPortrait,
-         triggerImageUpload, handleImageUpload, applyCustomImage,
-         clearImage, showBulkUpload } from './portraits.js';
+import { generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage,
+         clearImage, showBulkUpload, showCastStatus } from './portraits.js';
 
 import { G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
          getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore,
-         openV19Modal, goHome, goSetup, showGameScreen,
+         goHome, goSetup, showGameScreen,
          initTeams, renderCastList, addContestant, removeContestant,
          updateContestant, makeContestant, generateRandomCast,
          updateCastNavCount, renderTwistsGrid, updateTeamsPanel,
          autoAssignTeams, setupNav, startSeason, applyColor,
-         pickColor, makeTeam, makeName, resetNamePool,
-         buildAlliances, getTeamMembers, toggleReturneeSettings } from './state.js';
+         pickColor, makeName, resetNamePool,
+         buildAlliances, updateGameSidebar, gsPlayerChip, toggleReturneeSettings } from './state.js';
 
 import { getActive, rollChallenge, targetScore, getVoterAllies,
          pickVoteReason, runVote, resolveTie, resolveChallengerTie,
          idolFindChance, maybeGiveIdol, checkIdolPlay, getTwist,
          applyTwist, pickInteraction, computeAndStartEpisode,
-         runChallengeWithChoice, capturePlacementSnapshot,
-         selectChallenge, confirmChallenge, nextEpisode } from './engine.js';
+         runChallengeWithChoice, capturePlacementSnapshot } from './engine.js';
 
 import { buildBadge, buildPlayerChip, buildEventCard, buildNotice,
          renderStage, buildEpisodeHeader, buildStageCampLife,
          buildStageChallenge, buildChallengeChooser, buildStageTribal,
          buildStageElimination, buildStageNav, initVoteReveal,
          flipVote, revealAllVotes, updateRunningTally, revealElimination,
-         updateGameSidebar, gsPlayerChip, showPlayerDetail,
-         showCastStatus, showJuryPanel, showSeasonStats,
+         selectChallenge, confirmChallenge, nextEpisode, showPlayerDetail,
+         showJuryPanel, showSeasonStats,
          addDramaEvent, hostPlantIdol, hostGrantImmunity,
          applyHostImmunity, answerTribalQuestion } from './ui.js';
 

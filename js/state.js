@@ -467,5 +467,5 @@ function isPlayMode(){
 }
 
 // ===== EXPORTS =====
-export { updateGameSidebar, G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
+export { updateGameSidebar, gsPlayerChip, G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
          getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore, goHome, goSetup, showGameScreen, initTeams, renderCastList, addContestant, removeContestant, updateContestant, makeContestant, generateRandomCast, updateCastNavCount, renderTwistsGrid, updateTeamsPanel, autoAssignTeams, setupNav, startSeason, applyColor, pickColor, makeName, resetNamePool, buildAlliances, toggleReturneeSettings };

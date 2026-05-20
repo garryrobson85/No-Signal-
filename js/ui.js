@@ -945,7 +945,7 @@ function renderFinaleNoJury(winner,finalists){
 
 
 // ===== EXPORTS =====
-export { buildBadge, buildPlayerChip, buildEventCard, buildNotice, renderStage, buildEpisodeHeader, buildStageCampLife, buildStageChallenge, buildChallengeChooser, buildStageTribal, buildStageElimination, buildStageNav, initVoteReveal, flipVote, revealAllVotes, updateRunningTally, revealElimination, showPlayerDetail, showJuryPanel, showSeasonStats, addDramaEvent, hostPlantIdol, hostGrantImmunity, applyHostImmunity, answerTribalQuestion };
+export { buildBadge, buildPlayerChip, buildEventCard, buildNotice, renderStage, buildEpisodeHeader, buildStageCampLife, buildStageChallenge, buildChallengeChooser, buildStageTribal, buildStageElimination, buildStageNav, initVoteReveal, flipVote, revealAllVotes, updateRunningTally, revealElimination, selectChallenge, confirmChallenge, nextEpisode, showPlayerDetail, showJuryPanel, showSeasonStats, addDramaEvent, hostPlantIdol, hostGrantImmunity, applyHostImmunity, answerTribalQuestion };
 
 
 window.toggleDarkMode=function(){
