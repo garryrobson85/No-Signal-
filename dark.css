@@ -1,0 +1,53 @@
+/* No Signal — base.css */
+
+:root {
+  --fire: #E8450A;
+  --fire2: #F97316;
+  --ember: #FED7AA;
+  --torch: #7C2D12;
+  --night: #0C0F0A;
+  --bark: #1C1917;
+  --wood: #292524;
+  --moss: #2D4A1E;
+  --leaf: #4ADE80;
+  --sand: #D6C89A;
+  --sand2: #EDE8D8;
+  --water: #0EA5E9;
+  --mist: #E0F2FE;
+  --jury: #A855F7;
+  --jury-light: #F3E8FF;
+  --elim: #EF4444;
+  --elim-light: #FEE2E2;
+  --win: #EAB308;
+  --win-light: #FEF9C3;
+  --text: #1C1917;
+  --text2: #57534E;
+  --text3: #A8A29E;
+  --surface: #FAFAF9;
+  --surface2: #F5F5F4;
+  --surface3: #E7E5E4;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--surface2);
+  color: var(--text);
+  min-height: 100vh;
+}
+h1,h2,h3 { font-family: 'DM Sans', sans-serif; font-weight: 600; }
+.display { font-family: 'Bebas Neue', cursive; letter-spacing: 0.03em; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+
+/* APP SHELL */
+#app { display: flex; min-height: 100vh; flex-direction: column; }

@@ -1,0 +1,80 @@
+/* No Signal — layout.css */
+
+/* HEADER */
+.app-header {
+  background: var(--bark);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--fire);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-flame { font-size: 22px; }
+.logo-text { font-family: 'Bebas Neue', cursive; font-size: 26px; color: var(--fire2); letter-spacing: 0.06em; }
+.logo-sub { font-size: 11px; color: var(--sand); opacity: 0.6; letter-spacing: 0.08em; text-transform: uppercase; margin-top: -4px; }
+.header-ep-badge {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; padding: 6px 14px; color: #fff; font-size: 13px;
+}
+
+/* SCREENS */
+.screen { display: none; flex: 1; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ===================== HOME SCREEN ===================== */
+#screen-home {
+  align-items: center; justify-content: center;
+  background: var(--bark);
+  min-height: calc(100vh - 57px);
+  padding: 40px 20px;
+}
+.home-hero {
+  text-align: center; max-width: 520px; width: 100%;
+}
+.home-fire-wrap {
+  font-size: 72px; line-height: 1; margin-bottom: 16px;
+  animation: flicker 2s ease-in-out infinite alternate;
+}
+@keyframes flicker {
+  0% { transform: scale(1) rotate(-1deg); filter: brightness(1); }
+  100% { transform: scale(1.04) rotate(1deg); filter: brightness(1.15); }
+}
+.home-title { font-family: 'Bebas Neue', cursive; font-size: 72px; color: var(--fire2); letter-spacing: 0.06em; line-height: 1; }
+.home-sub { font-size: 14px; color: var(--sand); opacity: 0.7; margin-top: 8px; letter-spacing: 0.05em; text-transform: uppercase; }
+.home-btns { display: flex; gap: 12px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+
+/* ===================== SETUP SCREEN ===================== */
+#screen-setup {
+  flex-direction: row;
+  min-height: calc(100vh - 57px);
+}
+.setup-sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--bark);
+  padding: 20px 0;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.setup-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 20px; font-size: 14px; color: rgba(255,255,255,0.55);
+  cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent;
+  user-select: none;
+}
+.setup-nav-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.04); }
+.setup-nav-item.active { color: var(--fire2); border-left-color: var(--fire2); background: rgba(232,69,10,0.08); }
+.setup-nav-item .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+.setup-nav-item .nav-label { font-size: 14px; font-weight: 500; }
+.setup-nav-item .nav-count {
+  margin-left: auto; background: var(--fire); color: #fff;
+  font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 8px;
+  display: none;
+}
+.setup-nav-item .nav-count.show { display: block; }
+.setup-content { flex: 1; overflow-y: auto; padding: 28px 32px; max-width: 820px; }
+.setup-panel { display: none; }
+.setup-panel.active { display: block; }
+.setup-panel-title { font-family: 'Bebas Neue', cursive; font-size: 32px; color: var(--fire); margin-bottom: 4px; letter-spacing: 0.04em; }
+.setup-panel-sub { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
