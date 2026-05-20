@@ -33,3 +33,139 @@ body.light-mode input, body.light-mode select, body.light-mode textarea{backgrou
   .config-grid,.form-grid,.settings-grid{display:grid!important;grid-template-columns:1fr!important;gap:16px!important;}
   input,select,textarea,.input,.select{min-height:52px!important;font-size:16px!important;width:100%!important;box-sizing:border-box!important;}
 }
+
+
+/* ===== v19.5 THEME + MODAL READABILITY FIX ===== */
+:root {
+  --ns-bg-light: #f6f3ee;
+  --ns-panel-light: #ffffff;
+  --ns-text-light: #171717;
+  --ns-muted-light: #5f5a55;
+  --ns-border-light: rgba(23,23,23,.12);
+}
+
+html.light, body.light-mode {
+  --text: var(--ns-text-light);
+  --text2: var(--ns-muted-light);
+  --text3: #7a746e;
+  --surface: var(--ns-panel-light);
+  --surface2: var(--ns-bg-light);
+  --surface3: #eee8df;
+  --border: var(--ns-border-light);
+  --border2: rgba(23,23,23,.18);
+  background: var(--ns-bg-light) !important;
+  color: var(--ns-text-light) !important;
+}
+
+html.light body, body.light-mode {
+  background: var(--ns-bg-light) !important;
+  color: var(--ns-text-light) !important;
+}
+
+html.light .setup-content,
+html.light .game-main,
+body.light-mode .setup-content,
+body.light-mode .game-main {
+  background: var(--ns-bg-light) !important;
+  color: var(--ns-text-light) !important;
+}
+
+html.light .modal,
+body.light-mode .modal {
+  background: #fffaf4 !important;
+  color: #171717 !important;
+  border: 1px solid rgba(0,0,0,.14) !important;
+  box-shadow: 0 24px 80px rgba(0,0,0,.28) !important;
+}
+
+html.light .modal-title,
+body.light-mode .modal-title,
+html.light .modal strong,
+body.light-mode .modal strong {
+  color: #171717 !important;
+}
+
+html.light .modal p,
+html.light .modal div,
+html.light .modal li,
+body.light-mode .modal p,
+body.light-mode .modal div,
+body.light-mode .modal li {
+  color: #4f4944;
+}
+
+html.light #modal-gemini-help .modal,
+body.light-mode #modal-gemini-help .modal {
+  background: #fffaf4 !important;
+}
+
+html.light #modal-gemini-help .modal > div,
+body.light-mode #modal-gemini-help .modal > div {
+  color: #3c3630 !important;
+}
+
+html.light #modal-gemini-help [style*="background:var(--surface2)"],
+body.light-mode #modal-gemini-help [style*="background:var(--surface2)"] {
+  background: #f1e8dc !important;
+  color: #3c3630 !important;
+  border: 1px solid rgba(0,0,0,.08) !important;
+}
+
+html.light #modal-gemini-help [style*="color:var(--text2)"],
+body.light-mode #modal-gemini-help [style*="color:var(--text2)"] {
+  color: #4f4944 !important;
+}
+
+html.light #modal-gemini-help code,
+body.light-mode #modal-gemini-help code {
+  background: #e8ded2 !important;
+  color: #171717 !important;
+}
+
+html.light .form-input,
+html.light .form-select,
+html.light .form-textarea,
+body.light-mode .form-input,
+body.light-mode .form-select,
+body.light-mode .form-textarea {
+  background: #fff !important;
+  color: #171717 !important;
+  border-color: rgba(0,0,0,.16) !important;
+}
+
+html.light .btn-outline,
+body.light-mode .btn-outline {
+  color: #171717 !important;
+  border-color: rgba(0,0,0,.18) !important;
+  background: rgba(255,255,255,.72) !important;
+}
+
+.dark-toggle-btn {
+  min-width: 44px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.22) !important;
+}
+html.light .dark-toggle-btn,
+body.light-mode .dark-toggle-btn {
+  background: #fff !important;
+  color: #171717 !important;
+  border: 1px solid rgba(0,0,0,.18) !important;
+}
+
+@media (min-width: 900px) {
+  .setup-content-inner, .setup-panel, .config-panel, .screen-inner {
+    max-width: 1180px !important;
+    width: 100% !important;
+  }
+  .setup-content { padding: 36px 56px !important; }
+  .form-row, .settings-grid, .setup-grid, .config-grid {
+    grid-template-columns: repeat(2, minmax(260px, 1fr)) !important;
+    gap: 22px !important;
+  }
+  .form-input, .form-select { min-width: 220px; }
+}

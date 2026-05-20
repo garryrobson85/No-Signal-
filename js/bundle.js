@@ -5841,3 +5841,41 @@ document.addEventListener('keydown',e=>{
     if(btn) btn.textContent = document.body.classList.contains('light-mode') ? '☀️' : '🌙';
   });
 })();
+
+
+// ===== v19.5 ROBUST THEME PATCH =====
+(function(){
+  function applyTheme(mode){
+    const isLight = mode === 'light';
+    document.documentElement.classList.toggle('light', isLight);
+    document.documentElement.classList.toggle('dark', !isLight);
+    document.body.classList.toggle('light-mode', isLight);
+    try { localStorage.setItem('ns-theme', mode); localStorage.setItem('nosignal_darkmode', isLight ? '0' : '1'); } catch(e) {}
+    const btn = document.getElementById('dark-toggle-btn');
+    if(btn){
+      btn.textContent = isLight ? '🌙' : '☀️';
+      btn.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+      btn.setAttribute('aria-label', btn.title);
+    }
+  }
+  window.toggleDarkMode = function(){
+    const isLight = document.documentElement.classList.contains('light') || document.body.classList.contains('light-mode');
+    applyTheme(isLight ? 'dark' : 'light');
+  };
+  document.addEventListener('DOMContentLoaded', function(){
+    let saved = null;
+    try { saved = localStorage.getItem('ns-theme'); } catch(e) {}
+    if(!saved){
+      try { saved = localStorage.getItem('nosignal_darkmode') === '0' ? 'light' : 'dark'; } catch(e) {}
+    }
+    applyTheme(saved === 'light' ? 'light' : 'dark');
+    const btn = document.getElementById('dark-toggle-btn');
+    if(btn){
+      btn.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); window.toggleDarkMode(); };
+    }
+  });
+  document.addEventListener('click', function(ev){
+    const btn = ev.target.closest && ev.target.closest('#dark-toggle-btn,[data-action="toggleDarkMode"]');
+    if(btn){ ev.preventDefault(); ev.stopPropagation(); window.toggleDarkMode(); }
+  }, true);
+})();
