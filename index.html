@@ -1,270 +1,477 @@
-// No Signal — evolution.js
-// Dynamic archetype evolution system
-// Archetypes shift mid-season based on actual gameplay events.
-// Triggered at the start of each episode after ep 3.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>No Signal v19</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
 
-// ===== EVOLUTION RULES =====
-// Each rule: { from, to, condition(c, memories), minEpisode, message }
-// condition receives the contestant object and their memory array
-// Returns true if the evolution should trigger
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/game.css">
+  <link rel="stylesheet" href="css/dark.css">
+</head>
+<body>
+<div id="app">
+  <div class="app-header">
+    <div class="logo">
+      <div class="logo-flame">🔥</div>
+      <div>
+        <div class="logo-text">NO SIGNAL</div>
+        <div class="logo-sub">Reality Competition Simulator</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="dark-toggle-btn" data-action="toggleDarkMode" id="dark-toggle-btn" title="Toggle dark/light mode">🌙</button>
+      <div id="header-ep-badge" style="display:none" class="header-ep-badge">
+        <span id="hdr-ep-txt"></span>
+      </div>
+    </div>
+  </div>
 
-const EVOLUTION_RULES = [
-  // Challenge wins → threat recognition
-  {
-    from: 'The Underdog',
-    to: 'The Challenge Beast',
-    condition: (c) => c.challengeWins >= 3,
-    minEpisode: 3,
-    message: '{name} has stopped being the underdog — three challenge wins demands a new label.',
-  },
-  {
-    from: 'The Underdog',
-    to: 'The Fan Favorite',
-    condition: (c, mems) => {
-      const saves = mems.filter(m => m.type === 'saved' && m.object !== c.id).length;
-      return c.social >= 7 && saves >= 1;
-    },
-    minEpisode: 4,
-    message: '{name} has survived against the odds so many times the whole cast has started quietly rooting for them.',
-  },
-  {
-    from: 'The Floater',
-    to: 'The Puppet Master',
-    condition: (c, mems) => {
-      const betrayals = mems.filter(m => m.type === 'betrayal' && m.subject === c.id).length;
-      return betrayals >= 2 && c.mental >= 7;
-    },
-    minEpisode: 4,
-    message: '{name} has been labelled a Floater — but two alliances broken strategically tells a different story.',
-  },
-  {
-    from: 'The Floater',
-    to: 'The Goat',
-    condition: (c) => c.challengeWins === 0 && G.episode >= 7,
-    minEpisode: 7,
-    message: '{name} has drifted through this game without leaving a mark. People are keeping them around for a reason.',
-  },
-  {
-    from: 'The Strategist',
-    to: 'The Big Villain',
-    condition: (c, mems) => {
-      const betrayals = mems.filter(m => m.type === 'betrayal' && m.subject !== c.id && m.object === c.id).length;
-      // They've been caught betraying people
-      const caughtBetrayals = mems.filter(m => m.type === 'betrayal' && m.object === c.id).length;
-      return caughtBetrayals >= 2;
-    },
-    minEpisode: 4,
-    message: '{name} started as a strategist — but the number of burned allies tells a different story.',
-  },
-  {
-    from: 'The Social Butterfly',
-    to: 'The Puppet Master',
-    condition: (c, mems) => {
-      const alliancesFormed = mems.filter(m => m.type === 'alliance_formed' && m.subject === c.id).length;
-      return alliancesFormed >= 3 && c.social >= 8;
-    },
-    minEpisode: 5,
-    message: '{name} isn\'t just social — they\'re running three separate alliances simultaneously.',
-  },
-  {
-    from: 'The Challenge Beast',
-    to: 'The Jury Threat',
-    condition: (c) => c.challengeWins >= 4 && G.merged,
-    minEpisode: 6,
-    message: '{name}\'s challenge record post-merge has made them the most obvious jury threat in the game.',
-  },
-  {
-    from: 'The Sweetheart',
-    to: 'The Jury Threat',
-    condition: (c, mems) => {
-      const saves = mems.filter(m => m.type === 'saved' && m.object === c.id).length;
-      return c.social >= 8 && saves >= 2 && G.merged;
-    },
-    minEpisode: 6,
-    message: '{name} has been saved by other players twice. That kind of goodwill wins jury votes.',
-  },
-  {
-    from: 'The Quiet Threat',
-    to: 'The Strategist',
-    condition: (c) => G.merged && c.mental >= 8 && c.challengeWins >= 1,
-    minEpisode: 5,
-    message: '{name} can\'t stay quiet forever. Post-merge they\'ve stepped into the light.',
-  },
-  {
-    from: 'The Loose Cannon',
-    to: 'The Flipper',
-    condition: (c, mems) => {
-      const broken = mems.filter(m => m.type === 'alliance_broken' && m.subject === c.id).length;
-      return broken >= 2;
-    },
-    minEpisode: 3,
-    message: '{name}\'s chaos has a pattern now. They don\'t blow things up randomly — they flip deliberately.',
-  },
-  {
-    from: 'The Number',
-    to: 'The Underdog',
-    condition: (c, mems) => {
-      const votesAgainst = mems.filter(m => m.type === 'voted_for' && m.object === c.id).length;
-      return votesAgainst >= 3 && !c.eliminated;
-    },
-    minEpisode: 4,
-    message: '{name} has had their name written down three times and is still here. That\'s not a Number anymore.',
-  },
-];
+  <!-- ===================== HOME ===================== -->
+  <div id="screen-home" class="screen active">
+    <div class="home-hero">
+      <div class="home-fire-wrap">🏕️</div>
+      <div class="home-title">NO<br>SIGNAL</div>
+      <div class="home-sub">Cast. Compete. Survive. <span style="opacity:.55">v19</span></div>
+      <div class="home-btns">
+        <button class="btn btn-fire" data-action="goSetup">🔥 New Season</button>
+        <button class="btn btn-ghost" data-action="loadQuickDemo">⚡ Quick Demo</button>
+      </div>
+      <div id="continue-btn-wrap" style="margin-top:16px;display:none;flex-direction:column;gap:8px;align-items:center">
+        <button class="btn btn-fire btn-sm" data-action="loadGame">▶ Resume Saved Season</button>
+        <div class="flex gap-8" style="flex-wrap:wrap;justify-content:center">
+          <button class="btn btn-ghost btn-sm" data-action="exportSaveFile" style="font-size:11px">⬇ Export save</button>
+          <button class="btn btn-ghost btn-sm" data-action="openImportSave" style="font-size:11px">⬆ Import save</button>
+          <button class="btn btn-ghost btn-sm" data-action="deleteSave" style="font-size:11px;opacity:0.6">🗑 Delete save</button>
+        </div>
+        <input id="save-import-input" type="file" accept="application/json,.json" style="display:none" onchange="importSaveFile(event)">
+      </div>
+    </div>
+  </div>
 
-// ===== EVOLUTION ENGINE =====
+  <!-- ===================== SETUP ===================== -->
+  <div id="screen-setup" class="screen">
+    <div class="setup-sidebar">
+      <div style="padding:20px 20px 14px">
+        <div style="font-size:12px;color:rgba(255,255,255,0.3);letter-spacing:0.08em;text-transform:uppercase;font-weight:600">Season Setup</div>
+      </div>
+      <div class="setup-nav-item active" data-action="setupNav" data-panel="general" data-panel="general">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">General</span>
+      </div>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="cast" data-panel="cast">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Cast</span>
+        <span class="nav-count" id="cast-nav-count">0</span>
+      </div>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="teams" data-panel="teams">
+        <span class="nav-icon">🏳️</span>
+        <span class="nav-label">Teams</span>
+      </div>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="twists" data-panel="twists">
+        <span class="nav-icon">🌀</span>
+        <span class="nav-label">Twists</span>
+      </div>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="rules" data-panel="rules">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Rules</span>
+      </div>
+      <div style="padding: 20px 16px; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.06);">
+        <button class="btn btn-fire" style="width:100%;justify-content:center" data-action="startSeason">🔥 Start Season</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:8px" data-action="goHome">← Back</button>
+      </div>
+    </div>
+    <div class="setup-content">
+      <!-- GENERAL PANEL -->
+      <div id="panel-general" class="setup-panel active">
+        <div class="setup-panel-title">General Settings</div>
+        <div class="setup-panel-sub">Configure your season name, theme, and core rules.</div>
+        <div class="form-group">
+          <label class="form-label">Season Name</label>
+          <input type="text" class="form-input" id="s-name" value="No Signal: Season 1">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Location / Theme</label>
+            <input type="text" class="form-input" id="s-theme" value="Tropical Volcanic Island">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Season Flavor</label>
+            <select class="form-select" id="s-flavor">
+              <option value="camp">Classic Camp</option>
+              <option value="drama">High Drama</option>
+              <option value="strategic">Strategic Battle</option>
+              <option value="fun">Fun & Chaotic</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Season Seed <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">optional, makes seasons replayable</span></label>
+          <input type="text" class="form-input" id="s-seed" placeholder="e.g. camp-chaos-001">
+        </div>
+        <div class="divider"></div>
+        <div class="form-group">
+          <label class="form-label" style="display:flex;align-items:center;gap:8px">
+            ✨ AI Dialogue — Gemini API Key
+            <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">optional · free</span>
+            <button data-action="showGeminiHelp" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;display:flex;align-items:center;justify-content:center" title="How to get a free API key">?</button>
+          </label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="password" class="form-input" id="s-gemini-key" placeholder="Paste your Gemini API key here (AIza…)" autocomplete="off" oninput="saveGeminiKey(this.value)" style="flex:1">
+            <button class="btn btn-outline btn-sm" data-action="testGeminiKey" title="Test your API key" style="flex-shrink:0;white-space:nowrap">Test Key</button>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5">When set, episode scripts use Gemini Flash to write unique dialogue — confessionals, exit speeches, interactions — based on what actually happened that episode. Key is stored on your device only, never shared.</div>
+        </div>
+            <input type="number" class="form-input" id="s-merge" value="6" min="2" max="20">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Finale: Final How Many?</label>
+            <select class="form-select" id="s-finale-size">
+              <option value="2">Final 2</option>
+              <option value="3" selected>Final 3</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Voting System</label>
+            <select class="form-select" id="s-vote-system">
+              <option value="plurality">Plurality (most votes)</option>
+              <option value="majority">Majority (needs 50%+)</option>
+              <option value="random">Chaos (partially random)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tie-Breaker Rule</label>
+            <select class="form-select" id="s-tiebreak">
+              <option value="revote">Revote</option>
+              <option value="rocks">Purple Rocks</option>
+              <option value="fire">Fire-Making Challenge</option>
+            </select>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;margin-bottom:12px">Season Features</div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Alliance System</div><div class="toggle-desc">Contestants form alliances based on compatible personalities</div></div>
+            <div class="toggle-switch on" id="t-alliances" data-action="toggleSetting"></div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Confessionals</div><div class="toggle-desc">Random diary-room moments each episode</div></div>
+            <div class="toggle-switch on" id="t-confessionals" data-action="toggleSetting"></div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Drama Meter</div><div class="toggle-desc">Rising camp tension affects tribal unpredictability</div></div>
+            <div class="toggle-switch on" id="t-drama" data-action="toggleSetting"></div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Hidden Immunity Idols</div><div class="toggle-desc">Searchable advantages that can nullify votes</div></div>
+            <div class="toggle-switch on" id="t-idols" data-action="toggleSetting"></div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Jury System</div><div class="toggle-desc">Post-merge eliminated players vote for the winner</div></div>
+            <div class="toggle-switch on" id="t-jury" data-action="toggleSetting"></div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Contestant Interactions</div><div class="toggle-desc">Relationships, alliances, and conflicts between cast members</div></div>
+            <div class="toggle-switch on" id="t-interactions" data-action="toggleSetting"></div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Challenge Win Streak Tracker</div><div class="toggle-desc">Dominant players become bigger targets</div></div>
+            <div class="toggle-switch on" id="t-streaks" data-action="toggleSetting"></div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-title">Episode Recap Log</div><div class="toggle-desc">Full narrative summary of every episode</div></div>
+            <div class="toggle-switch on" id="t-log" data-action="toggleSetting"></div>
+          </div>
+        </div>
+      </div>
 
-/**
- * checkArchetypeEvolution()
- * Called at the start of each episode (ep >= 3).
- * Checks all active players against evolution rules.
- * Returns array of evolution events that occurred.
- * Mutates contestant.archetype if rule triggers.
- */
-function checkArchetypeEvolution() {
-  if(!G.memories) return [];
-  const events = [];
-  const active = getActive();
+      <!-- CAST PANEL -->
+      <div id="panel-cast" class="setup-panel">
+        <div class="setup-panel-title">Cast Builder</div>
+        <div class="setup-panel-sub">Add, customize, and fine-tune every contestant's personality, strengths, and weaknesses.</div>
+        <div class="section-hd">
+          <div>
+            <h3>Contestants <span style="color:var(--text2);font-weight:400;font-size:15px" id="cast-count-display">(0)</span></h3>
+          </div>
+          <div class="flex gap-8">
+            <button class="btn btn-outline btn-sm" data-action="generateCast12">⚡ Generate 12</button>
+            <button class="btn btn-outline btn-sm" data-action="generateCast16">⚡ Generate 16</button>
+            <button class="btn btn-outline btn-sm" data-action="showBulkUpload">📷 Photos</button>
+            <button class="btn btn-fire btn-sm" data-action="addContestant">+ Add</button>
+          </div>
+        </div>
+        <div id="cast-list-container" class="cast-grid"></div>
+      </div>
 
-  active.forEach(c => {
-    const memories = G.memories.filter(m => m.subject === c.id || m.object === c.id);
-    for(const rule of EVOLUTION_RULES) {
-      if(c.archetype !== rule.from) continue;
-      if(G.episode < rule.minEpisode) continue;
-      if(!rule.condition(c, memories)) continue;
-      // Evolution triggers — don't evolve same player twice in same episode
-      if(events.find(e => e.playerId === c.id)) continue;
+      <!-- TEAMS PANEL -->
+      <div id="panel-teams" class="setup-panel">
+        <div class="setup-panel-title">Team Configuration</div>
+        <div class="setup-panel-sub">Set up your tribes, customize their names and colors, and assign contestants.</div>
+        <div class="form-row" style="margin-bottom:20px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Number of Teams</label>
+            <select class="form-select" id="s-num-teams" onchange="initTeams()">
+              <option value="2" selected>2 Teams</option>
+              <option value="3">3 Teams</option>
+              <option value="4">4 Teams</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;display:flex;align-items:flex-end">
+            <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" data-action="autoAssignTeams">🔀 Auto-assign All</button>
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          <div class="form-label" style="margin-bottom:8px">Unassigned Players</div>
+          <div id="unassigned-pool" class="unassigned-pool">
+            <div class="empty-state" style="padding:10px;font-size:12px">All players assigned</div>
+          </div>
+        </div>
+        <div id="team-config-container"></div>
+      </div>
 
-      const oldArchetype = c.archetype;
-      c.archetype = rule.to;
-      // Store evolution history on the contestant
-      if(!c.archetypeHistory) c.archetypeHistory = [];
-      c.archetypeHistory.push({ from: oldArchetype, to: rule.to, episode: G.episode });
+      <!-- TWISTS PANEL -->
+      <div id="panel-twists" class="setup-panel">
+        <div class="setup-panel-title">Twists & Advantages</div>
+        <div class="setup-panel-sub">Choose which twists can appear during the season. They trigger randomly and infrequently.</div>
+        <div class="form-group">
+          <label class="form-label">Twist Frequency — <span id="twist-freq-val">15</span>% per episode</label>
+          <div class="range-wrap">
+            <span style="font-size:12px;color:var(--text2)">Rare</span>
+            <input type="range" min="5" max="45" value="15" id="s-twist-freq" oninput="document.getElementById('twist-freq-val').textContent=this.value">
+            <span style="font-size:12px;color:var(--text2)">Frequent</span>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="section-hd"><h3>Available Twists</h3></div>
+        <div class="twist-grid" id="twist-grid-container"></div>
+      </div>
 
-      const msg = rule.message.replace('{name}', c.name.split(' ')[0]);
-      events.push({ player: c, from: oldArchetype, to: rule.to, message: msg });
+      <!-- RULES PANEL -->
+      <div id="panel-rules" class="setup-panel">
+        <div class="setup-panel-title">Advanced Rules</div>
+        <div class="setup-panel-sub">Fine-tune the simulation parameters and narrative style.</div>
+        <div class="form-group">
+          <label class="form-label">Challenge Randomness</label>
+          <div class="range-wrap">
+            <span style="font-size:12px;color:var(--text2)">Stats-based</span>
+            <input type="range" min="0" max="100" value="30" id="s-randomness" oninput="document.getElementById('rand-val').textContent=this.value+'%'">
+            <span style="font-size:12px;color:var(--text2)">Pure random</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">Current: <strong id="rand-val">30%</strong> random variance</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alliance Strength</label>
+          <div class="range-wrap">
+            <span style="font-size:12px;color:var(--text2)">Weak</span>
+            <input type="range" min="10" max="90" value="60" id="s-alliance-str" oninput="document.getElementById('alstr-val').textContent=this.value+'%'">
+            <span style="font-size:12px;color:var(--text2)">Strong</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">Current: <strong id="alstr-val">60%</strong> alliance loyalty</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Idol Find Difficulty</label>
+          <select class="form-select" id="s-idol-diff">
+            <option value="easy">Easy (20% per episode)</option>
+            <option value="medium" selected>Medium (12% per episode)</option>
+            <option value="hard">Hard (6% per episode)</option>
+            <option value="rare">Very Rare (3% per episode)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Drama Escalation Rate</label>
+          <select class="form-select" id="s-drama-rate">
+            <option value="slow">Slow Burn</option>
+            <option value="medium" selected>Moderate</option>
+            <option value="fast">Fast Escalation</option>
+          </select>
+        </div>
+        <div class="divider"></div>
+        <div class="form-group">
+          <label class="form-label">Narrative Tone</label>
+          <select class="form-select" id="s-tone">
+            <option value="dramatic">Dramatic (Survivor-style)</option>
+            <option value="fun">Fun & Campy (Total Drama-style)</option>
+            <option value="competitive">Competitive Focus</option>
+          </select>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><div class="toggle-title">Show Challenge Scores</div><div class="toggle-desc">Display numerical scores during challenge results</div></div>
+          <div class="toggle-switch on" id="t-scores" data-action="toggleSetting"></div>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><div class="toggle-title">Show Individual Votes</div><div class="toggle-desc">Reveal who voted for whom at tribal council</div></div>
+          <div class="toggle-switch" id="t-show-votes" data-action="toggleSetting"></div>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><div class="toggle-title">Returnee Eligibility</div><div class="toggle-desc">Eliminated players return on a dedicated episode with no elimination</div></div>
+          <div class="toggle-switch on" id="t-returnees" data-action="toggleReturneeSettings"></div>
+        </div>
+        <div id="returnee-config" style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:8px">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Rejoin Episode</label>
+              <input type="number" class="form-input" id="s-rejoin-ep" value="4" min="2" max="20">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Players Returning</label>
+              <select class="form-select" id="s-rejoin-count">
+                <option value="1" selected>1 player</option>
+                <option value="2">2 players</option>
+                <option value="3">3 players</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:8px">💡 That episode has no vote — it focuses entirely on the dramatic return.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      // Record as a memory event — others notice the change
-      recordMemory('rivalry', c.id, null, G.episode, 30); // self-awareness spike
-      break; // only one evolution per player per episode
-    }
-  });
+  <!-- ===================== GAME ===================== -->
+  <div id="screen-game" class="screen">
+    <div class="game-sidebar">
+      <div class="gs-section">
+        <div class="gs-section-title">Episode</div>
+        <div class="gs-ep-display" id="gs-ep-num">1</div>
+        <div class="gs-ep-label" id="gs-ep-label">Pre-Merge</div>
+        <div id="gs-phase-badge" class="gs-status-badge gs-status-pre">Pre-Merge</div>
+      </div>
+      <div class="season-progress">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.08em">Progress</div>
+          <div style="font-size:10px;font-family:'DM Mono',monospace;color:rgba(255,255,255,0.4)" id="gs-progress-txt">0/0</div>
+        </div>
+        <div class="sp-track"><div class="sp-fill" id="gs-progress-bar" style="width:0%"></div></div>
+      </div>
+      <div class="drama-meter" id="drama-meter-wrap" style="display:none">
+        <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Drama Level</div>
+        <div class="drama-bars" id="drama-bars"></div>
+      </div>
+      <div class="gs-section" style="flex:1;overflow-y:auto">
+        <div class="gs-section-title">Active Players</div>
+        <div id="gs-player-list" class="gs-player-list"></div>
+      </div>
+    </div>
+    <div class="game-main">
+      <div class="ep-view" id="ep-view-container">
+        <!-- filled by JS -->
+      </div>
+      <div class="ep-nav-bar" id="ep-nav-bar">
+        <div style="font-size:13px;color:var(--text2)" id="ep-nav-status"></div>
+        <div class="flex gap-8">
+          <button class="btn btn-outline btn-sm" data-action="showCastStatus" id="btn-cast-status" aria-label="View cast status">👥 Cast</button>
+          <button class="btn btn-outline btn-sm" data-action="showSeasonStats" aria-label="View season stats">📊 Stats</button>
+          <button class="btn btn-outline btn-sm" data-action="showTribeHistory" aria-label="View tribe history">🗓️ History</button>
+          <button class="btn btn-outline btn-sm" data-action="showPlayerProfiles" aria-label="View player profiles">👤 Profiles</button>
+          <button class="btn btn-outline btn-sm" data-action="showV19Insights" aria-label="View game insights">🧠 Insights</button>
+          <button class="btn btn-outline btn-sm" data-action="showRelationshipWeb" aria-label="View relationship web">🕸️ Web</button>
+          <button class="btn btn-outline btn-sm" data-action="showEpisodeScripts" aria-label="View episode scripts">📜 Scripts</button>
+          <button class="btn btn-outline btn-sm" data-action="showSeasonRecap" aria-label="Season recap">📺 Recap</button>
+          <button class="btn btn-outline btn-sm" data-action="showSeasonStory" aria-label="Season story">📖 Story</button>
+          <button class="btn btn-outline btn-sm" data-action="saveGame" aria-label="Save game" title="Save (S)">💾</button>
+          <button class="btn btn-outline btn-sm" data-action="exportSaveFile" aria-label="Export save" title="Export save">⬇</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  return events;
-}
+  <!-- ===================== FINALE ===================== -->
+  <div id="screen-finale" class="screen">
+    <div class="game-main" style="overflow-y:auto">
+      <div id="finale-container" class="finale-screen"></div>
+    </div>
+  </div>
+</div>
 
-/**
- * buildEvolutionDisplay(events)
- * Returns HTML for the camp life stage showing evolution events.
- */
-function buildEvolutionDisplay(events) {
-  if(!events || !events.length) return '';
-  return events.map(ev => {
-    const port = ev.player.customImage
-      ? `<img src="${ev.player.customImage}" style="width:36px;height:44px;object-fit:cover;object-position:top;border-radius:6px">`
-      : getPortrait(ev.player).replace('width="120" height="145"','width="36" height="44"');
-    return `<div class="evolution-card">
-      <div class="evolution-port">${port}<\/div>
-      <div class="evolution-body">
-        <div class="evolution-label">
-          <span class="evolution-old">${ev.from}<\/span>
-          <span class="evolution-arrow">→<\/span>
-          <span class="evolution-new">${ev.to}<\/span>
-        <\/div>
-        <div class="evolution-msg">${ev.message}<\/div>
-      <\/div>
-    <\/div>`;
-  }).join('');
-}
+<!-- MODALS -->
+<div class="modal-backdrop" id="modal-cast-status">
+  <div class="modal" style="max-width:700px;width:100%">
+    <div class="modal-title">Cast Status</div>
+    <div id="modal-cast-content"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-cast-status">Close</button>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-player-detail">
+  <div class="modal">
+    <div id="modal-player-content"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-player-detail">Close</button>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-gemini-help">
+  <div class="modal" style="max-width:500px;width:100%">
+    <div class="modal-title">✨ How to get a free Gemini API key</div>
+    <div style="font-size:14px;line-height:1.8;color:var(--text)">
+      <div class="gemini-step"><span class="gemini-step-num">1</span><div><strong>Go to Google AI Studio</strong><br><a href="https://aistudio.google.com" target="_blank" style="color:var(--fire2);font-weight:600">aistudio.google.com</a> — sign in with any Google account</div></div>
+      <div class="gemini-step"><span class="gemini-step-num">2</span><div><strong>Create an API key</strong><br>Click <em>"Get API key"</em> in the left sidebar → <em>"Create API key"</em> → select any project</div></div>
+      <div class="gemini-step"><span class="gemini-step-num">3</span><div><strong>Copy your key</strong><br>It starts with <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px">AIza…</code> — tap the copy icon next to it</div></div>
+      <div class="gemini-step"><span class="gemini-step-num">4</span><div><strong>Paste it above</strong><br>In the API Key field in General Settings — it saves automatically</div></div>
+    </div>
 
+    <div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-top:14px;font-size:13px;color:var(--text2);line-height:1.6">
+      <strong style="color:var(--text)">Free tier — no card needed</strong><br>
+      A basic key works straight away with no billing details. You get enough quota for casual use — around 5–10 episode script generations per day. Perfect for trying it out.
+    </div>
 
+    <div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:13px;color:var(--text2);line-height:1.6">
+      <strong style="color:var(--text)">For heavier use — add billing with a low cap</strong><br>
+      If you want more generations or hit rate limits, add a payment method to your Google Cloud project and set a <strong style="color:var(--text)">spending cap of £2–£5</strong>. This unlocks much higher limits. In practice AI generation costs fractions of a penny per episode — you are extremely unlikely to ever be charged anything. The cap is just a safety net.
+    </div>
 
-// ===== EVOLUTION CEREMONY =====
-/**
- * buildEvolutionCeremony(events, ep)
- * Generates confessional text and camp reactions for archetype evolutions.
- * Called after checkArchetypeEvolution() when events exist.
- * Returns array of {player, confessional, campReaction} objects.
- */
-function buildEvolutionCeremony(events, ep){
-  return events.map(ev=>{
-    const fn=ev.player.name.split(' ')[0];
-    const confessional=_evoConfessional(ev);
-    const campReaction=_evoCampReaction(ev, ep);
-    // Store on ep so script generator can use them
-    return { player:ev.player, from:ev.from, to:ev.to,
-             confessional, campReaction, message:ev.message };
-  });
-}
+    <div style="background:rgba(232,69,10,0.08);border:1px solid rgba(232,69,10,0.2);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6">
+      🔒 <strong style="color:var(--text)">Your key stays on your device.</strong> It is stored in your browser only and sent directly to Google's API — never to any other server.
+    </div>
+    <div class="modal-btns" style="margin-top:16px">
+      <a href="https://aistudio.google.com" target="_blank" class="btn btn-fire" style="text-decoration:none">Open Google AI Studio →</a>
+      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-gemini-help">Close</button>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-script">
+  <div class="modal" style="max-width:720px;width:100%;max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-title" id="script-modal-title">Episode Script</div>
+    <div id="script-modal-content" style="overflow-y:auto;flex:1;margin:8px 0"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" data-action="copyScript">📋 Copy Script</button>
+      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-script">Close</button>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-color-pick">
+  <div class="modal" style="max-width:320px">
+    <div class="modal-title">Choose Color</div>
+    <div class="color-grid" id="color-grid-container"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-color-pick">Cancel</button>
+    </div>
+  </div>
+</div>
 
-function _evoConfessional(ev){
-  const fn=ev.player.name.split(' ')[0];
-  const lines={
-    // Underdog evolutions
-    'The Underdog→The Challenge Beast': `Three challenge wins. Three. I came out here labelled as someone who didn't belong. I don't think anyone's calling me an underdog anymore.`,
-    'The Underdog→The Fan Favorite': `I keep surviving when I shouldn't. I'm starting to wonder if that's not luck — if maybe I've been playing this game better than I thought.`,
-    // Floater evolutions
-    'The Floater→The Puppet Master': `People think I've been drifting. I haven't been drifting. I've been watching. There's a difference. A very important difference.`,
-    'The Floater→The Goat': `I'm still here. I genuinely don't know if that's a good thing or a bad thing.`,
-    // Strategist evolutions
-    'The Strategist→The Big Villain': `I've made some moves that weren't popular. That's the cost of playing to win. I can live with it.`,
-    // Social butterfly evolutions
-    'The Social Butterfly→The Puppet Master': `I have four separate conversations before breakfast every morning. And none of them know about the other three. That's not social — that's strategy.`,
-    // Challenge beast evolution
-    'The Challenge Beast→The Jury Threat': `I know what they're thinking. I'd be thinking the same thing. Four wins. I'm the biggest threat in this game. So now I have to be smarter than I am strong.`,
-    // Sweetheart evolution
-    'The Sweetheart→The Jury Threat': `People keep saving me. I used to think that was kindness. Now I think it's a strategy and I'm terrified they're right to do it.`,
-    // Quiet threat evolution
-    'The Quiet Threat→The Strategist': `Post-merge. No more hiding. Time to actually play.`,
-    // Loose cannon evolution
-    'The Loose Cannon→The Flipper': `I know what everyone says about me. That I'm unpredictable. That I can't be trusted. They're wrong. I'm completely predictable. I just have different priorities.`,
-  };
-  const key=`${ev.from}→${ev.to}`;
-  return lines[key]||`${fn}: ${ev.message}`;
-}
+<!-- NOTIFICATION -->
 
-function _evoCampReaction(ev, ep){
-  const fn=ev.player.name.split(' ')[0];
-  // Find another active player who might have noticed
-  const active=G.cast.filter(c=>!c.eliminated&&c.id!==ev.player.id);
-  if(!active.length) return null;
-  const observer=pick(active);
-  const on=observer.name.split(' ')[0];
+<div class="modal-backdrop" id="modal-v19">
+  <div class="modal v19-modal-wide">
+    <div class="modal-title" id="modal-v19-title">v19</div>
+    <div id="modal-v19-content"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-v19">Close</button>
+    </div>
+  </div>
+</div>
 
-  const negativeEvolutions=['The Big Villain','The Goat','The Jury Threat'];
-  const positiveEvolutions=['The Fan Favorite','The Challenge Beast','The Puppet Master'];
+<div id="notification" class="notification"></div>
 
-  if(negativeEvolutions.includes(ev.to)){
-    const reactions=[
-      `${on} noticed the shift in ${fn}'s demeanour. Something had changed. They filed it away quietly.`,
-      `Around camp, people were starting to talk about ${fn} differently. ${on} heard it and said nothing.`,
-      `${on} pulled someone aside after ${fn} left camp. "Has ${fn} seemed different to you lately?" They had.`,
-    ];
-    return pick(reactions);
-  }
-  if(positiveEvolutions.includes(ev.to)){
-    const reactions=[
-      `${on} watched ${fn} from across camp and felt something uncomfortable — was ${fn} actually going to win this?`,
-      `The tribe's perception of ${fn} was shifting. ${on} felt it and wasn't sure if that was good or bad for their own game.`,
-      `"${fn} is not who I thought ${fn} was," ${on} admitted to themselves. They'd need to recalibrate.`,
-    ];
-    return pick(reactions);
-  }
-  return `The tribe watched ${fn} closely tonight. Something was different and everyone could feel it.`;
-}
-
-
-/**
- * getArchetypeHistory(contestant)
- * Returns a formatted string of the contestant's evolution history.
- * Used in Player Profiles.
- */
-function getArchetypeHistory(contestant) {
-  if(!contestant.archetypeHistory || !contestant.archetypeHistory.length) return null;
-  return contestant.archetypeHistory
-    .map(h => `Ep ${h.episode}: ${h.from} → ${h.to}`)
-    .join(' · ');
-}
-
-// ===== EXPORTS =====
-export { EVOLUTION_RULES, checkArchetypeEvolution, buildEvolutionDisplay, getArchetypeHistory, buildEvolutionCeremony };
+  <!-- Single module entry point — all imports handled in main.js -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
