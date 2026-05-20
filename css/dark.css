@@ -220,13 +220,3 @@ html.dark ::-webkit-scrollbar-thumb { background: var(--surface3); }
 .v19-rel-fill{height:7px;border-radius:10px;background:var(--fire2)}
 .v19-help{font-size:12px;color:var(--text2);line-height:1.55;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin:12px 0}
 .v19-modal-wide{max-width:850px!important}
-
-/* v19.1 mobile/tablet setup readability */
-@media (max-width: 768px) {
-  #screen-setup { min-height: calc(100vh - 57px); }
-  .setup-content { width: 100%; max-width: none; padding: 20px 18px 110px; }
-  #panel-general .form-group,
-  #panel-rules .form-group,
-  #panel-twists .form-group { max-width: none; }
-  .form-input, .form-select, .form-textarea { min-height: 48px; font-size: 16px; }
-}
