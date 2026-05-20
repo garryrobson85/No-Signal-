@@ -10,11 +10,11 @@ import { TWISTS_DATA, ARCHETYPES, PERSONALITIES, CHALLENGE_DATA, DRAMA_EVENTS,
          DIALOGUE_BANK, VOTE_REASONS,
          buildConfessionalText, buildInteractionText, buildDramaText } from './data.js';
 
-import { generatePortrait, getPortrait, updateContestantPortrait,
+import { generatePortrait, updateContestantPortrait,
          triggerImageUpload, handleImageUpload, applyCustomImage,
          clearImage, showBulkUpload } from './portraits.js';
 
-import { G, rng, pick, shuffle, uid, notify, openModal, closeModal,
+import { G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
          getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore,
          openV19Modal, goHome, goSetup, showGameScreen,
          initTeams, renderCastList, addContestant, removeContestant,
