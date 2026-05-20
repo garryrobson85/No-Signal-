@@ -278,4 +278,4 @@ function showCastStatus(){
 
 
 // ===== EXPORTS =====
-export { generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage, clearImage, showBulkUpload };
+export { showCastStatus, generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage, clearImage, showBulkUpload };
