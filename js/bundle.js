@@ -360,7 +360,7 @@ Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', 
 Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
 ${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
 
-Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique.
+Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique. Confessionals that appear before Tribal Council must not reveal who is eliminated, who voted for whom, or post-vote fallout. Use suspense: uncertainty, reads, nerves, alliances, challenge pressure.
 Important episode logic: if this is Episode 1 and no vote has happened yet, confessionals must be first-impression based only. Do not mention voting someone out, names coming up, betrayal, cracks, post-vote fallout, tribal paranoia, or "I made my call" before the first vote exists. Early Episode 1 should sound like arrival, tribe dynamics, sizing people up, shelter/camp, first challenge nerves, and cautious social reads.`;
 }
 
@@ -841,13 +841,13 @@ function goHome(){
   // Auto-save if there's an active game
   if(G.currentEpData&&G.cast.length) saveGame(true);
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-home').classList.add('active');
+  const homeScreen=document.getElementById('screen-home'); homeScreen.classList.add('active'); homeScreen.style.display='flex'; homeScreen.removeAttribute('aria-hidden'); document.body.classList.remove('season-running');
   document.getElementById('header-ep-badge').style.display='none';
   updateContinueButton();
 }
 function goSetup(){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-setup').classList.add('active');
+  const setupScreen=document.getElementById('screen-setup'); setupScreen.classList.add('active'); setupScreen.style.display='flex'; setupScreen.removeAttribute('aria-hidden'); document.body.classList.remove('season-running');
   if(!G.cast.length) generateRandomCast(12);
   renderTwistsGrid();
   setupNav('general',document.querySelector('[data-panel="general"]'));
@@ -1117,8 +1117,22 @@ function buildAlliances(){
 
 // ===== GAME SCREEN =====
 function showGameScreen(){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-game').classList.add('active');
+  document.querySelectorAll('.screen').forEach(s=>{
+    s.classList.remove('active');
+    s.style.display='none';
+    s.setAttribute('aria-hidden','true');
+  });
+  const game=document.getElementById('screen-game');
+  game.classList.add('active');
+  game.style.display='flex';
+  game.removeAttribute('aria-hidden');
+  const setup=document.getElementById('screen-setup');
+  if(setup){
+    setup.classList.remove('active');
+    setup.style.display='none';
+    setup.setAttribute('aria-hidden','true');
+  }
+  document.body.classList.add('season-running');
   updateGameSidebar();
 }
 function updateGameSidebar(){
@@ -4875,6 +4889,46 @@ function buildEpisodeHeader(ep){
   <\/div>`;
 }
 
+
+function buildPreVoteConfessionalText(player, ep){
+  const fn=player.name.split(' ')[0];
+  const teamMates=G.cast.filter(c=>c.id!==player.id && c.status==='active' && (!G.merged ? c.team===player.team : true))
+    .slice(0,3).map(c=>c.name.split(' ')[0]);
+  const allies=(player.allianceIds||[]).flatMap(aid=>{
+    const al=G.alliances.find(a=>a.id===aid);
+    return al?al.members.filter(m=>m!==player.id).map(m=>G.cast.find(c=>c.id===m)?.name.split(' ')[0]).filter(Boolean):[];
+  });
+  const wonTeamChallenge=ep.challengeResult && !G.merged && ep.challengeResult.winner?.ti===player.team;
+  const lostTeamChallenge=ep.challengeResult && !G.merged && ep.challengeResult.loser?.ti===player.team;
+  const wonIndividual=ep.challengeResult && G.merged && ep.challengeResult.winner?.id===player.id;
+
+  if(ep.ep===1){
+    const options=[
+      `First impressions are everything right now. I'm watching how people talk, who listens, and who already wants to be the centre of camp.`,
+      `Everyone is still smiling, but you can feel the game underneath it. I'm trying to be useful without becoming obvious.`,
+      teamMates.length?`I'm getting a read on ${teamMates.join(', ')}. Day one is all about figuring out who feels real and who is performing.`:`I'm trying to read the room before the room starts reading me.`
+    ];
+    return pick(options);
+  }
+
+  if(wonIndividual){
+    return `Winning immunity gives me room to breathe, but it also puts a light on me. Tonight I can listen more than I talk.`;
+  }
+  if(wonTeamChallenge){
+    return `Winning as a tribe helps, but comfort is dangerous out here. The second you feel safe, someone else starts planning ahead.`;
+  }
+  if(lostTeamChallenge){
+    if(allies.length){
+      return `${allies.slice(0,2).join(' and ')} are the people I feel closest to, but losing changes the temperature fast. Tonight is about reading the room before it reads me.`;
+    }
+    return `Losing the challenge changed everything. People are being careful with their words, and that usually means names are starting to move.`;
+  }
+  if(allies.length){
+    return `${allies.slice(0,2).join(' and ')} are important to my game, but every episode tests whether trust is real or just convenient.`;
+  }
+  return `The game feels quieter than it looks. Little conversations, small looks, people walking away at the wrong time — that's where the truth is.`;
+}
+
 function buildStageCampLife(ep){
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏕️ Camp Life<\/div>`;
 
@@ -4975,7 +5029,7 @@ function buildStageCampLife(ep){
     html+=`<div class="confessional-card"><div class="conf-header">
       <div class="conf-portrait" style="flex-shrink:0;border-radius:8px;overflow:hidden;line-height:0;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${cp}<\/div>
       <div><div class="conf-name">${c.who.name}<\/div><div class="conf-label">${c.who.archetype} · ${c.who.personality}<\/div><\/div>
-    <\/div><div class="conf-text">${c.text}<\/div><\/div>`;});}
+    <\/div><div class="conf-text">${buildPreVoteConfessionalText(c.who,ep)}<\/div><\/div>`;});}
   if(!ep.dramaMsg&&!ep.idolFinder&&!ep.interactions.length&&!ep.confessionals.length&&!ep.twist&&!ep.mergeHappened)
     html+=`<div style="font-size:13px;color:var(--text2);padding:8px 0">A quiet day at camp. Everyone conserving energy before the challenge.<\/div>`;
   html+=`<\/div>`;
