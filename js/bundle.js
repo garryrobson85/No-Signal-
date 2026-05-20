@@ -1,6 +1,5 @@
 
-
-// ===== data.js =====
+// ===== FILE: data.js =====
 // No Signal — data.js
 // All game constants, templates, dialogue banks — zero logic
 
@@ -48,37 +47,6 @@ function buildConfessionalText(player, ep){
     ||(ep.challengeResult?.winner?.ti!=null&&ep.challengeResult?.winner?.ti===player.team);
   const merged=G.merged;
   const active=getActive().length;
-
-  // Episode 1 happens before the audience has seen a vote, so keep it to first impressions.
-  // Do not let precomputed vote data leak into early confessionals.
-  if(ep.ep===1){
-    const firstImpressionLines=[
-      `${fn}: first day, first impressions — everyone is smiling, but everyone is measuring each other.`,
-      `I'm trying to work out who feels real and who is already performing for the cameras.`,
-      `Camp looks friendly on the surface, but you can feel the game starting underneath it.`,
-      `Nobody has shown their full hand yet. Right now I'm watching, listening, and deciding who I can actually trust.`,
-      `The first few conversations matter more than people think. This is where the season quietly begins.`
-    ];
-    const archFirst={
-      'The Strategist':`I'm not making big moves yet. Day one is about reading the room and finding the people who think two steps ahead.`,
-      'The Fan Favorite':`I want people to feel good around me early. First impressions can become protection later.`,
-      'The Big Villain':`Everyone wants to look harmless on day one. I'm more interested in who is pretending the hardest.`,
-      'The Underdog':`I know I might not look like the obvious power player, and honestly that might be useful.`,
-      'The Puppet Master':`The first web gets spun with tiny threads. A smile here, a promise there, and suddenly people feel connected.`,
-      'The Sweetheart':`I want to trust people, but this game makes even a friendly chat feel loaded.`,
-      'The Loose Cannon':`Everyone is trying to be normal. I give it about six hours before that falls apart.`,
-      'The Quiet Threat':`I don't need to be loud today. I need to be noticed by the right people and underestimated by everyone else.`,
-      'The Social Butterfly':`Names, stories, little details — I'm collecting all of it. Relationships start before strategy admits it exists.`,
-      'The Challenge Beast':`I want them to see strength, not threat. That line is thin already.`,
-      'The Superfan':`I've watched this moment a hundred times. Living it is completely different.`,
-      'The Coattail Rider':`Early on, I need to find where the numbers are forming and stay close enough to matter.`,
-      'The Wildfire':`The beach is calm right now, but I can already feel sparks.`,
-      'The Number':`Everybody needs numbers eventually. My job is to become one they don't want to lose.`
-    };
-    const lines=[archFirst[player.archetype]||firstImpressionLines[0], ...shuffle(firstImpressionLines).slice(0,1)];
-    if(wonChallenge) lines.push(`That first challenge told me a lot. Who panics, who leads, who listens — that matters.`);
-    return lines.slice(0,2).join(' ');
-  }
 
   // Build a specific, contextual confessional from real state
   const lines=[];
@@ -266,333 +234,236 @@ const CHALLENGE_DATA = [
 // ===== EXPORTS =====
 
 
+// ===== FILE: ai.js =====
+// No Signal — ai.js
+// Gemini API integration, prompt builder, AI dialogue generation
 
-// ===== memory.js =====
-// No Signal — memory.js
-// Persistent contestant memory system
-// Contestants remember betrayals, alliances, idol plays, saves, and rivalries.
-// These memories feed into voting logic, confessionals, jury bias, and scripts.
-
-// ===== MEMORY EVENT TYPES =====
-// Each memory is a discrete event stored in G.memories[]
-//
-// { type, subject, object, episode, intensity, seen }
-//
-// type:      string key (see MEMORY_TYPES below)
-// subject:   contestant id who experienced/performed the action
-// object:    contestant id the action was directed at (or null)
-// episode:   episode number when it happened
-// intensity: 0-100 how significant this memory is
-// seen:      bool — whether this has been surfaced in a confessional/script
-
-const MEMORY_TYPES = {
-  betrayal:         { label:'Betrayal',        sentiment:-1, decay:0.02  }, // voted out / backstabbed an ally
-  voted_for:        { label:'Voted for',        sentiment:-1, decay:0.05  }, // non-ally vote
-  saved:            { label:'Saved',            sentiment:+1, decay:0.03  }, // didn't vote them out when they could
-  idol_played_on:   { label:'Idol played on',   sentiment:+1, decay:0.01  }, // used idol to save them
-  idol_played_against:{ label:'Idol blocked',   sentiment:-1, decay:0.01  }, // idol negated votes for them
-  alliance_formed:  { label:'Alliance formed',  sentiment:+1, decay:0.01  }, // formed alliance together
-  alliance_broken:  { label:'Alliance broken',  sentiment:-1, decay:0.02  }, // alliance shattered
-  challenge_beat:   { label:'Beat in challenge',sentiment:-1, decay:0.08  }, // beat them in key challenge
-  jury_speech:      { label:'Jury speech',      sentiment: 0, decay:0     }, // final jury statement
-  rivalry:          { label:'Rivalry',          sentiment:-1, decay:0.015 }, // ongoing conflict
-};
-
-// ===== CORE MEMORY API =====
-
-/**
- * recordMemory(type, subjectId, objectId, episode, intensity)
- * Adds a new memory event to G.memories[].
- * Called from engine.js after significant game events.
- */
-function recordMemory(type, subjectId, objectId, episode, intensity=50){
-  if(!G.memories) G.memories=[];
-  // Don't duplicate identical events in same episode
-  const dupe = G.memories.find(m=>
-    m.type===type && m.subject===subjectId &&
-    m.object===objectId && m.episode===episode
-  );
-  if(dupe) return;
-  G.memories.push({ type, subject:subjectId, object:objectId, episode, intensity, seen:false });
-}
-
-/**
- * getMemories(subjectId, objectId=null, types=null)
- * Returns memories for a subject, optionally filtered by object and/or type.
- * Sorted by episode desc (most recent first).
- */
-function getMemories(subjectId, objectId=null, types=null){
-  if(!G.memories) return [];
-  return G.memories
-    .filter(m=>{
-      if(m.subject!==subjectId) return false;
-      if(objectId && m.object!==objectId) return false;
-      if(types && !types.includes(m.type)) return false;
-      return true;
-    })
-    .sort((a,b)=>b.episode-a.episode);
-}
-
-/**
- * memoryScore(subjectId, objectId)
- * Returns a -100 to +100 sentiment score representing how subjectId
- * feels about objectId, based on accumulated memories with decay over time.
- *
- * Decay: old memories fade — a betrayal in ep 1 hurts less by ep 10.
- * Recency: recent events weigh more heavily.
- */
-function memoryScore(subjectId, objectId){
-  const mems = getMemories(subjectId, objectId);
-  if(!mems.length) return 0;
-  const currentEp = G.episode||1;
-  let total=0, weight=0;
-  mems.forEach(m=>{
-    const def = MEMORY_TYPES[m.type];
-    if(!def) return;
-    const age = currentEp - m.episode;
-    const decayFactor = Math.max(0.1, 1 - def.decay * age);
-    const contribution = def.sentiment * m.intensity * decayFactor;
-    total += contribution;
-    weight += Math.abs(contribution);
-  });
-  if(!weight) return 0;
-  return Math.max(-100, Math.min(100, Math.round(total)));
-}
-
-/**
- * hasBetrayedBy(subjectId, objectId)
- * Returns true if objectId has betrayed subjectId (voted them out, broke alliance etc)
- */
-function hasBetrayedBy(subjectId, objectId){
-  return getMemories(subjectId, objectId, ['betrayal','alliance_broken']).length > 0;
-}
-
-/**
- * getStrongestMemory(subjectId, objectId)
- * Returns the most intense memory between these two players.
- * Used in confessional and script generation for flavour.
- */
-function getStrongestMemory(subjectId, objectId){
-  const mems = getMemories(subjectId, objectId);
-  if(!mems.length) return null;
-  return mems.reduce((best,m)=>m.intensity>best.intensity?m:best, mems[0]);
-}
-
-/**
- * getUnseenMemories(subjectId)
- * Returns memories that haven't been surfaced in confessionals yet.
- * Marks them as seen once retrieved.
- */
-function getUnseenMemories(subjectId){
-  if(!G.memories) return [];
-  const unseen = G.memories.filter(m=>m.subject===subjectId && !m.seen);
-  unseen.forEach(m=>m.seen=true);
-  return unseen;
-}
-
-/**
- * getJuryBias(jurorId, finalistId)
- * Returns a -100 to +100 jury vote bias score.
- * Combines relationship score, memory score, and archetype affinity.
- * Called during finale jury vote calculation.
- */
-function getJuryBias(jurorId, finalistId){
-  const mem = memoryScore(jurorId, finalistId);
-  const rel = v19RelScore(jurorId, finalistId);
-  const juror = G.cast.find(c=>c.id===jurorId);
-  const finalist = G.cast.find(c=>c.id===finalistId);
-  if(!juror||!finalist) return 0;
-
-  // Base: relationship score normalised to -50/+50
-  let bias = (rel - 50);
-
-  // Memory layer: betrayal hurts badly, saves help
-  bias += mem * 0.4;
-
-  // Archetype respect: some juror types respect certain play styles
-  const respectMatrix = {
-    'Strategic':  ['The Strategist','The Puppet Master','The Quiet Threat'],
-    'Loyal':      ['The Sweetheart','The Fan Favorite','The Underdog'],
-    'Villain':    ['The Big Villain','The Manipulator','The Puppet Master'],
-    'Social':     ['The Social Butterfly','The Fan Favorite','The Sweetheart'],
-    'Hothead':    ['The Challenge Beast','The Physical Threat','The Loose Cannon'],
-    'Underdog':   ['The Underdog','The Fan Favorite','The Sweetheart'],
-  };
-  const respected = respectMatrix[juror.personality]||[];
-  if(respected.includes(finalist.archetype)) bias += 15;
-
-  // Betrayal penalty: if juror was voted out by finalist, strong negative bias
-  if(hasBetrayedBy(jurorId, finalistId)) bias -= 25;
-
-  // Saved bonus: if finalist saved juror at some point
-  if(getMemories(jurorId, finalistId, ['saved']).length) bias += 20;
-
-  return Math.max(-100, Math.min(100, Math.round(bias)));
-}
-
-// ===== MEMORY RECORDING HELPERS =====
-// Called from engine.js at key game moments
-
-/**
- * recordVoteMemories(voteResult, ep)
- * After a vote, records memories for all players involved.
- * - The eliminated player remembers who voted for them (betrayal if ally)
- * - Voters remember voting against someone (voted_for)
- * - Alliance members who voted together reinforce bonds
- */
-function recordVoteMemories(voteResult, ep){
-  if(!voteResult||!voteResult.individualVotes) return;
-  const {eliminated, individualVotes} = voteResult;
-  const epNum = ep.ep;
-
-  individualVotes.forEach(({voter, target, reason})=>{
-    // Target remembers being voted for
-    const isBetrayal = (voter.allianceIds||[]).some(aid=>(target.allianceIds||[]).includes(aid));
-    if(isBetrayal){
-      // Alliance member voted against them — that's a betrayal
-      recordMemory('betrayal', target.id, voter.id, epNum, 80);
-      recordMemory('alliance_broken', target.id, voter.id, epNum, 75);
-      // Voter also knows they broke the alliance
-      recordMemory('alliance_broken', voter.id, target.id, epNum, 60);
-    } else {
-      recordMemory('voted_for', target.id, voter.id, epNum, 40);
-    }
-
-    // If eliminated, everyone who voted for them — they remember more vividly
-    if(eliminated && target.id === eliminated.id){
-      recordMemory('voted_for', target.id, voter.id, epNum,
-        isBetrayal ? 95 : 55);
-    }
-  });
-
-  // Allies who voted together reinforce their bond
-  if(G.alliances){
-    G.alliances.forEach(alliance=>{
-      const votingTogether = alliance.members.filter(mid=>{
-        const v = individualVotes.find(iv=>iv.voter.id===mid);
-        if(!v) return false;
-        // Check if majority of alliance voted same target
-        const allianceVotes = individualVotes.filter(iv=>alliance.members.includes(iv.voter.id));
-        const topTarget = allianceVotes.reduce((acc,iv)=>{
-          acc[iv.target.id]=(acc[iv.target.id]||0)+1; return acc;
-        },{});
-        const maxVotes = Math.max(...Object.values(topTarget));
-        const consensusTarget = Object.keys(topTarget).find(id=>topTarget[id]===maxVotes);
-        return v.target.id === consensusTarget;
+// ===== GEMINI AI DIALOGUE GENERATION =====
+const GEMINI_KEY_STORE='nosignal_gemini_key';
+function showGeminiHelp(){openModal('modal-gemini-help');}
+async function testGeminiKey(){
+  const key=getGeminiKey();
+  if(!key){notify('Paste your API key first');return;}
+  notify('Testing key…');
+  const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
+  const errors=[];
+  for(const model of models){
+    try{
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{parts:[{text:'Say OK'}]}],generationConfig:{maxOutputTokens:5}})
       });
-      // If 3+ alliance members voted together, reinforce bonds between them
-      if(votingTogether.length>=3){
-        for(let i=0;i<votingTogether.length;i++){
-          for(let j=i+1;j<votingTogether.length;j++){
-            recordMemory('alliance_formed', votingTogether[i], votingTogether[j], epNum, 20);
-            recordMemory('alliance_formed', votingTogether[j], votingTogether[i], epNum, 20);
-          }
-        }
+      if(res.ok){notify(`✅ Key works with ${model}`,'win');return;}
+      const err=await res.json().catch(()=>({}));
+      const msg=err?.error?.message||'';
+      errors.push(`${model}: ${res.status} — ${msg.slice(0,50)}`);
+      if(res.status===401||res.status===403){notify(`❌ Key invalid or restricted: ${msg.slice(0,60)}`);return;}
+    }catch(e){errors.push(`${model}: network error`);}
+  }
+  notify(`❌ Failed. First error: ${errors[0]||'unknown'}`);
+  console.log('All model errors:',errors);
+}
+function saveGeminiKey(val){
+  try{val=val.trim();if(val)localStorage.setItem(GEMINI_KEY_STORE,val);else localStorage.removeItem(GEMINI_KEY_STORE);}catch(e){}
+}
+function getGeminiKey(){
+  try{return localStorage.getItem(GEMINI_KEY_STORE)||'';}catch(e){return '';}
+}
+function initGeminiKeyField(){
+  const el=document.getElementById('s-gemini-key');
+  if(el){const k=getGeminiKey();if(k) el.value=k;}
+}
+
+// Build the episode prompt for Gemini — tight, specific, structured
+function buildEpisodePrompt(ep){
+  const active=G.cast.filter(c=>!c.eliminated||(c.elimEp&&c.elimEp>=ep.ep));
+  const eliminated=ep.eliminated;
+  const tally=ep.voteResult?.tally||{};
+
+  // Narrative compression — use summaries not raw objects (~65% fewer tokens)
+  const recentSummaries=G.episodeLog
+    .filter(e=>e.summary&&e.ep<ep.ep).slice(-4)
+    .map(e=>e.summary).join(' / ');
+  const keyMemories=(G.memories||[])
+    .filter(m=>['betrayal','saved','idol_played_on'].includes(m.type)&&m.episode>=ep.ep-3)
+    .slice(0,6)
+    .map(m=>{
+      const s=G.cast.find(c=>c.id===m.subject),o=G.cast.find(c=>c.id===m.object);
+      return `${s?.name?.split(' ')[0]||'?'} ${m.type.replace(/_/g,' ')} ${o?.name?.split(' ')[0]||'?'}(ep${m.episode})`;
+    }).join('; ');
+  const allianceDesc=G.alliances
+    .map(a=>{
+      const names=a.members.map(id=>G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean);
+      return names.length>=2?names.join('+'):null;
+    }).filter(Boolean).join(' | ');
+  const voteLines=Object.entries(tally).map(([id,v])=>{
+    const p=G.cast.find(c=>c.id===id);
+    return p?`${v}v→${p.name.split(' ')[0]}(${p.archetype})`:null;
+  }).filter(Boolean).join(', ');
+  const confPlayers=(ep.confessionals||[]).map(c=>`${c.who.name} (${c.who.archetype}, ${c.who.personality}, ${c.who.challengeWins||0} challenge wins${G.idolHolders.includes(c.who.id)?' — has idol':''}${tally[c.who.id]?` — received ${tally[c.who.id]} vote(s)`:''})`).join('\n- ');
+  const interPlayers=(ep.interactions||[]).map(i=>`${i.a.name} (${i.a.archetype}/${i.a.personality}) + ${i.b.name} (${i.b.archetype}/${i.b.personality}), relationship score: ${v19RelScore(i.a.id,i.b.id)}/100`).join('\n- ');
+
+  return `Reality TV writer for "${G.settings.name||'No Signal'}" (Survivor-style, ${G.settings.theme||'remote island'}).
+Ep${ep.ep}/${G.settings.mergeEpisode||6}. ${G.merged?'POST-MERGE':'PRE-MERGE'}. ${active.length} remain.
+RECENT SEASON: ${recentSummaries||'Season start'}
+KEY MEMORIES: ${keyMemories||'None yet'}
+THIS EPISODE: ${ep.summary||''}
+ALLIANCES: ${allianceDesc||'None'}
+${ep.mergeHappened?'*** THE MERGE HAPPENED THIS EPISODE ***':''}
+CONFESSIONALS NEEDED (player/archetype/personality): ${confPlayers||'None'}
+INTERACTIONS (player pairs/rel score): ${interPlayers||'None'}
+
+Write the following in JSON format (no markdown, no backticks, pure JSON):
+{
+  "confessionals": [
+    { "playerId": "...", "text": "2-3 sentence confessional in first person, specific to their situation this episode, in the voice of their archetype and personality" }
+  ],
+  "interactions": [
+    { "playerIds": ["...", "..."], "text": "1-2 sentence third-person description of what happened between these two players, specific to their relationship score and episode events" }
+  ],
+  "exitSpeech": "2-3 sentence exit speech from ${eliminated?eliminated.name+' ('+eliminated.archetype+', '+eliminated.personality+')'  :'the eliminated player'}, in character",
+  "exitFinalWords": "3-4 sentence final words, reflective, in character for their archetype",
+  "hostComment": "1 sentence host quip reacting to tonight's vote specifically"
+}
+
+Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', ')}
+Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
+${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
+
+Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique.`;
+}
+
+// Call Gemini Flash API
+async function callGemini(prompt){
+  const key=getGeminiKey();
+  if(!key) return null;
+  // Try models in order of preference — free tier availability varies
+  const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
+  for(const model of models){
+    try{
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          contents:[{parts:[{text:prompt}]}],
+          generationConfig:{temperature:0.85,maxOutputTokens:1400,thinkingConfig:{thinkingBudget:0}}
+          // Note: NOT using responseMimeType — causes failures on some models/keys
+        })
+      });
+      if(!res.ok){
+        const err=await res.json().catch(()=>({}));
+        const msg=err?.error?.message||res.statusText||'Unknown error';
+        // 404 = model not found, try next; other errors = real problem
+        if(res.status===404||res.status===400) continue;
+        console.error(`Gemini ${model} error:`,msg);
+        notify(`AI error: ${msg.slice(0,80)}`);
+        return null;
       }
+      const data=await res.json();
+      const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      if(!text){ console.error('Gemini returned empty text'); continue; }
+      // Strip markdown code fences if model wrapped the JSON
+      const clean=text.replace(/^```(?:json)?\s*/,'').replace(/\s*```\s*$/,'').trim();
+      // Find the JSON object within the response (model sometimes adds preamble)
+      const jsonMatch=clean.match(/\{[\s\S]*\}/);
+      if(!jsonMatch){ console.error('No JSON found in response:', clean.slice(0,200)); continue; }
+      return JSON.parse(jsonMatch[0]);
+    }catch(e){
+      console.error(`Gemini ${model} call failed:`,e);
+      if(e instanceof SyntaxError) continue; // bad JSON, try next model
+      notify(`AI connection error: ${e.message?.slice(0,60)||'Network error'}`);
+      return null;
+    }
+  }
+  notify('AI generation failed — no working model found. Check your key at aistudio.google.com');
+  return null;
+}
+
+// Generate AI dialogue for one episode and apply it
+async function generateAIDialogueForEp(ep,onProgress){
+  const key=getGeminiKey();
+  if(!key) return false;
+  onProgress&&onProgress('Sending episode data to Gemini…');
+  const prompt=buildEpisodePrompt(ep);
+  const result=await callGemini(prompt);
+  if(!result) return false;
+  // Apply confessionals
+  if(result.confessionals&&ep.confessionals){
+    result.confessionals.forEach(ai=>{
+      const conf=ep.confessionals.find(c=>c.who.id===ai.playerId);
+      if(conf&&ai.text) conf.text=ai.text;
     });
   }
+  // Apply interactions
+  if(result.interactions&&ep.interactions){
+    result.interactions.forEach((ai,i)=>{
+      if(ep.interactions[i]&&ai.text) ep.interactions[i].text=ai.text;
+    });
+  }
+  // Apply exit speech
+  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=result.exitSpeech;
+  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=result.exitFinalWords;
+  if(result.hostComment) ep._aiHostComment=result.hostComment;
+  ep._aiGenerated=true;
+  onProgress&&onProgress('AI dialogue applied ✓');
+  return true;
 }
 
-/**
- * recordIdolMemories(idolPlay, ep)
- * Records memories when an idol is played.
- */
-function recordIdolMemories(idolPlay, ep){
-  if(!idolPlay) return;
-  const {idolPlayer, target} = idolPlay;
-  const epNum = ep.ep;
-  // Everyone who had votes nullified remembers the idol play
-  if(idolPlayer.id === target?.id){
-    // Played on themselves — anyone who voted for them remembers being blocked
-    (ep.voteResult?.individualVotes||[])
-      .filter(iv=>iv.target.id===idolPlayer.id)
-      .forEach(iv=>{
-        recordMemory('idol_played_against', iv.voter.id, idolPlayer.id, epNum, 70);
-      });
-  } else if(target){
-    // Played on someone else — they feel saved
-    recordMemory('idol_played_on', target.id, idolPlayer.id, epNum, 85);
-    recordMemory('saved', target.id, idolPlayer.id, epNum, 85);
+// Expose to script modal — "Generate with AI" button
+async function generateAIEpisodeScript(epNum){
+  const ep=G.episodeLog.find(e=>e.ep===epNum);
+  if(!ep){notify('Episode not found');return;}
+  const key=getGeminiKey();
+  if(!key){
+    notify('Add your free Gemini API key in Setup → General Settings');
+    showGeminiHelp();
+    return;
+  }
+  const btn=document.getElementById(`ai-gen-btn-${epNum}`);
+  if(btn){btn.disabled=true;btn.textContent='⏳ Contacting Gemini…';}
+  notify('Generating AI dialogue for Episode '+epNum+'…');
+  const ok=await generateAIDialogueForEp(ep,msg=>{
+    notify(msg);
+    if(btn) btn.textContent=`⏳ ${msg}`;
+  });
+  if(ok){
+    notify('✨ Done! Script updated with AI dialogue','win');
+    setTimeout(()=>showEpisodeScripts(epNum),500);
+  } else {
+    if(btn){btn.disabled=false;btn.textContent='✨ Generate with AI — Retry';}
   }
 }
 
-// ===== MEMORY → VOTING INTEGRATION =====
-
-/**
- * memoryTargetBonus(voter, target)
- * Returns a score modifier for targetScore() based on voter's memories of target.
- * Positive = more likely to vote them out. Negative = less likely.
- */
-function memoryTargetBonus(voter, target){
-  const score = memoryScore(voter.id, target.id);
-  // Negative memory score (betrayal, conflict) → voter wants to vote them out
-  // Positive memory score (saved, alliance) → voter less likely to target
-  // Scale: -100 → +8 bonus (strongly want out), +100 → -6 bonus (protected)
-  if(score < -60) return 8;
-  if(score < -30) return 5;
-  if(score < -10) return 2;
-  if(score > 60)  return -6;
-  if(score > 30)  return -3;
-  if(score > 10)  return -1;
-  return 0;
+function toggleDarkMode(){
+  const isDark = document.documentElement.classList.toggle('dark');
+  document.getElementById('dark-toggle-btn').textContent = isDark ? '☀️' : '🌙';
+  try { localStorage.setItem('nosignal_darkmode', isDark ? '1' : '0'); } catch(e){}
+}
+function initDarkMode(){
+  let pref = '0';
+  try { pref = localStorage.getItem('nosignal_darkmode') || '0'; } catch(e){}
+  // Also respect system preference if no saved preference
+  if(pref === '0' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) pref = '1';
+  if(pref === '1'){
+    document.documentElement.classList.add('dark');
+    const btn = document.getElementById('dark-toggle-btn');
+    if(btn) btn.textContent = '☀️';
+  }
 }
 
-// ===== MEMORY → CONFESSIONAL INTEGRATION =====
+document.addEventListener('DOMContentLoaded',()=>{
+  initDarkMode();
+  initGeminiKeyField();
+  initTeams();renderTwistsGrid();
+  updateContinueButton();
+});
 
-/**
- * getMemoryConfessionalLine(player, ep)
- * Returns a specific confessional line referencing a real past memory.
- * Returns null if no relevant unseen memories exist.
- */
-function getMemoryConfessionalLine(player, ep){
-  if(!G.memories) return null;
-  const recentBetrayal = getMemories(player.id, null, ['betrayal'])
-    .find(m => ep.ep - m.episode <= 3);
-  const recentSave = getMemories(player.id, null, ['saved'])
-    .find(m => ep.ep - m.episode <= 3);
-  const recentIdolBlock = getMemories(player.id, null, ['idol_played_against'])
-    .find(m => ep.ep - m.episode <= 2);
-
-  if(recentBetrayal){
-    const betrayer = G.cast.find(c=>c.id===recentBetrayal.object);
-    if(betrayer) return `${betrayer.name.split(' ')[0]} voted against me in Episode ${recentBetrayal.episode}. I haven't forgotten that. I won't.`;
-  }
-  if(recentIdolBlock){
-    const blocker = G.cast.find(c=>c.id===recentIdolBlock.object);
-    if(blocker) return `${blocker.name.split(' ')[0]} played an idol and blocked my vote. That kind of move doesn't go unanswered.`;
-  }
-  if(recentSave){
-    const saviour = G.cast.find(c=>c.id===recentSave.object);
-    if(saviour) return `${saviour.name.split(' ')[0]} could have written my name down and didn't. That means something to me. I owe them.`;
-  }
-  return null;
-}
-
-/**
- * getMemorySummary(playerA, playerB)
- * Returns a short prose description of the relationship history between two players.
- * Used in interaction text and script generation.
- */
-function getMemorySummary(playerA, playerB){
-  const score = memoryScore(playerA.id, playerB.id);
-  const betrayals = getMemories(playerA.id, playerB.id, ['betrayal']).length;
-  const saves = getMemories(playerA.id, playerB.id, ['saved']).length;
-  const an = playerA.name.split(' ')[0];
-  const bn = playerB.name.split(' ')[0];
-
-  if(betrayals>=2) return `${an} has been burned by ${bn} more than once. The history between them runs cold.`;
-  if(betrayals===1) return `${bn} voted against ${an} once before. ${an} hasn't forgotten.`;
-  if(saves>=1) return `${bn} spared ${an} when they didn't have to. That debt still stands.`;
-  if(score>60) return `${an} and ${bn} have built real trust across this season.`;
-  if(score<-40) return `The tension between ${an} and ${bn} has been building for weeks.`;
-  return null;
-}
 
 // ===== EXPORTS =====
 
 
-
-// ===== portraits.js =====
+// ===== FILE: portraits.js =====
 // No Signal — portraits.js
 // SVG portrait generator and custom image upload
 
@@ -875,8 +746,7 @@ function showCastStatus(){
 // ===== EXPORTS =====
 
 
-
-// ===== state.js =====
+// ===== FILE: state.js =====
 // No Signal — state.js
 // Game state (G), utilities, contestant/team builders
 
@@ -1348,8 +1218,1428 @@ function isPlayMode(){
 // ===== EXPORTS =====
 
 
+// ===== FILE: memory.js =====
+// No Signal — memory.js
+// Persistent contestant memory system
+// Contestants remember betrayals, alliances, idol plays, saves, and rivalries.
+// These memories feed into voting logic, confessionals, jury bias, and scripts.
 
-// ===== engine.js =====
+// ===== MEMORY EVENT TYPES =====
+// Each memory is a discrete event stored in G.memories[]
+//
+// { type, subject, object, episode, intensity, seen }
+//
+// type:      string key (see MEMORY_TYPES below)
+// subject:   contestant id who experienced/performed the action
+// object:    contestant id the action was directed at (or null)
+// episode:   episode number when it happened
+// intensity: 0-100 how significant this memory is
+// seen:      bool — whether this has been surfaced in a confessional/script
+
+const MEMORY_TYPES = {
+  betrayal:         { label:'Betrayal',        sentiment:-1, decay:0.02  }, // voted out / backstabbed an ally
+  voted_for:        { label:'Voted for',        sentiment:-1, decay:0.05  }, // non-ally vote
+  saved:            { label:'Saved',            sentiment:+1, decay:0.03  }, // didn't vote them out when they could
+  idol_played_on:   { label:'Idol played on',   sentiment:+1, decay:0.01  }, // used idol to save them
+  idol_played_against:{ label:'Idol blocked',   sentiment:-1, decay:0.01  }, // idol negated votes for them
+  alliance_formed:  { label:'Alliance formed',  sentiment:+1, decay:0.01  }, // formed alliance together
+  alliance_broken:  { label:'Alliance broken',  sentiment:-1, decay:0.02  }, // alliance shattered
+  challenge_beat:   { label:'Beat in challenge',sentiment:-1, decay:0.08  }, // beat them in key challenge
+  jury_speech:      { label:'Jury speech',      sentiment: 0, decay:0     }, // final jury statement
+  rivalry:          { label:'Rivalry',          sentiment:-1, decay:0.015 }, // ongoing conflict
+};
+
+// ===== CORE MEMORY API =====
+
+/**
+ * recordMemory(type, subjectId, objectId, episode, intensity)
+ * Adds a new memory event to G.memories[].
+ * Called from engine.js after significant game events.
+ */
+function recordMemory(type, subjectId, objectId, episode, intensity=50){
+  if(!G.memories) G.memories=[];
+  // Don't duplicate identical events in same episode
+  const dupe = G.memories.find(m=>
+    m.type===type && m.subject===subjectId &&
+    m.object===objectId && m.episode===episode
+  );
+  if(dupe) return;
+  G.memories.push({ type, subject:subjectId, object:objectId, episode, intensity, seen:false });
+}
+
+/**
+ * getMemories(subjectId, objectId=null, types=null)
+ * Returns memories for a subject, optionally filtered by object and/or type.
+ * Sorted by episode desc (most recent first).
+ */
+function getMemories(subjectId, objectId=null, types=null){
+  if(!G.memories) return [];
+  return G.memories
+    .filter(m=>{
+      if(m.subject!==subjectId) return false;
+      if(objectId && m.object!==objectId) return false;
+      if(types && !types.includes(m.type)) return false;
+      return true;
+    })
+    .sort((a,b)=>b.episode-a.episode);
+}
+
+/**
+ * memoryScore(subjectId, objectId)
+ * Returns a -100 to +100 sentiment score representing how subjectId
+ * feels about objectId, based on accumulated memories with decay over time.
+ *
+ * Decay: old memories fade — a betrayal in ep 1 hurts less by ep 10.
+ * Recency: recent events weigh more heavily.
+ */
+function memoryScore(subjectId, objectId){
+  const mems = getMemories(subjectId, objectId);
+  if(!mems.length) return 0;
+  const currentEp = G.episode||1;
+  let total=0, weight=0;
+  mems.forEach(m=>{
+    const def = MEMORY_TYPES[m.type];
+    if(!def) return;
+    const age = currentEp - m.episode;
+    const decayFactor = Math.max(0.1, 1 - def.decay * age);
+    const contribution = def.sentiment * m.intensity * decayFactor;
+    total += contribution;
+    weight += Math.abs(contribution);
+  });
+  if(!weight) return 0;
+  return Math.max(-100, Math.min(100, Math.round(total)));
+}
+
+/**
+ * hasBetrayedBy(subjectId, objectId)
+ * Returns true if objectId has betrayed subjectId (voted them out, broke alliance etc)
+ */
+function hasBetrayedBy(subjectId, objectId){
+  return getMemories(subjectId, objectId, ['betrayal','alliance_broken']).length > 0;
+}
+
+/**
+ * getStrongestMemory(subjectId, objectId)
+ * Returns the most intense memory between these two players.
+ * Used in confessional and script generation for flavour.
+ */
+function getStrongestMemory(subjectId, objectId){
+  const mems = getMemories(subjectId, objectId);
+  if(!mems.length) return null;
+  return mems.reduce((best,m)=>m.intensity>best.intensity?m:best, mems[0]);
+}
+
+/**
+ * getUnseenMemories(subjectId)
+ * Returns memories that haven't been surfaced in confessionals yet.
+ * Marks them as seen once retrieved.
+ */
+function getUnseenMemories(subjectId){
+  if(!G.memories) return [];
+  const unseen = G.memories.filter(m=>m.subject===subjectId && !m.seen);
+  unseen.forEach(m=>m.seen=true);
+  return unseen;
+}
+
+/**
+ * getJuryBias(jurorId, finalistId)
+ * Returns a -100 to +100 jury vote bias score.
+ * Combines relationship score, memory score, and archetype affinity.
+ * Called during finale jury vote calculation.
+ */
+function getJuryBias(jurorId, finalistId){
+  const mem = memoryScore(jurorId, finalistId);
+  const rel = v19RelScore(jurorId, finalistId);
+  const juror = G.cast.find(c=>c.id===jurorId);
+  const finalist = G.cast.find(c=>c.id===finalistId);
+  if(!juror||!finalist) return 0;
+
+  // Base: relationship score normalised to -50/+50
+  let bias = (rel - 50);
+
+  // Memory layer: betrayal hurts badly, saves help
+  bias += mem * 0.4;
+
+  // Archetype respect: some juror types respect certain play styles
+  const respectMatrix = {
+    'Strategic':  ['The Strategist','The Puppet Master','The Quiet Threat'],
+    'Loyal':      ['The Sweetheart','The Fan Favorite','The Underdog'],
+    'Villain':    ['The Big Villain','The Manipulator','The Puppet Master'],
+    'Social':     ['The Social Butterfly','The Fan Favorite','The Sweetheart'],
+    'Hothead':    ['The Challenge Beast','The Physical Threat','The Loose Cannon'],
+    'Underdog':   ['The Underdog','The Fan Favorite','The Sweetheart'],
+  };
+  const respected = respectMatrix[juror.personality]||[];
+  if(respected.includes(finalist.archetype)) bias += 15;
+
+  // Betrayal penalty: if juror was voted out by finalist, strong negative bias
+  if(hasBetrayedBy(jurorId, finalistId)) bias -= 25;
+
+  // Saved bonus: if finalist saved juror at some point
+  if(getMemories(jurorId, finalistId, ['saved']).length) bias += 20;
+
+  return Math.max(-100, Math.min(100, Math.round(bias)));
+}
+
+// ===== MEMORY RECORDING HELPERS =====
+// Called from engine.js at key game moments
+
+/**
+ * recordVoteMemories(voteResult, ep)
+ * After a vote, records memories for all players involved.
+ * - The eliminated player remembers who voted for them (betrayal if ally)
+ * - Voters remember voting against someone (voted_for)
+ * - Alliance members who voted together reinforce bonds
+ */
+function recordVoteMemories(voteResult, ep){
+  if(!voteResult||!voteResult.individualVotes) return;
+  const {eliminated, individualVotes} = voteResult;
+  const epNum = ep.ep;
+
+  individualVotes.forEach(({voter, target, reason})=>{
+    // Target remembers being voted for
+    const isBetrayal = (voter.allianceIds||[]).some(aid=>(target.allianceIds||[]).includes(aid));
+    if(isBetrayal){
+      // Alliance member voted against them — that's a betrayal
+      recordMemory('betrayal', target.id, voter.id, epNum, 80);
+      recordMemory('alliance_broken', target.id, voter.id, epNum, 75);
+      // Voter also knows they broke the alliance
+      recordMemory('alliance_broken', voter.id, target.id, epNum, 60);
+    } else {
+      recordMemory('voted_for', target.id, voter.id, epNum, 40);
+    }
+
+    // If eliminated, everyone who voted for them — they remember more vividly
+    if(eliminated && target.id === eliminated.id){
+      recordMemory('voted_for', target.id, voter.id, epNum,
+        isBetrayal ? 95 : 55);
+    }
+  });
+
+  // Allies who voted together reinforce their bond
+  if(G.alliances){
+    G.alliances.forEach(alliance=>{
+      const votingTogether = alliance.members.filter(mid=>{
+        const v = individualVotes.find(iv=>iv.voter.id===mid);
+        if(!v) return false;
+        // Check if majority of alliance voted same target
+        const allianceVotes = individualVotes.filter(iv=>alliance.members.includes(iv.voter.id));
+        const topTarget = allianceVotes.reduce((acc,iv)=>{
+          acc[iv.target.id]=(acc[iv.target.id]||0)+1; return acc;
+        },{});
+        const maxVotes = Math.max(...Object.values(topTarget));
+        const consensusTarget = Object.keys(topTarget).find(id=>topTarget[id]===maxVotes);
+        return v.target.id === consensusTarget;
+      });
+      // If 3+ alliance members voted together, reinforce bonds between them
+      if(votingTogether.length>=3){
+        for(let i=0;i<votingTogether.length;i++){
+          for(let j=i+1;j<votingTogether.length;j++){
+            recordMemory('alliance_formed', votingTogether[i], votingTogether[j], epNum, 20);
+            recordMemory('alliance_formed', votingTogether[j], votingTogether[i], epNum, 20);
+          }
+        }
+      }
+    });
+  }
+}
+
+/**
+ * recordIdolMemories(idolPlay, ep)
+ * Records memories when an idol is played.
+ */
+function recordIdolMemories(idolPlay, ep){
+  if(!idolPlay) return;
+  const {idolPlayer, target} = idolPlay;
+  const epNum = ep.ep;
+  // Everyone who had votes nullified remembers the idol play
+  if(idolPlayer.id === target?.id){
+    // Played on themselves — anyone who voted for them remembers being blocked
+    (ep.voteResult?.individualVotes||[])
+      .filter(iv=>iv.target.id===idolPlayer.id)
+      .forEach(iv=>{
+        recordMemory('idol_played_against', iv.voter.id, idolPlayer.id, epNum, 70);
+      });
+  } else if(target){
+    // Played on someone else — they feel saved
+    recordMemory('idol_played_on', target.id, idolPlayer.id, epNum, 85);
+    recordMemory('saved', target.id, idolPlayer.id, epNum, 85);
+  }
+}
+
+// ===== MEMORY → VOTING INTEGRATION =====
+
+/**
+ * memoryTargetBonus(voter, target)
+ * Returns a score modifier for targetScore() based on voter's memories of target.
+ * Positive = more likely to vote them out. Negative = less likely.
+ */
+function memoryTargetBonus(voter, target){
+  const score = memoryScore(voter.id, target.id);
+  // Negative memory score (betrayal, conflict) → voter wants to vote them out
+  // Positive memory score (saved, alliance) → voter less likely to target
+  // Scale: -100 → +8 bonus (strongly want out), +100 → -6 bonus (protected)
+  if(score < -60) return 8;
+  if(score < -30) return 5;
+  if(score < -10) return 2;
+  if(score > 60)  return -6;
+  if(score > 30)  return -3;
+  if(score > 10)  return -1;
+  return 0;
+}
+
+// ===== MEMORY → CONFESSIONAL INTEGRATION =====
+
+/**
+ * getMemoryConfessionalLine(player, ep)
+ * Returns a specific confessional line referencing a real past memory.
+ * Returns null if no relevant unseen memories exist.
+ */
+function getMemoryConfessionalLine(player, ep){
+  if(!G.memories) return null;
+  const recentBetrayal = getMemories(player.id, null, ['betrayal'])
+    .find(m => ep.ep - m.episode <= 3);
+  const recentSave = getMemories(player.id, null, ['saved'])
+    .find(m => ep.ep - m.episode <= 3);
+  const recentIdolBlock = getMemories(player.id, null, ['idol_played_against'])
+    .find(m => ep.ep - m.episode <= 2);
+
+  if(recentBetrayal){
+    const betrayer = G.cast.find(c=>c.id===recentBetrayal.object);
+    if(betrayer) return `${betrayer.name.split(' ')[0]} voted against me in Episode ${recentBetrayal.episode}. I haven't forgotten that. I won't.`;
+  }
+  if(recentIdolBlock){
+    const blocker = G.cast.find(c=>c.id===recentIdolBlock.object);
+    if(blocker) return `${blocker.name.split(' ')[0]} played an idol and blocked my vote. That kind of move doesn't go unanswered.`;
+  }
+  if(recentSave){
+    const saviour = G.cast.find(c=>c.id===recentSave.object);
+    if(saviour) return `${saviour.name.split(' ')[0]} could have written my name down and didn't. That means something to me. I owe them.`;
+  }
+  return null;
+}
+
+/**
+ * getMemorySummary(playerA, playerB)
+ * Returns a short prose description of the relationship history between two players.
+ * Used in interaction text and script generation.
+ */
+function getMemorySummary(playerA, playerB){
+  const score = memoryScore(playerA.id, playerB.id);
+  const betrayals = getMemories(playerA.id, playerB.id, ['betrayal']).length;
+  const saves = getMemories(playerA.id, playerB.id, ['saved']).length;
+  const an = playerA.name.split(' ')[0];
+  const bn = playerB.name.split(' ')[0];
+
+  if(betrayals>=2) return `${an} has been burned by ${bn} more than once. The history between them runs cold.`;
+  if(betrayals===1) return `${bn} voted against ${an} once before. ${an} hasn't forgotten.`;
+  if(saves>=1) return `${bn} spared ${an} when they didn't have to. That debt still stands.`;
+  if(score>60) return `${an} and ${bn} have built real trust across this season.`;
+  if(score<-40) return `The tension between ${an} and ${bn} has been building for weeks.`;
+  return null;
+}
+
+// ===== EXPORTS =====
+
+
+// ===== FILE: evolution.js =====
+// No Signal — evolution.js
+// Dynamic archetype evolution system
+// Archetypes shift mid-season based on actual gameplay events.
+// Triggered at the start of each episode after ep 3.
+
+// ===== EVOLUTION RULES =====
+// Each rule: { from, to, condition(c, memories), minEpisode, message }
+// condition receives the contestant object and their memory array
+// Returns true if the evolution should trigger
+
+const EVOLUTION_RULES = [
+  // Challenge wins → threat recognition
+  {
+    from: 'The Underdog',
+    to: 'The Challenge Beast',
+    condition: (c) => c.challengeWins >= 3,
+    minEpisode: 3,
+    message: '{name} has stopped being the underdog — three challenge wins demands a new label.',
+  },
+  {
+    from: 'The Underdog',
+    to: 'The Fan Favorite',
+    condition: (c, mems) => {
+      const saves = mems.filter(m => m.type === 'saved' && m.object !== c.id).length;
+      return c.social >= 7 && saves >= 1;
+    },
+    minEpisode: 4,
+    message: '{name} has survived against the odds so many times the whole cast has started quietly rooting for them.',
+  },
+  {
+    from: 'The Floater',
+    to: 'The Puppet Master',
+    condition: (c, mems) => {
+      const betrayals = mems.filter(m => m.type === 'betrayal' && m.subject === c.id).length;
+      return betrayals >= 2 && c.mental >= 7;
+    },
+    minEpisode: 4,
+    message: '{name} has been labelled a Floater — but two alliances broken strategically tells a different story.',
+  },
+  {
+    from: 'The Floater',
+    to: 'The Goat',
+    condition: (c) => c.challengeWins === 0 && G.episode >= 7,
+    minEpisode: 7,
+    message: '{name} has drifted through this game without leaving a mark. People are keeping them around for a reason.',
+  },
+  {
+    from: 'The Strategist',
+    to: 'The Big Villain',
+    condition: (c, mems) => {
+      const betrayals = mems.filter(m => m.type === 'betrayal' && m.subject !== c.id && m.object === c.id).length;
+      // They've been caught betraying people
+      const caughtBetrayals = mems.filter(m => m.type === 'betrayal' && m.object === c.id).length;
+      return caughtBetrayals >= 2;
+    },
+    minEpisode: 4,
+    message: '{name} started as a strategist — but the number of burned allies tells a different story.',
+  },
+  {
+    from: 'The Social Butterfly',
+    to: 'The Puppet Master',
+    condition: (c, mems) => {
+      const alliancesFormed = mems.filter(m => m.type === 'alliance_formed' && m.subject === c.id).length;
+      return alliancesFormed >= 3 && c.social >= 8;
+    },
+    minEpisode: 5,
+    message: '{name} isn\'t just social — they\'re running three separate alliances simultaneously.',
+  },
+  {
+    from: 'The Challenge Beast',
+    to: 'The Jury Threat',
+    condition: (c) => c.challengeWins >= 4 && G.merged,
+    minEpisode: 6,
+    message: '{name}\'s challenge record post-merge has made them the most obvious jury threat in the game.',
+  },
+  {
+    from: 'The Sweetheart',
+    to: 'The Jury Threat',
+    condition: (c, mems) => {
+      const saves = mems.filter(m => m.type === 'saved' && m.object === c.id).length;
+      return c.social >= 8 && saves >= 2 && G.merged;
+    },
+    minEpisode: 6,
+    message: '{name} has been saved by other players twice. That kind of goodwill wins jury votes.',
+  },
+  {
+    from: 'The Quiet Threat',
+    to: 'The Strategist',
+    condition: (c) => G.merged && c.mental >= 8 && c.challengeWins >= 1,
+    minEpisode: 5,
+    message: '{name} can\'t stay quiet forever. Post-merge they\'ve stepped into the light.',
+  },
+  {
+    from: 'The Loose Cannon',
+    to: 'The Flipper',
+    condition: (c, mems) => {
+      const broken = mems.filter(m => m.type === 'alliance_broken' && m.subject === c.id).length;
+      return broken >= 2;
+    },
+    minEpisode: 3,
+    message: '{name}\'s chaos has a pattern now. They don\'t blow things up randomly — they flip deliberately.',
+  },
+  {
+    from: 'The Number',
+    to: 'The Underdog',
+    condition: (c, mems) => {
+      const votesAgainst = mems.filter(m => m.type === 'voted_for' && m.object === c.id).length;
+      return votesAgainst >= 3 && !c.eliminated;
+    },
+    minEpisode: 4,
+    message: '{name} has had their name written down three times and is still here. That\'s not a Number anymore.',
+  },
+];
+
+// ===== EVOLUTION ENGINE =====
+
+/**
+ * checkArchetypeEvolution()
+ * Called at the start of each episode (ep >= 3).
+ * Checks all active players against evolution rules.
+ * Returns array of evolution events that occurred.
+ * Mutates contestant.archetype if rule triggers.
+ */
+function checkArchetypeEvolution() {
+  if(!G.memories) return [];
+  const events = [];
+  const active = getActive();
+
+  active.forEach(c => {
+    const memories = G.memories.filter(m => m.subject === c.id || m.object === c.id);
+    for(const rule of EVOLUTION_RULES) {
+      if(c.archetype !== rule.from) continue;
+      if(G.episode < rule.minEpisode) continue;
+      if(!rule.condition(c, memories)) continue;
+      // Evolution triggers — don't evolve same player twice in same episode
+      if(events.find(e => e.playerId === c.id)) continue;
+
+      const oldArchetype = c.archetype;
+      c.archetype = rule.to;
+      // Store evolution history on the contestant
+      if(!c.archetypeHistory) c.archetypeHistory = [];
+      c.archetypeHistory.push({ from: oldArchetype, to: rule.to, episode: G.episode });
+
+      const msg = rule.message.replace('{name}', c.name.split(' ')[0]);
+      events.push({ player: c, from: oldArchetype, to: rule.to, message: msg });
+
+      // Record as a memory event — others notice the change
+      recordMemory('rivalry', c.id, null, G.episode, 30); // self-awareness spike
+      break; // only one evolution per player per episode
+    }
+  });
+
+  return events;
+}
+
+/**
+ * buildEvolutionDisplay(events)
+ * Returns HTML for the camp life stage showing evolution events.
+ */
+function buildEvolutionDisplay(events) {
+  if(!events || !events.length) return '';
+  return events.map(ev => {
+    const port = ev.player.customImage
+      ? `<img src="${ev.player.customImage}" style="width:36px;height:44px;object-fit:cover;object-position:top;border-radius:6px">`
+      : getPortrait(ev.player).replace('width="120" height="145"','width="36" height="44"');
+    return `<div class="evolution-card">
+      <div class="evolution-port">${port}<\/div>
+      <div class="evolution-body">
+        <div class="evolution-label">
+          <span class="evolution-old">${ev.from}<\/span>
+          <span class="evolution-arrow">→<\/span>
+          <span class="evolution-new">${ev.to}<\/span>
+        <\/div>
+        <div class="evolution-msg">${ev.message}<\/div>
+      <\/div>
+    <\/div>`;
+  }).join('');
+}
+
+
+
+// ===== EVOLUTION CEREMONY =====
+/**
+ * buildEvolutionCeremony(events, ep)
+ * Generates confessional text and camp reactions for archetype evolutions.
+ * Called after checkArchetypeEvolution() when events exist.
+ * Returns array of {player, confessional, campReaction} objects.
+ */
+function buildEvolutionCeremony(events, ep){
+  return events.map(ev=>{
+    const fn=ev.player.name.split(' ')[0];
+    const confessional=_evoConfessional(ev);
+    const campReaction=_evoCampReaction(ev, ep);
+    // Store on ep so script generator can use them
+    return { player:ev.player, from:ev.from, to:ev.to,
+             confessional, campReaction, message:ev.message };
+  });
+}
+
+function _evoConfessional(ev){
+  const fn=ev.player.name.split(' ')[0];
+  const lines={
+    // Underdog evolutions
+    'The Underdog→The Challenge Beast': `Three challenge wins. Three. I came out here labelled as someone who didn't belong. I don't think anyone's calling me an underdog anymore.`,
+    'The Underdog→The Fan Favorite': `I keep surviving when I shouldn't. I'm starting to wonder if that's not luck — if maybe I've been playing this game better than I thought.`,
+    // Floater evolutions
+    'The Floater→The Puppet Master': `People think I've been drifting. I haven't been drifting. I've been watching. There's a difference. A very important difference.`,
+    'The Floater→The Goat': `I'm still here. I genuinely don't know if that's a good thing or a bad thing.`,
+    // Strategist evolutions
+    'The Strategist→The Big Villain': `I've made some moves that weren't popular. That's the cost of playing to win. I can live with it.`,
+    // Social butterfly evolutions
+    'The Social Butterfly→The Puppet Master': `I have four separate conversations before breakfast every morning. And none of them know about the other three. That's not social — that's strategy.`,
+    // Challenge beast evolution
+    'The Challenge Beast→The Jury Threat': `I know what they're thinking. I'd be thinking the same thing. Four wins. I'm the biggest threat in this game. So now I have to be smarter than I am strong.`,
+    // Sweetheart evolution
+    'The Sweetheart→The Jury Threat': `People keep saving me. I used to think that was kindness. Now I think it's a strategy and I'm terrified they're right to do it.`,
+    // Quiet threat evolution
+    'The Quiet Threat→The Strategist': `Post-merge. No more hiding. Time to actually play.`,
+    // Loose cannon evolution
+    'The Loose Cannon→The Flipper': `I know what everyone says about me. That I'm unpredictable. That I can't be trusted. They're wrong. I'm completely predictable. I just have different priorities.`,
+  };
+  const key=`${ev.from}→${ev.to}`;
+  return lines[key]||`${fn}: ${ev.message}`;
+}
+
+function _evoCampReaction(ev, ep){
+  const fn=ev.player.name.split(' ')[0];
+  // Find another active player who might have noticed
+  const active=G.cast.filter(c=>!c.eliminated&&c.id!==ev.player.id);
+  if(!active.length) return null;
+  const observer=pick(active);
+  const on=observer.name.split(' ')[0];
+
+  const negativeEvolutions=['The Big Villain','The Goat','The Jury Threat'];
+  const positiveEvolutions=['The Fan Favorite','The Challenge Beast','The Puppet Master'];
+
+  if(negativeEvolutions.includes(ev.to)){
+    const reactions=[
+      `${on} noticed the shift in ${fn}'s demeanour. Something had changed. They filed it away quietly.`,
+      `Around camp, people were starting to talk about ${fn} differently. ${on} heard it and said nothing.`,
+      `${on} pulled someone aside after ${fn} left camp. "Has ${fn} seemed different to you lately?" They had.`,
+    ];
+    return pick(reactions);
+  }
+  if(positiveEvolutions.includes(ev.to)){
+    const reactions=[
+      `${on} watched ${fn} from across camp and felt something uncomfortable — was ${fn} actually going to win this?`,
+      `The tribe's perception of ${fn} was shifting. ${on} felt it and wasn't sure if that was good or bad for their own game.`,
+      `"${fn} is not who I thought ${fn} was," ${on} admitted to themselves. They'd need to recalibrate.`,
+    ];
+    return pick(reactions);
+  }
+  return `The tribe watched ${fn} closely tonight. Something was different and everyone could feel it.`;
+}
+
+
+/**
+ * getArchetypeHistory(contestant)
+ * Returns a formatted string of the contestant's evolution history.
+ * Used in Player Profiles.
+ */
+function getArchetypeHistory(contestant) {
+  if(!contestant.archetypeHistory || !contestant.archetypeHistory.length) return null;
+  return contestant.archetypeHistory
+    .map(h => `Ep ${h.episode}: ${h.from} → ${h.to}`)
+    .join(' · ');
+}
+
+// ===== EXPORTS =====
+
+
+// ===== FILE: producer.js =====
+// No Signal — producer.js
+// Producer Mode — host agency tools that give the player meaningful decisions
+// These are deliberate interventions in the simulation, not random events.
+// One power per category per season to keep them meaningful.
+
+// ===== PRODUCER POWER DEFINITIONS =====
+const PRODUCER_POWERS = {
+  // Force a specific rivalry to be publicly noted at camp
+  force_rivalry: {
+    id: 'force_rivalry',
+    name: '⚔️ Manufacture Rivalry',
+    desc: 'Force a public confrontation between two players. Creates a lasting rivalry memory between them.',
+    usesPerSeason: 2,
+    phase: 'any',        // when it can be used
+    stage: 0,            // camp life stage
+  },
+  // Override the vote result this episode (host picks who goes home)
+  blindside: {
+    id: 'blindside',
+    name: '💥 Producer Blindside',
+    desc: 'Override the vote — you choose who goes home this episode. Once per season.',
+    usesPerSeason: 1,
+    phase: 'any',
+    stage: 2,            // tribal council stage
+  },
+  // Make a specific player find the idol (plant it where they look)
+  guided_idol: {
+    id: 'guided_idol',
+    name: '🗺️ Guided Idol Plant',
+    desc: 'Guarantee a specific player finds the hidden idol this episode.',
+    usesPerSeason: 1,
+    phase: 'any',
+    stage: 0,
+  },
+  // Force a specific alliance to fracture this episode
+  fracture_alliance: {
+    id: 'fracture_alliance',
+    name: '🔥 Fracture Alliance',
+    desc: 'Force a specific alliance to fracture. One member betrays the others this vote.',
+    usesPerSeason: 1,
+    phase: 'any',
+    stage: 0,
+  },
+  // Boost a player's challenge performance this episode
+  challenge_boost: {
+    id: 'challenge_boost',
+    name: '⚡ Challenge Boost',
+    desc: 'One player performs at their peak this challenge — maximum stats, no randomness.',
+    usesPerSeason: 2,
+    phase: 'any',
+    stage: 1,
+  },
+  // Secret vote reading — see how everyone plans to vote before tribal
+  intel_drop: {
+    id: 'intel_drop',
+    name: '👁️ Intel Drop',
+    desc: 'See how the tribe plans to vote before the parchments are read. No changes — just knowledge.',
+    usesPerSeason: 2,
+    phase: 'any',
+    stage: 2,
+  },
+};
+
+// Track usage in G.producerPowers = { powerId: usesRemaining }
+function initProducerPowers() {
+  G.producerPowers = {};
+  Object.entries(PRODUCER_POWERS).forEach(([id, p]) => {
+    G.producerPowers[id] = p.usesPerSeason;
+  });
+}
+
+function producerPowerUsed(id) {
+  if(!G.producerPowers) initProducerPowers();
+  return (G.producerPowers[id] || 0) <= 0;
+}
+
+function useProducerPower(id) {
+  if(!G.producerPowers) initProducerPowers();
+  if(G.producerPowers[id] > 0) G.producerPowers[id]--;
+}
+
+function producerUsesLeft(id) {
+  if(!G.producerPowers) initProducerPowers();
+  return G.producerPowers[id] ?? PRODUCER_POWERS[id]?.usesPerSeason ?? 0;
+}
+
+// ===== PRODUCER ACTIONS =====
+
+/**
+ * showProducerPanel()
+ * Opens the producer modal showing all available powers and their status.
+ * Called from the HOST CHOICE section of buildStageNav.
+ */
+function showProducerPanel() {
+  if(!G.producerPowers) initProducerPowers();
+  const active = getActive();
+  if(!active.length) return;
+
+  const ep = G.currentEpData;
+  const stage = G.stageIndex;
+
+  let html = `<div class="v19-help">Use these once-per-season powers to shape the narrative. Choose carefully — they're limited.<\/div>`;
+
+  html += `<div class="producer-grid">`;
+  Object.entries(PRODUCER_POWERS).forEach(([id, p]) => {
+    const uses = producerUsesLeft(id);
+    const used = uses <= 0;
+    const wrongStage = p.stage !== undefined && p.stage !== stage;
+    const disabled = used || wrongStage;
+    const reason = used ? 'Used up' : wrongStage ? `Available at ${['Camp','Challenge','Tribal'][p.stage]} stage` : '';
+    html += `<div class="producer-card ${disabled?'producer-disabled':''}">
+      <div class="producer-name">${p.name}<\/div>
+      <div class="producer-desc">${p.desc}<\/div>
+      <div class="producer-meta">
+        <span class="${used?'producer-used':'producer-uses'}">${used?'Exhausted':`${uses} use${uses!==1?'s':''} left`}<\/span>
+        ${reason?`<span class="producer-reason">${reason}<\/span>`:''}
+      <\/div>
+      ${!disabled?`<button class="btn btn-fire btn-sm" style="margin-top:8px;width:100%" data-action="producerAction" data-power="${id}">Use Now<\/button>`:''}
+    <\/div>`;
+  });
+  html += `<\/div>`;
+
+  openV19Modal('🎬 Producer Controls', html);
+}
+
+/**
+ * executeProducerAction(powerId)
+ * Dispatched from the delegated event handler when a producer button is tapped.
+ */
+function executeProducerAction(powerId) {
+  closeModal('modal-v19');
+  switch(powerId) {
+    case 'force_rivalry':     producerForceRivalry(); break;
+    case 'blindside':         producerBlindside(); break;
+    case 'guided_idol':       producerGuidedIdol(); break;
+    case 'fracture_alliance': producerFractureAlliance(); break;
+    case 'challenge_boost':   producerChallengeBoost(); break;
+    case 'intel_drop':        producerIntelDrop(); break;
+  }
+}
+
+// ─── FORCE RIVALRY ───────────────────────────────────────────────────────────
+function producerForceRivalry() {
+  const active = getActive();
+  if(active.length < 2) return;
+
+  // Build player picker
+  const opts = active.map(c =>
+    `<option value="${c.id}">${c.name} (${c.archetype})<\/option>`
+  ).join('');
+
+  const html = `<div class="v19-help">Choose two players. A public confrontation erupts between them — creating a lasting rivalry memory on both sides.<\/div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+      <div>
+        <label class="form-label">Player A<\/label>
+        <select class="form-select" id="rivalry-a">${opts}<\/select>
+      <\/div>
+      <div>
+        <label class="form-label">Player B<\/label>
+        <select class="form-select" id="rivalry-b">${opts}<\/select>
+      <\/div>
+      <button class="btn btn-fire" data-action="confirmRivalry">⚔️ Manufacture Rivalry<\/button>
+    <\/div>`;
+  openV19Modal('⚔️ Manufacture Rivalry', html);
+}
+
+function confirmRivalry() {
+  const aId = document.getElementById('rivalry-a')?.value;
+  const bId = document.getElementById('rivalry-b')?.value;
+  if(!aId || !bId || aId === bId) { notify('Pick two different players'); return; }
+  const a = G.cast.find(c=>c.id===aId), b = G.cast.find(c=>c.id===bId);
+  if(!a||!b) return;
+  closeModal('modal-v19');
+  useProducerPower('force_rivalry');
+  // Record rivalry memories on both sides at high intensity
+  recordMemory('rivalry', aId, bId, G.episode, 85);
+  recordMemory('rivalry', bId, aId, G.episode, 85);
+  // Also set negative relationship score
+  const key = [aId,bId].sort().join('|');
+  G.relationships[key] = Math.min(G.relationships[key]||50, 20);
+  G.dramaLevel = Math.min(5, G.dramaLevel + 1);
+  notify(`⚔️ ${a.name.split(' ')[0]} and ${b.name.split(' ')[0]} just became enemies`, 'twist');
+  renderStage(G.stageIndex);
+}
+
+// ─── PRODUCER BLINDSIDE ───────────────────────────────────────────────────────
+function producerBlindside() {
+  const ep = G.currentEpData;
+  if(!ep?.voteResult) { notify('Run the vote first — then override it'); return; }
+  const active = getActive().filter(c =>
+    !ep.eliminated || c.id !== ep.eliminated.id
+  );
+  const opts = active.map(c => {
+    const votes = ep.voteResult.tally[c.id] || 0;
+    return `<option value="${c.id}">${c.name} (${c.archetype}) — ${votes} vote${votes!==1?'s':''}<\/option>`;
+  }).join('');
+
+  const html = `<div class="v19-help">The vote has been counted — but you can override it. Choose who actually goes home tonight. The original vote result is discarded.<\/div>
+    <div style="margin-top:12px">
+      <label class="form-label">Send home instead<\/label>
+      <select class="form-select" id="blindside-target">${opts}<\/select>
+      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmBlindside">💥 Execute Blindside<\/button>
+    <\/div>`;
+  openV19Modal('💥 Producer Blindside', html);
+}
+
+function confirmBlindside() {
+  const targetId = document.getElementById('blindside-target')?.value;
+  if(!targetId) return;
+  const target = G.cast.find(c=>c.id===targetId);
+  if(!target) return;
+  closeModal('modal-v19');
+  useProducerPower('blindside');
+  const ep = G.currentEpData;
+  // Override the eliminated player
+  const old = ep.eliminated;
+  ep.eliminated = target;
+  ep._producerBlindside = true;
+  ep._originalEliminated = old;
+  // Record betrayal memories for everyone who voted the original target
+  (ep.voteResult?.individualVotes||[]).forEach(iv => {
+    if(iv.target.id === (old?.id)) {
+      recordMemory('betrayal', iv.target.id, 'producer', G.episode, 60);
+    }
+  });
+  notify(`💥 Producer blindside — ${target.name.split(' ')[0]} goes home instead`, 'twist');
+  renderStage(G.stageIndex);
+}
+
+// ─── GUIDED IDOL ─────────────────────────────────────────────────────────────
+function producerGuidedIdol() {
+  const active = getActive();
+  const opts = active.map(c =>
+    `<option value="${c.id}">${c.name} (${c.archetype})<\/option>`
+  ).join('');
+
+  const html = `<div class="v19-help">Choose a player. They'll find the hidden idol this episode — guaranteed. Useful for protecting a fan favourite or disrupting a dominant alliance.<\/div>
+    <div style="margin-top:12px">
+      <label class="form-label">Idol goes to<\/label>
+      <select class="form-select" id="guided-idol-target">${opts}<\/select>
+      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmGuidedIdol">🗺️ Plant the Idol<\/button>
+    <\/div>`;
+  openV19Modal('🗺️ Guided Idol Plant', html);
+}
+
+function confirmGuidedIdol() {
+  const targetId = document.getElementById('guided-idol-target')?.value;
+  if(!targetId) return;
+  const target = G.cast.find(c=>c.id===targetId);
+  if(!target) return;
+  closeModal('modal-v19');
+  useProducerPower('guided_idol');
+  if(!G.idolHolders.includes(targetId)) G.idolHolders.push(targetId);
+  const ep = G.currentEpData;
+  ep.idolFinder = target;
+  notify(`🗺️ ${target.name.split(' ')[0]} finds the hidden idol`, 'win');
+  renderStage(G.stageIndex);
+}
+
+// ─── FRACTURE ALLIANCE ────────────────────────────────────────────────────────
+function producerFractureAlliance() {
+  if(!G.alliances?.length) { notify('No active alliances to fracture'); return; }
+  const opts = G.alliances.map(a => {
+    const names = a.members.map(id => G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean).join(', ');
+    return `<option value="${a.id}">${names}<\/option>`;
+  }).join('');
+
+  const html = `<div class="v19-help">Choose an alliance to fracture. One member will betray the others this vote — and everyone will remember it.<\/div>
+    <div style="margin-top:12px">
+      <label class="form-label">Alliance to fracture<\/label>
+      <select class="form-select" id="fracture-target">${opts}<\/select>
+      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmFractureAlliance">🔥 Fracture It<\/button>
+    <\/div>`;
+  openV19Modal('🔥 Fracture Alliance', html);
+}
+
+function confirmFractureAlliance() {
+  const allianceId = document.getElementById('fracture-target')?.value;
+  if(!allianceId) return;
+  const alliance = G.alliances.find(a=>a.id===allianceId);
+  if(!alliance||alliance.members.length<2) return;
+  closeModal('modal-v19');
+  useProducerPower('fracture_alliance');
+  // Pick a random member as the betrayer
+  const betrayer = G.cast.find(c=>c.id===pick(alliance.members));
+  // Record betrayal memories on all other members
+  alliance.members.forEach(mid => {
+    if(mid === betrayer.id) return;
+    recordMemory('betrayal', mid, betrayer.id, G.episode, 90);
+    recordMemory('alliance_broken', mid, betrayer.id, G.episode, 85);
+  });
+  // Remove from alliance
+  alliance.members = alliance.members.filter(id=>id!==betrayer.id);
+  betrayer.allianceIds = (betrayer.allianceIds||[]).filter(id=>id!==allianceId);
+  G.dramaLevel = Math.min(5, G.dramaLevel + 2);
+  notify(`🔥 ${betrayer.name.split(' ')[0]} fractures the alliance — betrayal recorded`, 'twist');
+  renderStage(G.stageIndex);
+}
+
+// ─── CHALLENGE BOOST ──────────────────────────────────────────────────────────
+function producerChallengeBoost() {
+  const active = getActive();
+  const opts = active.map(c =>
+    `<option value="${c.id}">${c.name} — ${c.archetype} (phys:${c.physical} ment:${c.mental})<\/option>`
+  ).join('');
+
+  const html = `<div class="v19-help">Choose a player. They perform at their absolute peak this challenge — max stats, no randomness applied.<\/div>
+    <div style="margin-top:12px">
+      <label class="form-label">Boost this player<\/label>
+      <select class="form-select" id="boost-target">${opts}<\/select>
+      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmChallengeBoost">⚡ Apply Boost<\/button>
+    <\/div>`;
+  openV19Modal('⚡ Challenge Boost', html);
+}
+
+function confirmChallengeBoost() {
+  const targetId = document.getElementById('boost-target')?.value;
+  if(!targetId) return;
+  const target = G.cast.find(c=>c.id===targetId);
+  if(!target) return;
+  closeModal('modal-v19');
+  useProducerPower('challenge_boost');
+  G._challengeBoostId = targetId;
+  notify(`⚡ ${target.name.split(' ')[0]} will dominate the challenge`, 'win');
+}
+
+// ─── INTEL DROP ───────────────────────────────────────────────────────────────
+function producerIntelDrop() {
+  const ep = G.currentEpData;
+  if(!ep?.voteResult?.tally) { notify('No vote data yet — run the episode first'); return; }
+  const tally = ep.voteResult.tally;
+  const sorted = Object.entries(tally)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([id,count]) => {
+      const p = G.cast.find(c=>c.id===id);
+      return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>${p?.name||id} <span style="font-size:11px;color:var(--text2)">${p?.archetype||''}<\/span><\/span>
+        <strong>${count} vote${count!==1?'s':''}<\/strong>
+      <\/div>`;
+    }).join('');
+
+  const html = `<div class="v19-help">Host's eyes only. This is how the votes actually fell — before the parchments are read.<\/div>
+    <div style="margin-top:12px">${sorted}<\/div>
+    <button class="btn btn-outline" style="margin-top:14px;width:100%" data-action="closeV19Modal">Close<\/button>`;
+  useProducerPower('intel_drop');
+  openV19Modal('👁️ Intel Drop — Confidential', html);
+}
+
+// ===== EXPORTS =====
+
+
+// ===== FILE: story.js =====
+// No Signal — story.js
+// Season Story Layer — the game reads its own season and identifies narrative highlights.
+// Transforms vote sequences into remembered character arcs.
+// Called at season end or on demand via the 📖 Season Story button.
+
+// ===== SEASON NARRATIVE ANALYSER =====
+
+/**
+ * analyseSeasonStory()
+ * Reads G.memories[], G.episodeLog[], G.cast, G.alliances
+ * and identifies the key narrative moments that define this season.
+ * Returns a structured story object used by buildSeasonStoryCard().
+ */
+function analyseSeasonStory(){
+  const story={
+    title:        null,   // auto-generated season tagline
+    villain:      null,   // player who manipulated most aggressively
+    hero:         null,   // dominant winner or fan favourite
+    tragic:       null,   // player with power who lost it suddenly
+    underdog:     null,   // most survived despite votes against them
+    mastermind:   null,   // player who controlled the most votes
+    bitterJuror:  null,   // jury member with highest betrayal score
+    bestAlliance: null,   // alliance that lasted longest / deepest
+    biggestBlindside: null, // highest-intensity betrayal event
+    definingEpisode: null,  // episode with most significant events
+    arcSummary:   null,   // 2-3 sentence season arc in prose
+    playerArcs:   [],     // per-player arc summaries
+  };
+
+  if(!G.cast||!G.cast.length) return story;
+
+  const eliminated=[...G.cast].filter(c=>c.eliminated&&c.elimEp).sort((a,b)=>a.elimEp-b.elimEp);
+  const active=getActive();
+  const winner=G.cast.find(c=>c.winner);
+  const allMemories=G.memories||[];
+
+  // ── VILLAIN ─────────────────────────────────────────────────────────────
+  // Most betrayal events as SUBJECT (they did the betraying)
+  const betrayalsByPlayer={};
+  allMemories.filter(m=>m.type==='betrayal').forEach(m=>{
+    betrayalsByPlayer[m.subject]=(betrayalsByPlayer[m.subject]||0)+m.intensity;
+  });
+  const villainId=Object.entries(betrayalsByPlayer).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  story.villain=villainId?G.cast.find(c=>c.id===villainId):null;
+
+  // ── HERO / DOMINANT PLAYER ───────────────────────────────────────────────
+  // Highest combined challenge wins + final placement + jury respect
+  const heroScore=c=>{
+    const wins=c.challengeWins||0;
+    const placement=c.winner?1:(c.juryMember?G.jury.indexOf(G.jury.find(j=>j.id===c.id))+1:99);
+    const juryBias=G.jury.reduce((sum,j)=>{
+      return sum+(typeof getJuryBias==='function'?getJuryBias(j.id,c.id):0);
+    },0);
+    return wins*15 + (10-Math.min(placement,10)) + juryBias*0.1;
+  };
+  story.hero=winner||[...G.cast].sort((a,b)=>heroScore(b)-heroScore(a))[0];
+
+  // ── TRAGIC DOWNFALL ──────────────────────────────────────────────────────
+  // Player who held power (challenge wins, alliances) then was blindsided
+  const tragicScore=c=>{
+    if(!c.eliminated) return 0;
+    const wins=c.challengeWins||0;
+    const hadAlliance=(c.allianceIds||[]).length>0?1:0;
+    // Higher elimination episode = deeper run = bigger fall
+    const depth=c.elimEp||0;
+    // Check if they were blindsided — many in their alliance voted them out
+    const betrayedThem=allMemories.filter(m=>
+      m.type==='betrayal'&&m.object===c.id&&m.intensity>=70
+    ).length;
+    return (wins*10) + (hadAlliance*8) + (depth*3) + (betrayedThem*15);
+  };
+  story.tragic=eliminated.length
+    ?[...eliminated].sort((a,b)=>tragicScore(b)-tragicScore(a))[0]
+    :null;
+
+  // ── UNDERDOG ─────────────────────────────────────────────────────────────
+  // Most votes received while surviving — narrowly escaped the most
+  const votesReceivedWhileSurviving={};
+  (G.episodeLog||[]).forEach(ep=>{
+    if(!ep.voteResult?.tally) return;
+    Object.entries(ep.voteResult.tally).forEach(([id,count])=>{
+      const p=G.cast.find(c=>c.id===id);
+      // Only count if they survived this episode
+      if(p&&ep.eliminated?.id!==id&&count>0){
+        votesReceivedWhileSurviving[id]=(votesReceivedWhileSurviving[id]||0)+count;
+      }
+    });
+  });
+  const underdogId=Object.entries(votesReceivedWhileSurviving)
+    .sort((a,b)=>b[1]-a[1])[0]?.[0];
+  story.underdog=underdogId?G.cast.find(c=>c.id===underdogId):null;
+
+  // ── MASTERMIND ───────────────────────────────────────────────────────────
+  // Player whose vote target went home the most (controlled most eliminations)
+  const controlledVotes={};
+  (G.episodeLog||[]).forEach(ep=>{
+    if(!ep.voteResult?.individualVotes||!ep.eliminated) return;
+    ep.voteResult.individualVotes.forEach(v=>{
+      if(v.target.id===ep.eliminated.id){
+        controlledVotes[v.voter.id]=(controlledVotes[v.voter.id]||0)+1;
+      }
+    });
+  });
+  const mastermindId=Object.entries(controlledVotes).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  story.mastermind=mastermindId?G.cast.find(c=>c.id===mastermindId):null;
+
+  // ── BITTER JUROR ─────────────────────────────────────────────────────────
+  // Jury member with highest total betrayal intensity against finalists
+  if(G.jury&&G.jury.length){
+    const finalists=active.length?active:G.cast.filter(c=>c.winner);
+    const bitterScore=j=>finalists.reduce((sum,f)=>{
+      const mems=allMemories.filter(m=>
+        m.type==='betrayal'&&m.subject===j.id&&m.object===f.id
+      );
+      return sum+mems.reduce((s,m)=>s+m.intensity,0);
+    },0);
+    const sorted=[...G.jury].sort((a,b)=>bitterScore(b)-bitterScore(a));
+    if(bitterScore(sorted[0])>0) story.bitterJuror=sorted[0];
+  }
+
+  // ── BEST ALLIANCE ────────────────────────────────────────────────────────
+  // Alliance whose members collectively lasted deepest into the game
+  if(G.alliances&&G.alliances.length){
+    const allianceDepth=al=>{
+      const members=al.members.map(id=>G.cast.find(c=>c.id===id)).filter(Boolean);
+      const avgPlacement=members.reduce((sum,m)=>{
+        const ep=m.eliminated?m.elimEp||0:G.episode+5;
+        return sum+ep;
+      },0)/Math.max(members.length,1);
+      return avgPlacement * members.length;
+    };
+    story.bestAlliance=[...G.alliances].sort((a,b)=>allianceDepth(b)-allianceDepth(a))[0];
+  }
+
+  // ── BIGGEST BLINDSIDE ────────────────────────────────────────────────────
+  // Highest intensity betrayal memory event
+  const biggestBetrayalMem=allMemories
+    .filter(m=>m.type==='betrayal')
+    .sort((a,b)=>b.intensity-a.intensity)[0];
+  if(biggestBetrayalMem){
+    story.biggestBlindside={
+      victim: G.cast.find(c=>c.id===biggestBetrayalMem.object),
+      perpetrator: G.cast.find(c=>c.id===biggestBetrayalMem.subject),
+      episode: biggestBetrayalMem.episode,
+      intensity: biggestBetrayalMem.intensity,
+    };
+  }
+
+  // ── DEFINING EPISODE ────────────────────────────────────────────────────
+  // Episode with most significant combined events
+  const epSignificance=ep=>{
+    let score=0;
+    if(ep.mergeHappened) score+=30;
+    if(ep.idolPlay) score+=25;
+    if(ep.twist) score+=10;
+    if(ep.doubleElim) score+=20;
+    if(ep.voteResult?.tied) score+=15;
+    if(ep.evolutionEvents?.length) score+=ep.evolutionEvents.length*10;
+    const betrayalsThisEp=allMemories.filter(m=>m.type==='betrayal'&&m.episode===ep.ep);
+    score+=betrayalsThisEp.reduce((s,m)=>s+m.intensity,0)*0.1;
+    return score;
+  };
+  if(G.episodeLog?.length){
+    story.definingEpisode=[...G.episodeLog].sort((a,b)=>epSignificance(b)-epSignificance(a))[0];
+  }
+
+  // ── PLAYER ARCS ──────────────────────────────────────────────────────────
+  // Per-player narrative summaries for the top 5 most story-relevant players
+  const storyPlayers=new Set([
+    story.villain, story.hero, story.tragic,
+    story.underdog, story.mastermind
+  ].filter(Boolean).map(p=>p.id));
+
+  story.playerArcs=[...storyPlayers].slice(0,5).map(id=>{
+    const p=G.cast.find(c=>c.id===id);
+    if(!p) return null;
+    return buildPlayerArc(p, story);
+  }).filter(Boolean);
+
+  // ── ARC SUMMARY ─────────────────────────────────────────────────────────
+  story.arcSummary=buildArcSummary(story);
+
+  // ── SEASON TAGLINE ───────────────────────────────────────────────────────
+  story.title=buildSeasonTagline(story);
+
+  return story;
+}
+
+// ===== ARC BUILDERS =====
+
+/**
+ * buildPlayerArc(player, story)
+ * Generates a 2-3 sentence narrative summary of one player's season story.
+ */
+function buildPlayerArc(p, story){
+  const fn=p.name.split(' ')[0];
+  const evo=p.archetypeHistory?.length
+    ? ` — evolving from ${p.archetypeHistory[0].from} to ${p.archetype} by episode ${p.archetypeHistory[p.archetypeHistory.length-1].episode}`
+    : '';
+  const wins=p.challengeWins||0;
+  const isVillain=story.villain?.id===p.id;
+  const isHero=story.hero?.id===p.id;
+  const isTragic=story.tragic?.id===p.id;
+  const isUnderdog=story.underdog?.id===p.id;
+  const isMastermind=story.mastermind?.id===p.id;
+
+  const votesAgainst=Object.values(
+    (G.episodeLog||[]).reduce((acc,ep)=>{
+      const v=ep.voteResult?.tally?.[p.id]||0;
+      if(v>0) acc[ep.ep]=v;
+      return acc;
+    },{})
+  ).reduce((s,v)=>s+v,0);
+
+  let arc='';
+
+  if(p.winner){
+    arc=`${fn} played a complete game${wins>0?`, winning ${wins} challenge${wins!==1?'s':''}`:''}.`;
+    if(isMastermind) arc+=` They controlled the vote more than anyone else in the game.`;
+    else if(isHero) arc+=` Their social game never cracked under pressure.`;
+    arc+=` At the finale, the jury rewarded them with the win.`;
+  } else if(isTragic){
+    arc=`${fn} had everything needed to win${wins>0?` — ${wins} challenge win${wins!==1?'s':''} and a strong alliance`:''}${evo}.`;
+    arc+=` But the game turned on them in episode ${p.elimEp||'?'}, and the player who seemed untouchable became the most memorable elimination of the season.`;
+  } else if(isVillain){
+    arc=`${fn} left a trail of broken alliances and betrayal memories through this season${evo}.`;
+    arc+=` Whether it was strategy or survival, nobody trusted them by the end — and the jury remembered every move.`;
+  } else if(isUnderdog){
+    arc=`${fn} received ${votesAgainst} vote${votesAgainst!==1?'s':''} against them and survived every single one${evo}.`;
+    arc+=` They outlasted players with more power, more allies, and better odds. Somehow they're still here.`;
+  } else if(isMastermind){
+    arc=`${fn} controlled the direction of more votes than anyone else this season${evo}.`;
+    arc+=` Most players never realised the extent of their influence until it was too late.`;
+  } else {
+    arc=`${fn} played a ${p.personality?.toLowerCase()||'strategic'} game${evo}`;
+    arc+=p.eliminated?`, finishing in episode ${p.elimEp||'?'}.`:`, and is still fighting.`;
+  }
+  return { player:p, arc, role:isVillain?'Villain':isHero?'Hero':isTragic?'Tragic':isUnderdog?'Underdog':isMastermind?'Mastermind':'Player' };
+}
+
+/**
+ * buildArcSummary(story)
+ * 2-3 sentence season arc summary.
+ */
+function buildArcSummary(story){
+  const parts=[];
+  const sn=G.settings.name||'This season';
+
+  if(story.villain&&story.hero&&story.villain.id!==story.hero.id){
+    parts.push(`${sn} was defined by the collision between ${story.villain.name.split(' ')[0]}'s ruthless manipulation and ${story.hero.name.split(' ')[0]}'s steadier game.`);
+  } else if(story.hero){
+    parts.push(`${sn} belonged to ${story.hero.name.split(' ')[0]}, who emerged as the season's defining player.`);
+  } else {
+    parts.push(`${sn} was a season of shifting power and unpredictable alliances.`);
+  }
+
+  if(story.tragic){
+    parts.push(`The season's most dramatic moment came when ${story.tragic.name.split(' ')[0]} — seemingly in control — was blindsided in episode ${story.tragic.elimEp||'?'}.`);
+  } else if(story.biggestBlindside?.victim){
+    parts.push(`The defining moment came in episode ${story.biggestBlindside.episode}, when ${story.biggestBlindside.victim.name.split(' ')[0]} was betrayed by ${story.biggestBlindside.perpetrator?.name.split(' ')[0]||'someone they trusted'}.`);
+  }
+
+  if(story.underdog&&story.underdog.id!==story.hero?.id){
+    parts.push(`Throughout it all, ${story.underdog.name.split(' ')[0]} quietly survived everything the game threw at them — the season's most resilient story.`);
+  }
+
+  return parts.join(' ');
+}
+
+/**
+ * buildSeasonTagline(story)
+ * Generates a short dramatic tagline for the season.
+ */
+function buildSeasonTagline(story){
+  const taglines=[
+    story.villain&&story.hero&&story.villain.id!==story.hero.id
+      ? `${story.hero.name.split(' ')[0]} vs ${story.villain.name.split(' ')[0]}: One Game, Two Visions`
+      : null,
+    story.tragic
+      ? `The Fall of ${story.tragic.name.split(' ')[0]}`
+      : null,
+    story.underdog&&(G.cast.find(c=>c.winner)?.id===story.underdog.id)
+      ? `The ${story.underdog.name.split(' ')[0]} Story: Against Every Odd`
+      : null,
+    story.biggestBlindside?.victim
+      ? `Nobody Saw It Coming`
+      : null,
+    `${G.settings.name||'No Signal'}: A Season of Broken Trust`,
+  ];
+  return taglines.find(t=>t!==null)||`${G.settings.name||'No Signal'}`;
+}
+
+// ===== SEASON STORY CARD BUILDER =====
+
+/**
+ * buildSeasonStoryCard(story)
+ * Returns HTML for the full season story card.
+ * Visual, editorial, emotionally readable.
+ */
+function buildSeasonStoryCard(story){
+  const winner=G.cast.find(c=>c.winner);
+
+  let html=`<div class="ss-wrap">`;
+
+  // ── SEASON TAGLINE ──────────────────────────────────────────────────────
+  html+=`<div class="ss-tagline">${story.title||G.settings.name||'No Signal'}</div>`;
+
+  // ── ARC SUMMARY ─────────────────────────────────────────────────────────
+  if(story.arcSummary){
+    html+=`<div class="ss-arc">${story.arcSummary}</div>`;
+  }
+
+  // ── STORY ROLES GRID ────────────────────────────────────────────────────
+  const roles=[
+    { label:'Season Villain',   player:story.villain,      icon:'😈', desc:'Most betrayals committed' },
+    { label:'Dominant Player',  player:story.hero,         icon:'👑', desc:'Most control over outcome' },
+    { label:'Tragic Fall',      player:story.tragic,       icon:'💔', desc:'Had power — then lost it all' },
+    { label:'Underdog',         player:story.underdog,     icon:'🔥', desc:'Survived the most votes against' },
+    { label:'Puppet Master',    player:story.mastermind,   icon:'🧵', desc:'Controlled the most eliminations' },
+    { label:'Bitter Juror',     player:story.bitterJuror,  icon:'⚖️', desc:'Most aggrieved jury member' },
+  ].filter(r=>r.player);
+
+  if(roles.length){
+    html+=`<div class="ss-roles">`;
+    roles.forEach(r=>{
+      const p=r.player;
+      const port=p.customImage
+        ?`<img src="${p.customImage}" style="width:52px;height:63px;object-fit:cover;object-position:top;border-radius:8px;display:block">`
+        :getPortrait(p).replace('width="120" height="145"','width="52" height="63"');
+      html+=`<div class="ss-role-card">
+        <div class="ss-role-port" style="border-color:${p.color}">${port}</div>
+        <div class="ss-role-icon">${r.icon}</div>
+        <div class="ss-role-label">${r.label}</div>
+        <div class="ss-role-name">${p.name.split(' ')[0]}</div>
+        <div class="ss-role-arch">${p.archetype}</div>
+        <div class="ss-role-desc">${r.desc}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // ── DEFINING EPISODE ────────────────────────────────────────────────────
+  if(story.definingEpisode){
+    const ep=story.definingEpisode;
+    const title=ep.mergeHappened?'The Merge':ep.idolPlay?'The Idol Play':ep.doubleElim?'Double Elimination':`Episode ${ep.ep}`;
+    html+=`<div class="ss-defining">
+      <div class="ss-section-label">🎬 Defining Episode</div>
+      <div class="ss-defining-title">Episode ${ep.ep} — ${title}</div>
+      <div class="ss-defining-body">${ep.summary||''}</div>
+    </div>`;
+  }
+
+  // ── BIGGEST BLINDSIDE ────────────────────────────────────────────────────
+  if(story.biggestBlindside?.victim&&story.biggestBlindside?.perpetrator){
+    const bs=story.biggestBlindside;
+    html+=`<div class="ss-blindside">
+      <div class="ss-section-label">💥 Biggest Blindside</div>
+      <div class="ss-blindside-body">
+        Episode ${bs.episode}: <strong>${bs.perpetrator.name.split(' ')[0]}</strong> betrayed <strong>${bs.victim.name.split(' ')[0]}</strong> with an intensity score of ${bs.intensity}/100.
+        ${bs.intensity>=90?'An all-time betrayal.':bs.intensity>=70?'A defining moment of the season.':'A turning point nobody expected.'}
+      </div>
+    </div>`;
+  }
+
+  // ── BEST ALLIANCE ────────────────────────────────────────────────────────
+  if(story.bestAlliance){
+    const al=story.bestAlliance;
+    const names=al.members.map(id=>G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean);
+    html+=`<div class="ss-alliance">
+      <div class="ss-section-label">🤝 Most Effective Alliance</div>
+      <div class="ss-alliance-names">${names.join(' · ')}</div>
+    </div>`;
+  }
+
+  // ── PLAYER ARCS ──────────────────────────────────────────────────────────
+  if(story.playerArcs?.length){
+    html+=`<div class="ss-section-label" style="margin-top:16px">📖 Character Arcs</div>`;
+    html+=`<div class="ss-arcs">`;
+    story.playerArcs.forEach(a=>{
+      const roleBadge=`<span class="ss-arc-role ss-role-${a.role.toLowerCase()}">${a.role}</span>`;
+      html+=`<div class="ss-arc-item">
+        <div class="ss-arc-header">${a.player.name} ${roleBadge}</div>
+        <div class="ss-arc-text">${a.arc}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  html+=`</div>`;
+  return html;
+}
+
+// ===== SHOW SEASON STORY MODAL =====
+
+/**
+ * showSeasonStory()
+ * Analyses the current season and shows the story card modal.
+ */
+function showSeasonStory(){
+  if(!G.episodeLog?.length&&!G.cast.some(c=>c.eliminated)){
+    notify('Play some episodes first — the story builds as the season unfolds');
+    return;
+  }
+  const story=analyseSeasonStory();
+  const card=buildSeasonStoryCard(story);
+  const html=`${card}
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-fire" style="flex:1" data-action="exportSeasonStory">⬇ Export Story</button>
+      <button class="btn btn-outline" style="flex:1" data-action="showSeasonRecap">📺 Full Recap</button>
+    </div>`;
+  openV19Modal('📖 Season Story', html);
+  // Cache story for export
+  window._currentStory=story;
+}
+
+/**
+ * exportSeasonStory()
+ * Exports the season story as a formatted text file.
+ */
+function exportSeasonStory(){
+  const story=window._currentStory||analyseSeasonStory();
+  let txt=`${(G.settings.name||'No Signal Season').toUpperCase()}\n`;
+  txt+=`${story.title?story.title+'\n':''}\n`;
+  if(story.arcSummary) txt+=`${story.arcSummary}\n\n`;
+
+  txt+=`SEASON ROLES\n${'─'.repeat(40)}\n`;
+  const roles=[
+    ['Season Villain', story.villain],
+    ['Dominant Player', story.hero],
+    ['Tragic Fall',     story.tragic],
+    ['Underdog',        story.underdog],
+    ['Puppet Master',   story.mastermind],
+    ['Bitter Juror',    story.bitterJuror],
+  ];
+  roles.filter(([,p])=>p).forEach(([role,p])=>{
+    txt+=`${role}: ${p.name} (${p.archetype})\n`;
+  });
+
+  if(story.biggestBlindside?.victim){
+    const bs=story.biggestBlindside;
+    txt+=`\nBIGGEST BLINDSIDE\n${'─'.repeat(40)}\n`;
+    txt+=`Episode ${bs.episode}: ${bs.perpetrator?.name||'?'} → ${bs.victim.name} (intensity: ${bs.intensity}/100)\n`;
+  }
+
+  if(story.bestAlliance){
+    const names=story.bestAlliance.members
+      .map(id=>G.cast.find(c=>c.id===id)?.name).filter(Boolean).join(', ');
+    txt+=`\nBEST ALLIANCE\n${'─'.repeat(40)}\n${names}\n`;
+  }
+
+  if(story.playerArcs?.length){
+    txt+=`\nCHARACTER ARCS\n${'─'.repeat(40)}\n`;
+    story.playerArcs.forEach(a=>{
+      txt+=`${a.player.name} (${a.role})\n${a.arc}\n\n`;
+    });
+  }
+
+  txt+=`\nGenerated by No Signal — garryrobson85.github.io/No-Signal-\n`;
+
+  const name=(G.settings.name||'no-signal').toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  const blob=new Blob([txt],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${name}-story.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  notify('Season story exported ✓','win');
+}
+
+// ===== EXPORTS =====
+
+
+// ===== FILE: engine.js =====
 // No Signal — engine.js
 // Episode engine, voting, challenges, alliances, idols
 // No DOM manipulation here.
@@ -1952,1799 +3242,7 @@ function applyTwist(twist){
 // ===== EXPORTS =====
 
 
-
-// ===== evolution.js =====
-// No Signal — evolution.js
-// Dynamic archetype evolution system
-// Archetypes shift mid-season based on actual gameplay events.
-// Triggered at the start of each episode after ep 3.
-
-// ===== EVOLUTION RULES =====
-// Each rule: { from, to, condition(c, memories), minEpisode, message }
-// condition receives the contestant object and their memory array
-// Returns true if the evolution should trigger
-
-const EVOLUTION_RULES = [
-  // Challenge wins → threat recognition
-  {
-    from: 'The Underdog',
-    to: 'The Challenge Beast',
-    condition: (c) => c.challengeWins >= 3,
-    minEpisode: 3,
-    message: '{name} has stopped being the underdog — three challenge wins demands a new label.',
-  },
-  {
-    from: 'The Underdog',
-    to: 'The Fan Favorite',
-    condition: (c, mems) => {
-      const saves = mems.filter(m => m.type === 'saved' && m.object !== c.id).length;
-      return c.social >= 7 && saves >= 1;
-    },
-    minEpisode: 4,
-    message: '{name} has survived against the odds so many times the whole cast has started quietly rooting for them.',
-  },
-  {
-    from: 'The Floater',
-    to: 'The Puppet Master',
-    condition: (c, mems) => {
-      const betrayals = mems.filter(m => m.type === 'betrayal' && m.subject === c.id).length;
-      return betrayals >= 2 && c.mental >= 7;
-    },
-    minEpisode: 4,
-    message: '{name} has been labelled a Floater — but two alliances broken strategically tells a different story.',
-  },
-  {
-    from: 'The Floater',
-    to: 'The Goat',
-    condition: (c) => c.challengeWins === 0 && G.episode >= 7,
-    minEpisode: 7,
-    message: '{name} has drifted through this game without leaving a mark. People are keeping them around for a reason.',
-  },
-  {
-    from: 'The Strategist',
-    to: 'The Big Villain',
-    condition: (c, mems) => {
-      const betrayals = mems.filter(m => m.type === 'betrayal' && m.subject !== c.id && m.object === c.id).length;
-      // They've been caught betraying people
-      const caughtBetrayals = mems.filter(m => m.type === 'betrayal' && m.object === c.id).length;
-      return caughtBetrayals >= 2;
-    },
-    minEpisode: 4,
-    message: '{name} started as a strategist — but the number of burned allies tells a different story.',
-  },
-  {
-    from: 'The Social Butterfly',
-    to: 'The Puppet Master',
-    condition: (c, mems) => {
-      const alliancesFormed = mems.filter(m => m.type === 'alliance_formed' && m.subject === c.id).length;
-      return alliancesFormed >= 3 && c.social >= 8;
-    },
-    minEpisode: 5,
-    message: '{name} isn\'t just social — they\'re running three separate alliances simultaneously.',
-  },
-  {
-    from: 'The Challenge Beast',
-    to: 'The Jury Threat',
-    condition: (c) => c.challengeWins >= 4 && G.merged,
-    minEpisode: 6,
-    message: '{name}\'s challenge record post-merge has made them the most obvious jury threat in the game.',
-  },
-  {
-    from: 'The Sweetheart',
-    to: 'The Jury Threat',
-    condition: (c, mems) => {
-      const saves = mems.filter(m => m.type === 'saved' && m.object === c.id).length;
-      return c.social >= 8 && saves >= 2 && G.merged;
-    },
-    minEpisode: 6,
-    message: '{name} has been saved by other players twice. That kind of goodwill wins jury votes.',
-  },
-  {
-    from: 'The Quiet Threat',
-    to: 'The Strategist',
-    condition: (c) => G.merged && c.mental >= 8 && c.challengeWins >= 1,
-    minEpisode: 5,
-    message: '{name} can\'t stay quiet forever. Post-merge they\'ve stepped into the light.',
-  },
-  {
-    from: 'The Loose Cannon',
-    to: 'The Flipper',
-    condition: (c, mems) => {
-      const broken = mems.filter(m => m.type === 'alliance_broken' && m.subject === c.id).length;
-      return broken >= 2;
-    },
-    minEpisode: 3,
-    message: '{name}\'s chaos has a pattern now. They don\'t blow things up randomly — they flip deliberately.',
-  },
-  {
-    from: 'The Number',
-    to: 'The Underdog',
-    condition: (c, mems) => {
-      const votesAgainst = mems.filter(m => m.type === 'voted_for' && m.object === c.id).length;
-      return votesAgainst >= 3 && !c.eliminated;
-    },
-    minEpisode: 4,
-    message: '{name} has had their name written down three times and is still here. That\'s not a Number anymore.',
-  },
-];
-
-// ===== EVOLUTION ENGINE =====
-
-/**
- * checkArchetypeEvolution()
- * Called at the start of each episode (ep >= 3).
- * Checks all active players against evolution rules.
- * Returns array of evolution events that occurred.
- * Mutates contestant.archetype if rule triggers.
- */
-function checkArchetypeEvolution() {
-  if(!G.memories) return [];
-  const events = [];
-  const active = getActive();
-
-  active.forEach(c => {
-    const memories = G.memories.filter(m => m.subject === c.id || m.object === c.id);
-    for(const rule of EVOLUTION_RULES) {
-      if(c.archetype !== rule.from) continue;
-      if(G.episode < rule.minEpisode) continue;
-      if(!rule.condition(c, memories)) continue;
-      // Evolution triggers — don't evolve same player twice in same episode
-      if(events.find(e => e.playerId === c.id)) continue;
-
-      const oldArchetype = c.archetype;
-      c.archetype = rule.to;
-      // Store evolution history on the contestant
-      if(!c.archetypeHistory) c.archetypeHistory = [];
-      c.archetypeHistory.push({ from: oldArchetype, to: rule.to, episode: G.episode });
-
-      const msg = rule.message.replace('{name}', c.name.split(' ')[0]);
-      events.push({ player: c, from: oldArchetype, to: rule.to, message: msg });
-
-      // Record as a memory event — others notice the change
-      recordMemory('rivalry', c.id, null, G.episode, 30); // self-awareness spike
-      break; // only one evolution per player per episode
-    }
-  });
-
-  return events;
-}
-
-/**
- * buildEvolutionDisplay(events)
- * Returns HTML for the camp life stage showing evolution events.
- */
-function buildEvolutionDisplay(events) {
-  if(!events || !events.length) return '';
-  return events.map(ev => {
-    const port = ev.player.customImage
-      ? `<img src="${ev.player.customImage}" style="width:36px;height:44px;object-fit:cover;object-position:top;border-radius:6px">`
-      : getPortrait(ev.player).replace('width="120" height="145"','width="36" height="44"');
-    return `<div class="evolution-card">
-      <div class="evolution-port">${port}<\/div>
-      <div class="evolution-body">
-        <div class="evolution-label">
-          <span class="evolution-old">${ev.from}<\/span>
-          <span class="evolution-arrow">→<\/span>
-          <span class="evolution-new">${ev.to}<\/span>
-        <\/div>
-        <div class="evolution-msg">${ev.message}<\/div>
-      <\/div>
-    <\/div>`;
-  }).join('');
-}
-
-
-
-// ===== EVOLUTION CEREMONY =====
-/**
- * buildEvolutionCeremony(events, ep)
- * Generates confessional text and camp reactions for archetype evolutions.
- * Called after checkArchetypeEvolution() when events exist.
- * Returns array of {player, confessional, campReaction} objects.
- */
-function buildEvolutionCeremony(events, ep){
-  return events.map(ev=>{
-    const fn=ev.player.name.split(' ')[0];
-    const confessional=_evoConfessional(ev);
-    const campReaction=_evoCampReaction(ev, ep);
-    // Store on ep so script generator can use them
-    return { player:ev.player, from:ev.from, to:ev.to,
-             confessional, campReaction, message:ev.message };
-  });
-}
-
-function _evoConfessional(ev){
-  const fn=ev.player.name.split(' ')[0];
-  const lines={
-    // Underdog evolutions
-    'The Underdog→The Challenge Beast': `Three challenge wins. Three. I came out here labelled as someone who didn't belong. I don't think anyone's calling me an underdog anymore.`,
-    'The Underdog→The Fan Favorite': `I keep surviving when I shouldn't. I'm starting to wonder if that's not luck — if maybe I've been playing this game better than I thought.`,
-    // Floater evolutions
-    'The Floater→The Puppet Master': `People think I've been drifting. I haven't been drifting. I've been watching. There's a difference. A very important difference.`,
-    'The Floater→The Goat': `I'm still here. I genuinely don't know if that's a good thing or a bad thing.`,
-    // Strategist evolutions
-    'The Strategist→The Big Villain': `I've made some moves that weren't popular. That's the cost of playing to win. I can live with it.`,
-    // Social butterfly evolutions
-    'The Social Butterfly→The Puppet Master': `I have four separate conversations before breakfast every morning. And none of them know about the other three. That's not social — that's strategy.`,
-    // Challenge beast evolution
-    'The Challenge Beast→The Jury Threat': `I know what they're thinking. I'd be thinking the same thing. Four wins. I'm the biggest threat in this game. So now I have to be smarter than I am strong.`,
-    // Sweetheart evolution
-    'The Sweetheart→The Jury Threat': `People keep saving me. I used to think that was kindness. Now I think it's a strategy and I'm terrified they're right to do it.`,
-    // Quiet threat evolution
-    'The Quiet Threat→The Strategist': `Post-merge. No more hiding. Time to actually play.`,
-    // Loose cannon evolution
-    'The Loose Cannon→The Flipper': `I know what everyone says about me. That I'm unpredictable. That I can't be trusted. They're wrong. I'm completely predictable. I just have different priorities.`,
-  };
-  const key=`${ev.from}→${ev.to}`;
-  return lines[key]||`${fn}: ${ev.message}`;
-}
-
-function _evoCampReaction(ev, ep){
-  const fn=ev.player.name.split(' ')[0];
-  // Find another active player who might have noticed
-  const active=G.cast.filter(c=>!c.eliminated&&c.id!==ev.player.id);
-  if(!active.length) return null;
-  const observer=pick(active);
-  const on=observer.name.split(' ')[0];
-
-  const negativeEvolutions=['The Big Villain','The Goat','The Jury Threat'];
-  const positiveEvolutions=['The Fan Favorite','The Challenge Beast','The Puppet Master'];
-
-  if(negativeEvolutions.includes(ev.to)){
-    const reactions=[
-      `${on} noticed the shift in ${fn}'s demeanour. Something had changed. They filed it away quietly.`,
-      `Around camp, people were starting to talk about ${fn} differently. ${on} heard it and said nothing.`,
-      `${on} pulled someone aside after ${fn} left camp. "Has ${fn} seemed different to you lately?" They had.`,
-    ];
-    return pick(reactions);
-  }
-  if(positiveEvolutions.includes(ev.to)){
-    const reactions=[
-      `${on} watched ${fn} from across camp and felt something uncomfortable — was ${fn} actually going to win this?`,
-      `The tribe's perception of ${fn} was shifting. ${on} felt it and wasn't sure if that was good or bad for their own game.`,
-      `"${fn} is not who I thought ${fn} was," ${on} admitted to themselves. They'd need to recalibrate.`,
-    ];
-    return pick(reactions);
-  }
-  return `The tribe watched ${fn} closely tonight. Something was different and everyone could feel it.`;
-}
-
-
-/**
- * getArchetypeHistory(contestant)
- * Returns a formatted string of the contestant's evolution history.
- * Used in Player Profiles.
- */
-function getArchetypeHistory(contestant) {
-  if(!contestant.archetypeHistory || !contestant.archetypeHistory.length) return null;
-  return contestant.archetypeHistory
-    .map(h => `Ep ${h.episode}: ${h.from} → ${h.to}`)
-    .join(' · ');
-}
-
-// ===== EXPORTS =====
-
-
-
-// ===== features.js =====
-// No Signal — features.js
-// Tribe History, Profiles, Relationship Web, V19 Insights
-
-// ===== V19 INSIGHTS / RELATIONSHIP TOOLS =====
-function v19PlayerName(id){const p=G.cast.find(c=>c.id===id);return p?p.name:'Unknown';}
-function v19ActiveThreatScore(c){
-  const statAvg=((+c.physical||0)+(+c.social||0)+(+c.mental||0)+(+c.endurance||0))/4;
-  const wins=(+c.challengeWins||0)*1.6;
-  const idols=G.idolHolders&&G.idolHolders.includes(c.id)?2.2:0;
-  const alliance=(c.allianceIds||[]).length*0.7;
-  const juryPenalty=c.juryMember?-3:0;
-  return Math.max(0, Math.round((statAvg+wins+idols+alliance+juryPenalty)*10)/10);
-}
-function v19SocialPowerScore(c){
-  const rel=v19RelationshipScoresFor(c.id);
-  const avg=rel.length?rel.reduce((a,b)=>a+b.score,0)/rel.length:50;
-  return Math.round(((+c.social||0)*6 + avg*0.4 + ((c.allianceIds||[]).length*8))*10)/10;
-}
-function v19RelationshipKey(a,b){return [a,b].sort().join('|');}
-function v19EnsureRelationships(){
-  if(!G.relationships) G.relationships={};
-  const ids=G.cast.map(c=>c.id);
-  ids.forEach((a,i)=>ids.slice(i+1).forEach(b=>{
-    const key=v19RelationshipKey(a,b);
-    if(G.relationships[key]==null){
-      const pa=G.cast.find(c=>c.id===a), pb=G.cast.find(c=>c.id===b);
-      let base=50;
-      if(pa&&pb){
-        if((pa.allianceIds||[]).some(x=>(pb.allianceIds||[]).includes(x))) base+=18;
-        if(pa.personality===pb.personality) base+=8;
-        if(pa.archetype===pb.archetype) base+=5;
-        base+=Math.round((((+pa.social||5)+(+pb.social||5))/2-5)*2);
-      }
-      G.relationships[key]=Math.max(5,Math.min(95,base));
-    }
-  }));
-  return G.relationships;
-}
-function v19RelationshipScoresFor(id){
-  v19EnsureRelationships();
-  return Object.entries(G.relationships).filter(([k])=>k.includes(id)).map(([k,score])=>{
-    const other=k.split('|').find(x=>x!==id);
-    return {id:other, name:v19PlayerName(other), score:+score||50};
-  }).sort((a,b)=>b.score-a.score);
-}
-function v19TopPairs(){
-  v19EnsureRelationships();
-  return Object.entries(G.relationships).map(([k,score])=>{
-    const [a,b]=k.split('|'); return {a,b,score:+score||50};
-  }).sort((x,y)=>y.score-x.score);
-}
-function openV19Modal(title,html){
-  document.getElementById('modal-v19-title').textContent=title;
-  document.getElementById('modal-v19-content').innerHTML=html;
-  openModal('modal-v19');
-}
-function showV19Insights(){
-  const active=getActive();
-  v19EnsureRelationships();
-  const threats=[...active].sort((a,b)=>v19ActiveThreatScore(b)-v19ActiveThreatScore(a));
-  const social=[...active].sort((a,b)=>v19SocialPowerScore(b)-v19SocialPowerScore(a));
-  const underdogs=[...active].sort((a,b)=>v19ActiveThreatScore(a)-v19ActiveThreatScore(b));
-  const leader=threats[0], socialBoss=social[0], underdog=underdogs[0];
-  let html=`<div class="v19-help">These are explainable v19 estimates, not hard-coded outcomes. They combine stats, challenge wins, idols, alliances and relationship strength so you can see why someone may become a target.<\/div>`;
-  html+=`<div class="v19-card-grid">
-    <div class="v19-insight-card"><div class="v19-insight-label">Biggest Threat<\/div><div class="v19-insight-value">${leader?leader.name:'—'}<\/div><div class="v19-insight-sub">Threat score ${leader?v19ActiveThreatScore(leader):0}<\/div><\/div>
-    <div class="v19-insight-card"><div class="v19-insight-label">Social Power<\/div><div class="v19-insight-value">${socialBoss?socialBoss.name:'—'}<\/div><div class="v19-insight-sub">Power score ${socialBoss?v19SocialPowerScore(socialBoss):0}<\/div><\/div>
-    <div class="v19-insight-card"><div class="v19-insight-label">Underdog<\/div><div class="v19-insight-value">${underdog?underdog.name:'—'}<\/div><div class="v19-insight-sub">Lowest visible threat<\/div><\/div>
-    <div class="v19-insight-card"><div class="v19-insight-label">Seed<\/div><div class="v19-insight-value" style="font-size:15px">${G.settings.seed||'Random'}<\/div><div class="v19-insight-sub">Replayable if a seed is set<\/div><\/div>
-  <\/div>`;
-  html+=`<table class="v19-table"><thead><tr><th>Player<\/th><th>Threat<\/th><th>Social<\/th><th>Wins<\/th><th>Idol<\/th><th>Read<\/th><\/tr><\/thead><tbody>`;
-  threats.forEach(c=>{
-    const threat=v19ActiveThreatScore(c), sp=v19SocialPowerScore(c);
-    const read=threat>=13?'Huge target':threat>=10?'Visible threat':sp>=75?'Protected socially':'Floating safely';
-    html+=`<tr><td><strong>${c.name}<\/strong><div style="font-size:10px;color:var(--text3)">${c.archetype} · ${c.personality}<\/div><\/td><td><span class="v19-score-pill">${threat}<\/span><\/td><td><span class="v19-score-pill">${sp}<\/span><\/td><td>${c.challengeWins||0}<\/td><td>${G.idolHolders.includes(c.id)?'💎':'—'}<\/td><td>${read}<\/td><\/tr>`;
-  });
-  html+=`<\/tbody><\/table><div class="modal-btns"><button class="btn btn-fire" onclick="exportV19SeasonReport()">⬇ Export readable report<\/button><\/div>`;
-  openV19Modal('🧠 v19 Game Insights',html);
-}
-
-// ===== TRIBE HISTORY TRACKER (BrantSteele-style placement timeline) =====
-function showTribeHistory(){
-  if(!G.placementHistory.length){ notify('No episodes played yet — history builds as you go'); return; }
-  // Order players by how far they got: still active first, then by elimination episode desc
-  const order=[...G.cast].sort((a,b)=>{
-    const ae=a.eliminated?(a.elimEp||0):999, be=b.eliminated?(b.elimEp||0):999;
-    if(ae!==be) return be-ae;
-    return a.name.localeCompare(b.name);
-  });
-  const eps=G.placementHistory;
-  let html=`<div class="th-wrap"><table class="th-table"><thead><tr><th class="th-name-col">Player<\/th>`;
-  eps.forEach(s=>{ html+=`<th title="Episode ${s.episode}">${s.episode}<\/th>`; });
-  html+=`<th>Result<\/th><\/tr><\/thead><tbody>`;
-  order.forEach(c=>{
-    html+=`<tr><td class="th-name-col"><span class="th-dot" style="background:${c.color}"><\/span>${c.name.split(' ')[0]}<\/td>`;
-    eps.forEach(s=>{
-      const ps=s.players[c.id];
-      if(!ps){ html+=`<td class="th-cell th-blank"><\/td>`; return; }
-      let cls='th-cell', label='', bg='';
-      if(ps.status==='eliminated'){ cls+=' th-elim'; label='OUT'; bg='#EF4444'; }
-      else if(ps.status==='out'){ cls+=' th-gone'; label=''; bg='transparent'; }
-      else if(ps.status==='rejoined'){ cls+=' th-rejoin'; label='↩'; bg='#F59E0B'; }
-      else if(ps.merged){ cls+=' th-merged'; label=ps.immune?'🛡':'•'; bg='#8B5CF6'; }
-      else if(ps.team!=null&&G.teams[ps.team]){ label=ps.immune?'🛡':''; bg=G.teams[ps.team].color; }
-      else { label=ps.immune?'🛡':'•'; bg='#94A3B8'; }
-      const title=`Ep ${s.episode}: ${ps.status}${ps.votesGot?` · ${ps.votesGot} vote(s)`:''}`;
-      html+=`<td class="${cls}" style="background:${bg};color:#fff" title="${title}">${label}<\/td>`;
-    });
-    const res=c.eliminated?`Ep ${c.elimEp||'?'}`:(c.winner?'WINNER 👑':'Still in');
-    html+=`<td class="th-result ${c.eliminated?'':'th-alive'}">${res}<\/td><\/tr>`;
-  });
-  html+=`<\/tbody><\/table><\/div>
-    <div class="th-legend">
-      <span><i style="background:#94A3B8"><\/i> Pre-merge<\/span>
-      <span><i style="background:#8B5CF6"><\/i> Merged<\/span>
-      <span><i style="background:#EF4444"><\/i> Voted out<\/span>
-      <span><i style="background:#F59E0B"><\/i> Rejoined<\/span>
-      <span>🛡 Immune<\/span>
-    <\/div>`;
-  openV19Modal('📊 Tribe History',html);
-}
-
-// ===== RELATIONSHIP WEB (visual graph, not a table) =====
-function showRelationshipWeb(){
-  const active=getActive();
-  if(active.length<2){ notify('Need at least 2 active players'); return; }
-  v19EnsureRelationships();
-  const N=active.length;
-  const size=Math.min(680, Math.max(340, N*46));
-  const cx=size/2, cy=size/2, R=size/2-54;
-  // node positions on a circle
-  const nodes=active.map((c,i)=>{
-    const ang=(i/N)*Math.PI*2 - Math.PI/2;
-    return { c, x:cx+Math.cos(ang)*R, y:cy+Math.sin(ang)*R };
-  });
-  let edges='';
-  for(let i=0;i<nodes.length;i++){
-    for(let j=i+1;j<nodes.length;j++){
-      const a=nodes[i], b=nodes[j];
-      const score=v19RelScore(a.c.id,b.c.id); // 0-100
-      if(score<35 && score>20) continue; // skip neutral clutter
-      let col, w;
-      if(score>=65){ col='rgba(22,163,74,'; w=1+(score-65)/14; }
-      else if(score<=20){ col='rgba(220,38,38,'; w=1+(20-score)/12; }
-      else continue;
-      const op=Math.min(0.85, 0.25+Math.abs(score-42)/70);
-      edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${col}${op.toFixed(2)})" stroke-width="${w.toFixed(2)}"/>`;
-    }
-  }
-  let dots='';
-  nodes.forEach(n=>{
-    // Clickable node — tap to see this player's history with others
-    dots+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="13" fill="${n.c.color}" stroke="#fff" stroke-width="2" style="cursor:pointer" onclick="showOneProfile('${n.c.id}')"/>`;
-    const lx=n.x, ly=n.y> cy ? n.y+26 : n.y-18;
-    dots+=`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text)" style="cursor:pointer" onclick="showOneProfile('${n.c.id}')">${n.c.name.split(' ')[0]}<\/text>`;
-  });
-  const svg=`<svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:${size}px;display:block;margin:0 auto">${edges}${dots}<\/svg>`;
-  const legend=`<div class="th-legend" style="justify-content:center;margin-top:10px">
-    <span><i style="background:rgba(22,163,74,0.8)"><\/i> Strong bond<\/span>
-    <span><i style="background:rgba(220,38,38,0.8)"><\/i> Rivalry<\/span>
-    <span style="color:var(--text2)">Line thickness = intensity<\/span>
-  <\/div>`;
-  openV19Modal('🕸️ Relationship Web', `<div class="v19-help">A live map of who's tight and who's clashing. Strong bonds in green, rivalries in red.<\/div>${svg}${legend}`);
-}
-// score helper that reads the v19 relationship store consistently
-function v19RelScore(idA,idB){
-  if(typeof v19PairScore==='function') return v19PairScore(idA,idB);
-  const key=[idA,idB].sort().join('|');
-  if(G.relationships&&G.relationships[key]!=null) return G.relationships[key];
-  // fallback derived score
-  const a=G.cast.find(c=>c.id===idA), b=G.cast.find(c=>c.id===idB);
-  if(!a||!b) return 50;
-  let s=50;
-  const shared=(a.allianceIds||[]).some(x=>(b.allianceIds||[]).includes(x));
-  if(shared) s+=30;
-  if(a.personality===b.personality) s+=8;
-  s+=((a.social||5)+(b.social||5))-10;
-  return Math.max(0,Math.min(100,Math.round(s)));
-}
-
-// ===== PLAYER PROFILES (per-player full season history) =====
-function showPlayerProfiles(){
-  const order=[...G.cast].sort((a,b)=>{
-    const ae=a.eliminated?(a.elimEp||0):999, be=b.eliminated?(b.elimEp||0):999;
-    if(ae!==be) return be-ae; return a.name.localeCompare(b.name);
-  });
-  let html=`<div class="v19-help">Tap a player for their full season story — placement, votes, challenges, alliances.<\/div><div class="pp-grid">`;
-  order.forEach(c=>{
-    const port=c.customImage
-      ? `<img src="${c.customImage}" style="width:54px;height:65px;object-fit:cover;object-position:top;border-radius:8px">`
-      : getPortrait(c).replace('width="120" height="145"','width="54" height="65"');
-    html+=`<div class="pp-card" onclick="showOneProfile('${c.id}')">
-      <div class="pp-port">${port}<\/div>
-      <div class="pp-name">${c.name.split(' ')[0]}<\/div>
-      <div class="pp-sub">${c.eliminated?`Out Ep ${c.elimEp||'?'}`:(c.winner?'👑 Winner':'Active')}<\/div>
-    <\/div>`;
-  });
-  html+=`<\/div>`;
-  openV19Modal('👤 Player Profiles',html);
-}
-function showOneProfile(id){
-  const c=G.cast.find(x=>x.id===id); if(!c) return;
-  let votesCast=0, votesGot=0, tcAppear=0, immunities=0;
-  G.episodeLog.forEach(ep=>{
-    if(ep.voteResult&&ep.voteResult.individualVotes){
-      ep.voteResult.individualVotes.forEach(v=>{
-        if(v.voter.id===c.id) votesCast++;
-        if(v.target.id===c.id) votesGot++;
-      });
-      if(ep.voteResult.individualVotes.some(v=>v.voter.id===c.id)) tcAppear++;
-    }
-    if(ep.challengeResult){
-      if(ep.challengeResult.type==='individual'&&ep.challengeResult.winner?.id===c.id) immunities++;
-      if(ep.challengeResult.type==='tribal'&&ep.challengeResult.winner?.ti===c.team) immunities++;
-    }
-  });
-  const allies=(c.allianceIds||[]).flatMap(aid=>{
-    const al=G.alliances.find(a=>a.id===aid);
-    return al?al.members.filter(m=>m!==c.id).map(m=>G.cast.find(x=>x.id===m)?.name.split(' ')[0]).filter(Boolean):[];
-  });
-  const port=c.customImage
-    ? `<img src="${c.customImage}" style="width:90px;height:109px;object-fit:cover;object-position:top;border-radius:10px">`
-    : getPortrait(c).replace('width="120" height="145"','width="90" height="109"');
-  let timeline='';
-  G.placementHistory.forEach(s=>{
-    const ps=s.players[c.id]; if(!ps||ps.status==='out') return;
-    let tag=ps.status==='eliminated'?'🔴 Voted out':ps.status==='rejoined'?'↩ Rejoined':ps.immune?'🛡 Immune':ps.merged?'Merged':'Safe';
-    timeline+=`<div class="pp-tl-row"><span class="pp-tl-ep">Ep ${s.episode}<\/span><span>${tag}${ps.votesGot?` · received ${ps.votesGot} vote(s)`:''}<\/span><\/div>`;
-  });
-  const html=`<div class="pp-detail">
-    <div class="pp-detail-head">
-      <div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.15)">${port}<\/div>
-      <div>
-        <div class="pp-detail-name">${c.name}<\/div>
-        <div class="pp-detail-arch">${c.archetype} · ${c.personality}<\/div>
-        <div class="pp-detail-status">${c.eliminated?`Eliminated Episode ${c.elimEp||'?'}${c.juryMember?' · Jury member':''}`:(c.winner?'👑 Sole Survivor':'Still in the game')}<\/div>
-      <\/div>
-    <\/div>
-    <div class="pp-stats">
-      <div class="pp-stat"><b>${immunities}<\/b><span>Immunities<\/span><\/div>
-      <div class="pp-stat"><b>${votesGot}<\/b><span>Votes received<\/span><\/div>
-      <div class="pp-stat"><b>${votesCast}<\/b><span>Votes cast<\/span><\/div>
-      <div class="pp-stat"><b>${tcAppear}<\/b><span>Tribals attended<\/span><\/div>
-      <div class="pp-stat"><b>${c.challengeWins||0}<\/b><span>Challenge wins<\/span><\/div>
-      <div class="pp-stat"><b>${G.idolHolders.includes(c.id)?'Yes':'No'}<\/b><span>Holds idol<\/span><\/div>
-    <\/div>
-    ${allies.length?`<div class="pp-section"><b>Alliance:<\/b> ${allies.join(', ')}<\/div>`:''}
-    <div class="pp-section"><b>Stats:<\/b> 💪${c.physical} 🧠${c.mental} ❤️${c.social} 🔋${c.endurance}<\/div>
-    ${c.archetypeHistory&&c.archetypeHistory.length?`<div class="pp-section"><b>Archetype evolution:<\/b> ${c.archetypeHistory.map(h=>`Ep${h.episode}: ${h.from} → ${h.to}`).join(' · ')}<\/div>`:''}
-    <div class="pp-section"><b>Season timeline:<\/b><\/div>
-    <div class="pp-timeline">${timeline||'<div style="color:var(--text2);font-size:13px">No episodes recorded yet.<\/div>'}<\/div>
-    <button class="btn btn-outline btn-sm" style="margin-top:14px" onclick="showPlayerProfiles()">← All profiles<\/button>
-    <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%" data-action="showRelHistoryPicker" data-player="${c.id}">🔗 View Relationship History<\/button>
-  <\/div>`;
-  openV19Modal(`👤 ${c.name}`,html);
-}
-
-
-function showV19Relationships(){
-  const pairs=v19TopPairs();
-  const strongest=pairs.slice(0,8), weakest=pairs.slice(-8).reverse();
-  let html=`<div class="v19-help">Relationship scores are generated from alliances, personality matches and social stats. You can use this as a production board for storylines and future vote logic.<\/div>`;
-  html+=`<h3 style="font-size:15px;margin:12px 0 6px">Strongest Bonds<\/h3>`;
-  strongest.forEach(p=>{html+=`<div class="v19-rel-row"><strong>${v19PlayerName(p.a)}<\/strong><div class="v19-rel-meter"><div class="v19-rel-fill" style="width:${p.score}%"><\/div><\/div><strong style="text-align:right">${v19PlayerName(p.b)}<\/strong><div style="grid-column:1/-1;font-size:11px;color:var(--text2)">Bond score ${p.score}/100<\/div><\/div>`});
-  html+=`<h3 style="font-size:15px;margin:18px 0 6px">Weakest Bonds / Rivalries<\/h3>`;
-  weakest.forEach(p=>{html+=`<div class="v19-rel-row"><strong>${v19PlayerName(p.a)}<\/strong><div class="v19-rel-meter"><div class="v19-rel-fill" style="width:${p.score}%;background:var(--elim)"><\/div><\/div><strong style="text-align:right">${v19PlayerName(p.b)}<\/strong><div style="grid-column:1/-1;font-size:11px;color:var(--text2)">Bond score ${p.score}/100<\/div><\/div>`});
-  openV19Modal('🕸️ v19 Relationship Board',html);
-}
-function buildV19SeasonReport(){
-  const lines=[];
-  lines.push(`${G.settings.name||'No Signal Season'} — v19 Report`);
-  lines.push(`Theme: ${G.settings.theme||'—'}`);
-  lines.push(`Seed: ${G.settings.seed||'Random'}`);
-  lines.push(`Episode: ${G.episode} | Phase: ${G.merged?'Post-merge':'Pre-merge'}`);
-  lines.push('');
-  lines.push('ACTIVE PLAYER READS');
-  getActive().sort((a,b)=>v19ActiveThreatScore(b)-v19ActiveThreatScore(a)).forEach(c=>{
-    lines.push(`- ${c.name}: threat ${v19ActiveThreatScore(c)}, social ${v19SocialPowerScore(c)}, wins ${c.challengeWins||0}${G.idolHolders.includes(c.id)?', has idol':''}`);
-  });
-  lines.push('');
-  lines.push('ELIMINATED');
-  G.cast.filter(c=>c.eliminated).sort((a,b)=>(a.elimEp||99)-(b.elimEp||99)).forEach(c=>lines.push(`- Ep ${c.elimEp||'?'}: ${c.name}${c.juryMember?' (jury)':''}`));
-  lines.push('');
-  lines.push('TOP RELATIONSHIPS');
-  v19TopPairs().slice(0,10).forEach(p=>lines.push(`- ${v19PlayerName(p.a)} + ${v19PlayerName(p.b)}: ${p.score}/100`));
-  return lines.join('\n');
-}
-function exportV19SeasonReport(){
-  downloadTextFile(`${seasonSlug()}-v19-report.txt`, buildV19SeasonReport(), 'text/plain');
-  notify('⬇ v19 report exported','win');
-}
-
-/* ===== v19 CLEANUP HELPERS =====
-   These helpers are intentionally non-invasive. Existing inline onclick handlers remain
-   for compatibility, but future controls can use data-action/data-payload and route here.
-   v19 adds seeded seasons, insight panels, relationship tools, and richer season export. */
-const NoSignalCleanup = (() => {
-  function safeJson(value) {
-    if (!value) return null;
-    try { return JSON.parse(value); } catch (_) { return value; }
-  }
-
-  function delegateActions(root = document) {
-    root.addEventListener('click', (event) => {
-      const target = event.target.closest('[data-action]');
-      if (!target) return;
-      const action = target.dataset.action;
-      const payload = safeJson(target.dataset.payload);
-      const handler = window[action];
-      if (typeof handler === 'function') {
-        event.preventDefault();
-        Array.isArray(payload) ? handler(...payload) : handler(payload);
-      }
-    });
-  }
-
-  function saveGameSafe(reason = 'manual') {
-    if (typeof saveGame === 'function') {
-      try { saveGame(); return true; }
-      catch (err) { console.warn('Save failed:', reason, err); }
-    }
-    return false;
-  }
-
-  return { delegateActions, saveGameSafe };
-})();
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => NoSignalCleanup.delegateActions());
-} else {
-  NoSignalCleanup.delegateActions();
-}
-
-
-// ===== RELATIONSHIP HISTORY PANEL =====
-/**
- * showRelationshipHistory(idA, idB)
- * Shows the full episode-by-episode history between two players.
- * The Jordan↔Casey table — every interaction, vote, and memory event
- * with emotional weight, ordered chronologically.
- * Called from player profiles, relationship web, and cast status.
- */
-function showRelationshipHistory(idA, idB){
-  const a=G.cast.find(c=>c.id===idA), b=G.cast.find(c=>c.id===idB);
-  if(!a||!b) return;
-
-  // Gather all memory events involving both players
-  const events=[];
-  (G.memories||[]).forEach(m=>{
-    const involves=(m.subject===idA&&m.object===idB)||(m.subject===idB&&m.object===idA);
-    if(!involves) return;
-    const def=MEMORY_TYPES[m.type]||{sentiment:0};
-    const actor=G.cast.find(c=>c.id===m.subject);
-    const target=G.cast.find(c=>c.id===m.object);
-    events.push({
-      episode:m.episode,
-      type:m.type,
-      label:_memTypeLabel(m.type,actor,target),
-      intensity:m.intensity,
-      sentiment:def.sentiment,
-      actor,target,
-    });
-  });
-
-  // Also include alliance formation from G.alliances history
-  (G.alliances||[]).forEach(al=>{
-    if(al.members.includes(idA)&&al.members.includes(idB)){
-      events.push({
-        episode:1,type:'alliance_active',
-        label:`In alliance together`,
-        intensity:60,sentiment:1,actor:a,target:b,
-      });
-    }
-  });
-
-  // Sort by episode
-  events.sort((x,y)=>x.episode-y.episode||(x.sentiment-y.sentiment));
-
-  // Running score
-  let runningScore=50; // neutral baseline
-  const rows=events.map(ev=>{
-    const delta=Math.round(ev.sentiment*ev.intensity*0.4);
-    runningScore=Math.max(0,Math.min(100,runningScore+delta));
-    const col=delta>0?'var(--leaf)':delta<0?'var(--elim)':'var(--text2)';
-    const sign=delta>0?'+':'';
-    return `<tr>
-      <td class="rh-ep">Ep ${ev.episode}</td>
-      <td class="rh-event">${ev.label}</td>
-      <td class="rh-delta" style="color:${col}">${sign}${delta}</td>
-      <td class="rh-score">${runningScore}</td>
-    </tr>`;
-  }).join('');
-
-  // Current relationship score
-  const curScore=v19RelScore(idA,idB);
-  const scoreColor=curScore>=65?'var(--leaf)':curScore<=35?'var(--elim)':'var(--text2)';
-  const scoreLabel=curScore>=65?'Strong bond':curScore<=35?'Rivalry':'Neutral';
-
-  const portA=a.customImage
-    ?`<img src="${a.customImage}" style="width:48px;height:58px;object-fit:cover;object-position:top;border-radius:8px">`
-    :getPortrait(a).replace('width="120" height="145"','width="48" height="58"');
-  const portB=b.customImage
-    ?`<img src="${b.customImage}" style="width:48px;height:58px;object-fit:cover;object-position:top;border-radius:8px">`
-    :getPortrait(b).replace('width="120" height="145"','width="48" height="58"');
-
-  const html=`
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-      <div style="text-align:center">
-        <div style="width:48px;height:58px;border-radius:8px;overflow:hidden;margin:0 auto 4px">${portA}<\/div>
-        <div style="font-size:12px;font-weight:700">${a.name.split(' ')[0]}<\/div>
-        <div style="font-size:10px;color:var(--text2)">${a.archetype}<\/div>
-      <\/div>
-      <div style="flex:1;text-align:center">
-        <div style="font-size:22px">↔<\/div>
-        <div style="font-size:18px;font-weight:800;color:${scoreColor}">${curScore}<\/div>
-        <div style="font-size:11px;color:${scoreColor}">${scoreLabel}<\/div>
-      <\/div>
-      <div style="text-align:center">
-        <div style="width:48px;height:58px;border-radius:8px;overflow:hidden;margin:0 auto 4px">${portB}<\/div>
-        <div style="font-size:12px;font-weight:700">${b.name.split(' ')[0]}<\/div>
-        <div style="font-size:10px;color:var(--text2)">${b.archetype}<\/div>
-      <\/div>
-    <\/div>
-    ${events.length?`
-    <table class="rh-table">
-      <thead><tr>
-        <th>Ep<\/th><th>Event<\/th><th>Δ<\/th><th>Score<\/th>
-      <\/tr><\/thead>
-      <tbody>${rows}<\/tbody>
-    <\/table>
-    `:`<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px">No recorded history yet — history builds as episodes are played.<\/div>`}
-    <div style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center">Score: 0=bitter rivals · 50=neutral · 100=unbreakable bond<\/div>`;
-
-  openV19Modal(`🔗 ${a.name.split(' ')[0]} ↔ ${b.name.split(' ')[0]}`, html);
-}
-
-function _memTypeLabel(type, actor, target){
-  const an=actor?.name?.split(' ')[0]||'?';
-  const tn=target?.name?.split(' ')[0]||'?';
-  const labels={
-    betrayal:`${an} betrayed ${tn}`,
-    voted_for:`${an} voted against ${tn}`,
-    saved:`${an} spared ${tn}`,
-    idol_played_on:`${an} played idol for ${tn}`,
-    idol_played_against:`${an}'s idol blocked ${tn}'s votes`,
-    alliance_formed:`${an} and ${tn} strengthened their alliance`,
-    alliance_broken:`${an} broke alliance with ${tn}`,
-    challenge_beat:`${an} beat ${tn} in a challenge`,
-    rivalry:`${an} and ${tn} clashed`,
-    jury_speech:`${an} addressed ${tn} at the finale`,
-  };
-  return labels[type]||type.replace(/_/g,' ');
-}
-
-
-/**
- * showRelHistoryPicker(playerId)
- * Shows a picker to select which other player to compare history with.
- */
-function showRelHistoryPicker(playerId){
-  const player=G.cast.find(c=>c.id===playerId);
-  if(!player) return;
-  const others=G.cast.filter(c=>c.id!==playerId);
-  const opts=others.map(c=>{
-    const score=v19RelScore(playerId,c.id);
-    const col=score>=65?'var(--leaf)':score<=35?'var(--elim)':'var(--text2)';
-    const port=c.customImage
-      ?`<img src="${c.customImage}" style="width:28px;height:34px;object-fit:cover;object-position:top;border-radius:5px">`
-      :getPortrait(c).replace('width="120" height="145"','width="28" height="34"');
-    return `<div class="rh-pick-row" data-action="showRelHistory" data-a="${playerId}" data-b="${c.id}">
-      <div style="width:28px;height:34px;border-radius:5px;overflow:hidden;flex-shrink:0">${port}<\/div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${c.name}<\/div>
-        <div style="font-size:10px;color:var(--text2)">${c.archetype}<\/div>
-      <\/div>
-      <div style="font-weight:700;font-size:14px;color:${col}">${score}<\/div>
-    <\/div>`;
-  }).join('');
-  openV19Modal(`🔗 ${player.name.split(' ')[0]}'s Relationships`,
-    `<div class="v19-help">Select a player to view your full history together — every vote, alliance, and memory event.<\/div><div style="margin-top:10px">${opts}<\/div>`);
-}
-
-
-// ===== EXPORTS =====
-
-
-
-// ===== story.js =====
-// No Signal — story.js
-// Season Story Layer — the game reads its own season and identifies narrative highlights.
-// Transforms vote sequences into remembered character arcs.
-// Called at season end or on demand via the 📖 Season Story button.
-
-// ===== SEASON NARRATIVE ANALYSER =====
-
-/**
- * analyseSeasonStory()
- * Reads G.memories[], G.episodeLog[], G.cast, G.alliances
- * and identifies the key narrative moments that define this season.
- * Returns a structured story object used by buildSeasonStoryCard().
- */
-function analyseSeasonStory(){
-  const story={
-    title:        null,   // auto-generated season tagline
-    villain:      null,   // player who manipulated most aggressively
-    hero:         null,   // dominant winner or fan favourite
-    tragic:       null,   // player with power who lost it suddenly
-    underdog:     null,   // most survived despite votes against them
-    mastermind:   null,   // player who controlled the most votes
-    bitterJuror:  null,   // jury member with highest betrayal score
-    bestAlliance: null,   // alliance that lasted longest / deepest
-    biggestBlindside: null, // highest-intensity betrayal event
-    definingEpisode: null,  // episode with most significant events
-    arcSummary:   null,   // 2-3 sentence season arc in prose
-    playerArcs:   [],     // per-player arc summaries
-  };
-
-  if(!G.cast||!G.cast.length) return story;
-
-  const eliminated=[...G.cast].filter(c=>c.eliminated&&c.elimEp).sort((a,b)=>a.elimEp-b.elimEp);
-  const active=getActive();
-  const winner=G.cast.find(c=>c.winner);
-  const allMemories=G.memories||[];
-
-  // ── VILLAIN ─────────────────────────────────────────────────────────────
-  // Most betrayal events as SUBJECT (they did the betraying)
-  const betrayalsByPlayer={};
-  allMemories.filter(m=>m.type==='betrayal').forEach(m=>{
-    betrayalsByPlayer[m.subject]=(betrayalsByPlayer[m.subject]||0)+m.intensity;
-  });
-  const villainId=Object.entries(betrayalsByPlayer).sort((a,b)=>b[1]-a[1])[0]?.[0];
-  story.villain=villainId?G.cast.find(c=>c.id===villainId):null;
-
-  // ── HERO / DOMINANT PLAYER ───────────────────────────────────────────────
-  // Highest combined challenge wins + final placement + jury respect
-  const heroScore=c=>{
-    const wins=c.challengeWins||0;
-    const placement=c.winner?1:(c.juryMember?G.jury.indexOf(G.jury.find(j=>j.id===c.id))+1:99);
-    const juryBias=G.jury.reduce((sum,j)=>{
-      return sum+(typeof getJuryBias==='function'?getJuryBias(j.id,c.id):0);
-    },0);
-    return wins*15 + (10-Math.min(placement,10)) + juryBias*0.1;
-  };
-  story.hero=winner||[...G.cast].sort((a,b)=>heroScore(b)-heroScore(a))[0];
-
-  // ── TRAGIC DOWNFALL ──────────────────────────────────────────────────────
-  // Player who held power (challenge wins, alliances) then was blindsided
-  const tragicScore=c=>{
-    if(!c.eliminated) return 0;
-    const wins=c.challengeWins||0;
-    const hadAlliance=(c.allianceIds||[]).length>0?1:0;
-    // Higher elimination episode = deeper run = bigger fall
-    const depth=c.elimEp||0;
-    // Check if they were blindsided — many in their alliance voted them out
-    const betrayedThem=allMemories.filter(m=>
-      m.type==='betrayal'&&m.object===c.id&&m.intensity>=70
-    ).length;
-    return (wins*10) + (hadAlliance*8) + (depth*3) + (betrayedThem*15);
-  };
-  story.tragic=eliminated.length
-    ?[...eliminated].sort((a,b)=>tragicScore(b)-tragicScore(a))[0]
-    :null;
-
-  // ── UNDERDOG ─────────────────────────────────────────────────────────────
-  // Most votes received while surviving — narrowly escaped the most
-  const votesReceivedWhileSurviving={};
-  (G.episodeLog||[]).forEach(ep=>{
-    if(!ep.voteResult?.tally) return;
-    Object.entries(ep.voteResult.tally).forEach(([id,count])=>{
-      const p=G.cast.find(c=>c.id===id);
-      // Only count if they survived this episode
-      if(p&&ep.eliminated?.id!==id&&count>0){
-        votesReceivedWhileSurviving[id]=(votesReceivedWhileSurviving[id]||0)+count;
-      }
-    });
-  });
-  const underdogId=Object.entries(votesReceivedWhileSurviving)
-    .sort((a,b)=>b[1]-a[1])[0]?.[0];
-  story.underdog=underdogId?G.cast.find(c=>c.id===underdogId):null;
-
-  // ── MASTERMIND ───────────────────────────────────────────────────────────
-  // Player whose vote target went home the most (controlled most eliminations)
-  const controlledVotes={};
-  (G.episodeLog||[]).forEach(ep=>{
-    if(!ep.voteResult?.individualVotes||!ep.eliminated) return;
-    ep.voteResult.individualVotes.forEach(v=>{
-      if(v.target.id===ep.eliminated.id){
-        controlledVotes[v.voter.id]=(controlledVotes[v.voter.id]||0)+1;
-      }
-    });
-  });
-  const mastermindId=Object.entries(controlledVotes).sort((a,b)=>b[1]-a[1])[0]?.[0];
-  story.mastermind=mastermindId?G.cast.find(c=>c.id===mastermindId):null;
-
-  // ── BITTER JUROR ─────────────────────────────────────────────────────────
-  // Jury member with highest total betrayal intensity against finalists
-  if(G.jury&&G.jury.length){
-    const finalists=active.length?active:G.cast.filter(c=>c.winner);
-    const bitterScore=j=>finalists.reduce((sum,f)=>{
-      const mems=allMemories.filter(m=>
-        m.type==='betrayal'&&m.subject===j.id&&m.object===f.id
-      );
-      return sum+mems.reduce((s,m)=>s+m.intensity,0);
-    },0);
-    const sorted=[...G.jury].sort((a,b)=>bitterScore(b)-bitterScore(a));
-    if(bitterScore(sorted[0])>0) story.bitterJuror=sorted[0];
-  }
-
-  // ── BEST ALLIANCE ────────────────────────────────────────────────────────
-  // Alliance whose members collectively lasted deepest into the game
-  if(G.alliances&&G.alliances.length){
-    const allianceDepth=al=>{
-      const members=al.members.map(id=>G.cast.find(c=>c.id===id)).filter(Boolean);
-      const avgPlacement=members.reduce((sum,m)=>{
-        const ep=m.eliminated?m.elimEp||0:G.episode+5;
-        return sum+ep;
-      },0)/Math.max(members.length,1);
-      return avgPlacement * members.length;
-    };
-    story.bestAlliance=[...G.alliances].sort((a,b)=>allianceDepth(b)-allianceDepth(a))[0];
-  }
-
-  // ── BIGGEST BLINDSIDE ────────────────────────────────────────────────────
-  // Highest intensity betrayal memory event
-  const biggestBetrayalMem=allMemories
-    .filter(m=>m.type==='betrayal')
-    .sort((a,b)=>b.intensity-a.intensity)[0];
-  if(biggestBetrayalMem){
-    story.biggestBlindside={
-      victim: G.cast.find(c=>c.id===biggestBetrayalMem.object),
-      perpetrator: G.cast.find(c=>c.id===biggestBetrayalMem.subject),
-      episode: biggestBetrayalMem.episode,
-      intensity: biggestBetrayalMem.intensity,
-    };
-  }
-
-  // ── DEFINING EPISODE ────────────────────────────────────────────────────
-  // Episode with most significant combined events
-  const epSignificance=ep=>{
-    let score=0;
-    if(ep.mergeHappened) score+=30;
-    if(ep.idolPlay) score+=25;
-    if(ep.twist) score+=10;
-    if(ep.doubleElim) score+=20;
-    if(ep.voteResult?.tied) score+=15;
-    if(ep.evolutionEvents?.length) score+=ep.evolutionEvents.length*10;
-    const betrayalsThisEp=allMemories.filter(m=>m.type==='betrayal'&&m.episode===ep.ep);
-    score+=betrayalsThisEp.reduce((s,m)=>s+m.intensity,0)*0.1;
-    return score;
-  };
-  if(G.episodeLog?.length){
-    story.definingEpisode=[...G.episodeLog].sort((a,b)=>epSignificance(b)-epSignificance(a))[0];
-  }
-
-  // ── PLAYER ARCS ──────────────────────────────────────────────────────────
-  // Per-player narrative summaries for the top 5 most story-relevant players
-  const storyPlayers=new Set([
-    story.villain, story.hero, story.tragic,
-    story.underdog, story.mastermind
-  ].filter(Boolean).map(p=>p.id));
-
-  story.playerArcs=[...storyPlayers].slice(0,5).map(id=>{
-    const p=G.cast.find(c=>c.id===id);
-    if(!p) return null;
-    return buildPlayerArc(p, story);
-  }).filter(Boolean);
-
-  // ── ARC SUMMARY ─────────────────────────────────────────────────────────
-  story.arcSummary=buildArcSummary(story);
-
-  // ── SEASON TAGLINE ───────────────────────────────────────────────────────
-  story.title=buildSeasonTagline(story);
-
-  return story;
-}
-
-// ===== ARC BUILDERS =====
-
-/**
- * buildPlayerArc(player, story)
- * Generates a 2-3 sentence narrative summary of one player's season story.
- */
-function buildPlayerArc(p, story){
-  const fn=p.name.split(' ')[0];
-  const evo=p.archetypeHistory?.length
-    ? ` — evolving from ${p.archetypeHistory[0].from} to ${p.archetype} by episode ${p.archetypeHistory[p.archetypeHistory.length-1].episode}`
-    : '';
-  const wins=p.challengeWins||0;
-  const isVillain=story.villain?.id===p.id;
-  const isHero=story.hero?.id===p.id;
-  const isTragic=story.tragic?.id===p.id;
-  const isUnderdog=story.underdog?.id===p.id;
-  const isMastermind=story.mastermind?.id===p.id;
-
-  const votesAgainst=Object.values(
-    (G.episodeLog||[]).reduce((acc,ep)=>{
-      const v=ep.voteResult?.tally?.[p.id]||0;
-      if(v>0) acc[ep.ep]=v;
-      return acc;
-    },{})
-  ).reduce((s,v)=>s+v,0);
-
-  let arc='';
-
-  if(p.winner){
-    arc=`${fn} played a complete game${wins>0?`, winning ${wins} challenge${wins!==1?'s':''}`:''}.`;
-    if(isMastermind) arc+=` They controlled the vote more than anyone else in the game.`;
-    else if(isHero) arc+=` Their social game never cracked under pressure.`;
-    arc+=` At the finale, the jury rewarded them with the win.`;
-  } else if(isTragic){
-    arc=`${fn} had everything needed to win${wins>0?` — ${wins} challenge win${wins!==1?'s':''} and a strong alliance`:''}${evo}.`;
-    arc+=` But the game turned on them in episode ${p.elimEp||'?'}, and the player who seemed untouchable became the most memorable elimination of the season.`;
-  } else if(isVillain){
-    arc=`${fn} left a trail of broken alliances and betrayal memories through this season${evo}.`;
-    arc+=` Whether it was strategy or survival, nobody trusted them by the end — and the jury remembered every move.`;
-  } else if(isUnderdog){
-    arc=`${fn} received ${votesAgainst} vote${votesAgainst!==1?'s':''} against them and survived every single one${evo}.`;
-    arc+=` They outlasted players with more power, more allies, and better odds. Somehow they're still here.`;
-  } else if(isMastermind){
-    arc=`${fn} controlled the direction of more votes than anyone else this season${evo}.`;
-    arc+=` Most players never realised the extent of their influence until it was too late.`;
-  } else {
-    arc=`${fn} played a ${p.personality?.toLowerCase()||'strategic'} game${evo}`;
-    arc+=p.eliminated?`, finishing in episode ${p.elimEp||'?'}.`:`, and is still fighting.`;
-  }
-  return { player:p, arc, role:isVillain?'Villain':isHero?'Hero':isTragic?'Tragic':isUnderdog?'Underdog':isMastermind?'Mastermind':'Player' };
-}
-
-/**
- * buildArcSummary(story)
- * 2-3 sentence season arc summary.
- */
-function buildArcSummary(story){
-  const parts=[];
-  const sn=G.settings.name||'This season';
-
-  if(story.villain&&story.hero&&story.villain.id!==story.hero.id){
-    parts.push(`${sn} was defined by the collision between ${story.villain.name.split(' ')[0]}'s ruthless manipulation and ${story.hero.name.split(' ')[0]}'s steadier game.`);
-  } else if(story.hero){
-    parts.push(`${sn} belonged to ${story.hero.name.split(' ')[0]}, who emerged as the season's defining player.`);
-  } else {
-    parts.push(`${sn} was a season of shifting power and unpredictable alliances.`);
-  }
-
-  if(story.tragic){
-    parts.push(`The season's most dramatic moment came when ${story.tragic.name.split(' ')[0]} — seemingly in control — was blindsided in episode ${story.tragic.elimEp||'?'}.`);
-  } else if(story.biggestBlindside?.victim){
-    parts.push(`The defining moment came in episode ${story.biggestBlindside.episode}, when ${story.biggestBlindside.victim.name.split(' ')[0]} was betrayed by ${story.biggestBlindside.perpetrator?.name.split(' ')[0]||'someone they trusted'}.`);
-  }
-
-  if(story.underdog&&story.underdog.id!==story.hero?.id){
-    parts.push(`Throughout it all, ${story.underdog.name.split(' ')[0]} quietly survived everything the game threw at them — the season's most resilient story.`);
-  }
-
-  return parts.join(' ');
-}
-
-/**
- * buildSeasonTagline(story)
- * Generates a short dramatic tagline for the season.
- */
-function buildSeasonTagline(story){
-  const taglines=[
-    story.villain&&story.hero&&story.villain.id!==story.hero.id
-      ? `${story.hero.name.split(' ')[0]} vs ${story.villain.name.split(' ')[0]}: One Game, Two Visions`
-      : null,
-    story.tragic
-      ? `The Fall of ${story.tragic.name.split(' ')[0]}`
-      : null,
-    story.underdog&&(G.cast.find(c=>c.winner)?.id===story.underdog.id)
-      ? `The ${story.underdog.name.split(' ')[0]} Story: Against Every Odd`
-      : null,
-    story.biggestBlindside?.victim
-      ? `Nobody Saw It Coming`
-      : null,
-    `${G.settings.name||'No Signal'}: A Season of Broken Trust`,
-  ];
-  return taglines.find(t=>t!==null)||`${G.settings.name||'No Signal'}`;
-}
-
-// ===== SEASON STORY CARD BUILDER =====
-
-/**
- * buildSeasonStoryCard(story)
- * Returns HTML for the full season story card.
- * Visual, editorial, emotionally readable.
- */
-function buildSeasonStoryCard(story){
-  const winner=G.cast.find(c=>c.winner);
-
-  let html=`<div class="ss-wrap">`;
-
-  // ── SEASON TAGLINE ──────────────────────────────────────────────────────
-  html+=`<div class="ss-tagline">${story.title||G.settings.name||'No Signal'}</div>`;
-
-  // ── ARC SUMMARY ─────────────────────────────────────────────────────────
-  if(story.arcSummary){
-    html+=`<div class="ss-arc">${story.arcSummary}</div>`;
-  }
-
-  // ── STORY ROLES GRID ────────────────────────────────────────────────────
-  const roles=[
-    { label:'Season Villain',   player:story.villain,      icon:'😈', desc:'Most betrayals committed' },
-    { label:'Dominant Player',  player:story.hero,         icon:'👑', desc:'Most control over outcome' },
-    { label:'Tragic Fall',      player:story.tragic,       icon:'💔', desc:'Had power — then lost it all' },
-    { label:'Underdog',         player:story.underdog,     icon:'🔥', desc:'Survived the most votes against' },
-    { label:'Puppet Master',    player:story.mastermind,   icon:'🧵', desc:'Controlled the most eliminations' },
-    { label:'Bitter Juror',     player:story.bitterJuror,  icon:'⚖️', desc:'Most aggrieved jury member' },
-  ].filter(r=>r.player);
-
-  if(roles.length){
-    html+=`<div class="ss-roles">`;
-    roles.forEach(r=>{
-      const p=r.player;
-      const port=p.customImage
-        ?`<img src="${p.customImage}" style="width:52px;height:63px;object-fit:cover;object-position:top;border-radius:8px;display:block">`
-        :getPortrait(p).replace('width="120" height="145"','width="52" height="63"');
-      html+=`<div class="ss-role-card">
-        <div class="ss-role-port" style="border-color:${p.color}">${port}</div>
-        <div class="ss-role-icon">${r.icon}</div>
-        <div class="ss-role-label">${r.label}</div>
-        <div class="ss-role-name">${p.name.split(' ')[0]}</div>
-        <div class="ss-role-arch">${p.archetype}</div>
-        <div class="ss-role-desc">${r.desc}</div>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-
-  // ── DEFINING EPISODE ────────────────────────────────────────────────────
-  if(story.definingEpisode){
-    const ep=story.definingEpisode;
-    const title=ep.mergeHappened?'The Merge':ep.idolPlay?'The Idol Play':ep.doubleElim?'Double Elimination':`Episode ${ep.ep}`;
-    html+=`<div class="ss-defining">
-      <div class="ss-section-label">🎬 Defining Episode</div>
-      <div class="ss-defining-title">Episode ${ep.ep} — ${title}</div>
-      <div class="ss-defining-body">${ep.summary||''}</div>
-    </div>`;
-  }
-
-  // ── BIGGEST BLINDSIDE ────────────────────────────────────────────────────
-  if(story.biggestBlindside?.victim&&story.biggestBlindside?.perpetrator){
-    const bs=story.biggestBlindside;
-    html+=`<div class="ss-blindside">
-      <div class="ss-section-label">💥 Biggest Blindside</div>
-      <div class="ss-blindside-body">
-        Episode ${bs.episode}: <strong>${bs.perpetrator.name.split(' ')[0]}</strong> betrayed <strong>${bs.victim.name.split(' ')[0]}</strong> with an intensity score of ${bs.intensity}/100.
-        ${bs.intensity>=90?'An all-time betrayal.':bs.intensity>=70?'A defining moment of the season.':'A turning point nobody expected.'}
-      </div>
-    </div>`;
-  }
-
-  // ── BEST ALLIANCE ────────────────────────────────────────────────────────
-  if(story.bestAlliance){
-    const al=story.bestAlliance;
-    const names=al.members.map(id=>G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean);
-    html+=`<div class="ss-alliance">
-      <div class="ss-section-label">🤝 Most Effective Alliance</div>
-      <div class="ss-alliance-names">${names.join(' · ')}</div>
-    </div>`;
-  }
-
-  // ── PLAYER ARCS ──────────────────────────────────────────────────────────
-  if(story.playerArcs?.length){
-    html+=`<div class="ss-section-label" style="margin-top:16px">📖 Character Arcs</div>`;
-    html+=`<div class="ss-arcs">`;
-    story.playerArcs.forEach(a=>{
-      const roleBadge=`<span class="ss-arc-role ss-role-${a.role.toLowerCase()}">${a.role}</span>`;
-      html+=`<div class="ss-arc-item">
-        <div class="ss-arc-header">${a.player.name} ${roleBadge}</div>
-        <div class="ss-arc-text">${a.arc}</div>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-
-  html+=`</div>`;
-  return html;
-}
-
-// ===== SHOW SEASON STORY MODAL =====
-
-/**
- * showSeasonStory()
- * Analyses the current season and shows the story card modal.
- */
-function showSeasonStory(){
-  if(!G.episodeLog?.length&&!G.cast.some(c=>c.eliminated)){
-    notify('Play some episodes first — the story builds as the season unfolds');
-    return;
-  }
-  const story=analyseSeasonStory();
-  const card=buildSeasonStoryCard(story);
-  const html=`${card}
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-fire" style="flex:1" data-action="exportSeasonStory">⬇ Export Story</button>
-      <button class="btn btn-outline" style="flex:1" data-action="showSeasonRecap">📺 Full Recap</button>
-    </div>`;
-  openV19Modal('📖 Season Story', html);
-  // Cache story for export
-  window._currentStory=story;
-}
-
-/**
- * exportSeasonStory()
- * Exports the season story as a formatted text file.
- */
-function exportSeasonStory(){
-  const story=window._currentStory||analyseSeasonStory();
-  let txt=`${(G.settings.name||'No Signal Season').toUpperCase()}\n`;
-  txt+=`${story.title?story.title+'\n':''}\n`;
-  if(story.arcSummary) txt+=`${story.arcSummary}\n\n`;
-
-  txt+=`SEASON ROLES\n${'─'.repeat(40)}\n`;
-  const roles=[
-    ['Season Villain', story.villain],
-    ['Dominant Player', story.hero],
-    ['Tragic Fall',     story.tragic],
-    ['Underdog',        story.underdog],
-    ['Puppet Master',   story.mastermind],
-    ['Bitter Juror',    story.bitterJuror],
-  ];
-  roles.filter(([,p])=>p).forEach(([role,p])=>{
-    txt+=`${role}: ${p.name} (${p.archetype})\n`;
-  });
-
-  if(story.biggestBlindside?.victim){
-    const bs=story.biggestBlindside;
-    txt+=`\nBIGGEST BLINDSIDE\n${'─'.repeat(40)}\n`;
-    txt+=`Episode ${bs.episode}: ${bs.perpetrator?.name||'?'} → ${bs.victim.name} (intensity: ${bs.intensity}/100)\n`;
-  }
-
-  if(story.bestAlliance){
-    const names=story.bestAlliance.members
-      .map(id=>G.cast.find(c=>c.id===id)?.name).filter(Boolean).join(', ');
-    txt+=`\nBEST ALLIANCE\n${'─'.repeat(40)}\n${names}\n`;
-  }
-
-  if(story.playerArcs?.length){
-    txt+=`\nCHARACTER ARCS\n${'─'.repeat(40)}\n`;
-    story.playerArcs.forEach(a=>{
-      txt+=`${a.player.name} (${a.role})\n${a.arc}\n\n`;
-    });
-  }
-
-  txt+=`\nGenerated by No Signal — garryrobson85.github.io/No-Signal-\n`;
-
-  const name=(G.settings.name||'no-signal').toLowerCase().replace(/[^a-z0-9]+/g,'-');
-  const blob=new Blob([txt],{type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`${name}-story.txt`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  notify('Season story exported ✓','win');
-}
-
-// ===== EXPORTS =====
-
-
-
-// ===== producer.js =====
-// No Signal — producer.js
-// Producer Mode — host agency tools that give the player meaningful decisions
-// These are deliberate interventions in the simulation, not random events.
-// One power per category per season to keep them meaningful.
-
-// ===== PRODUCER POWER DEFINITIONS =====
-const PRODUCER_POWERS = {
-  // Force a specific rivalry to be publicly noted at camp
-  force_rivalry: {
-    id: 'force_rivalry',
-    name: '⚔️ Manufacture Rivalry',
-    desc: 'Force a public confrontation between two players. Creates a lasting rivalry memory between them.',
-    usesPerSeason: 2,
-    phase: 'any',        // when it can be used
-    stage: 0,            // camp life stage
-  },
-  // Override the vote result this episode (host picks who goes home)
-  blindside: {
-    id: 'blindside',
-    name: '💥 Producer Blindside',
-    desc: 'Override the vote — you choose who goes home this episode. Once per season.',
-    usesPerSeason: 1,
-    phase: 'any',
-    stage: 2,            // tribal council stage
-  },
-  // Make a specific player find the idol (plant it where they look)
-  guided_idol: {
-    id: 'guided_idol',
-    name: '🗺️ Guided Idol Plant',
-    desc: 'Guarantee a specific player finds the hidden idol this episode.',
-    usesPerSeason: 1,
-    phase: 'any',
-    stage: 0,
-  },
-  // Force a specific alliance to fracture this episode
-  fracture_alliance: {
-    id: 'fracture_alliance',
-    name: '🔥 Fracture Alliance',
-    desc: 'Force a specific alliance to fracture. One member betrays the others this vote.',
-    usesPerSeason: 1,
-    phase: 'any',
-    stage: 0,
-  },
-  // Boost a player's challenge performance this episode
-  challenge_boost: {
-    id: 'challenge_boost',
-    name: '⚡ Challenge Boost',
-    desc: 'One player performs at their peak this challenge — maximum stats, no randomness.',
-    usesPerSeason: 2,
-    phase: 'any',
-    stage: 1,
-  },
-  // Secret vote reading — see how everyone plans to vote before tribal
-  intel_drop: {
-    id: 'intel_drop',
-    name: '👁️ Intel Drop',
-    desc: 'See how the tribe plans to vote before the parchments are read. No changes — just knowledge.',
-    usesPerSeason: 2,
-    phase: 'any',
-    stage: 2,
-  },
-};
-
-// Track usage in G.producerPowers = { powerId: usesRemaining }
-function initProducerPowers() {
-  G.producerPowers = {};
-  Object.entries(PRODUCER_POWERS).forEach(([id, p]) => {
-    G.producerPowers[id] = p.usesPerSeason;
-  });
-}
-
-function producerPowerUsed(id) {
-  if(!G.producerPowers) initProducerPowers();
-  return (G.producerPowers[id] || 0) <= 0;
-}
-
-function useProducerPower(id) {
-  if(!G.producerPowers) initProducerPowers();
-  if(G.producerPowers[id] > 0) G.producerPowers[id]--;
-}
-
-function producerUsesLeft(id) {
-  if(!G.producerPowers) initProducerPowers();
-  return G.producerPowers[id] ?? PRODUCER_POWERS[id]?.usesPerSeason ?? 0;
-}
-
-// ===== PRODUCER ACTIONS =====
-
-/**
- * showProducerPanel()
- * Opens the producer modal showing all available powers and their status.
- * Called from the HOST CHOICE section of buildStageNav.
- */
-function showProducerPanel() {
-  if(!G.producerPowers) initProducerPowers();
-  const active = getActive();
-  if(!active.length) return;
-
-  const ep = G.currentEpData;
-  const stage = G.stageIndex;
-
-  let html = `<div class="v19-help">Use these once-per-season powers to shape the narrative. Choose carefully — they're limited.<\/div>`;
-
-  html += `<div class="producer-grid">`;
-  Object.entries(PRODUCER_POWERS).forEach(([id, p]) => {
-    const uses = producerUsesLeft(id);
-    const used = uses <= 0;
-    const wrongStage = p.stage !== undefined && p.stage !== stage;
-    const disabled = used || wrongStage;
-    const reason = used ? 'Used up' : wrongStage ? `Available at ${['Camp','Challenge','Tribal'][p.stage]} stage` : '';
-    html += `<div class="producer-card ${disabled?'producer-disabled':''}">
-      <div class="producer-name">${p.name}<\/div>
-      <div class="producer-desc">${p.desc}<\/div>
-      <div class="producer-meta">
-        <span class="${used?'producer-used':'producer-uses'}">${used?'Exhausted':`${uses} use${uses!==1?'s':''} left`}<\/span>
-        ${reason?`<span class="producer-reason">${reason}<\/span>`:''}
-      <\/div>
-      ${!disabled?`<button class="btn btn-fire btn-sm" style="margin-top:8px;width:100%" data-action="producerAction" data-power="${id}">Use Now<\/button>`:''}
-    <\/div>`;
-  });
-  html += `<\/div>`;
-
-  openV19Modal('🎬 Producer Controls', html);
-}
-
-/**
- * executeProducerAction(powerId)
- * Dispatched from the delegated event handler when a producer button is tapped.
- */
-function executeProducerAction(powerId) {
-  closeModal('modal-v19');
-  switch(powerId) {
-    case 'force_rivalry':     producerForceRivalry(); break;
-    case 'blindside':         producerBlindside(); break;
-    case 'guided_idol':       producerGuidedIdol(); break;
-    case 'fracture_alliance': producerFractureAlliance(); break;
-    case 'challenge_boost':   producerChallengeBoost(); break;
-    case 'intel_drop':        producerIntelDrop(); break;
-  }
-}
-
-// ─── FORCE RIVALRY ───────────────────────────────────────────────────────────
-function producerForceRivalry() {
-  const active = getActive();
-  if(active.length < 2) return;
-
-  // Build player picker
-  const opts = active.map(c =>
-    `<option value="${c.id}">${c.name} (${c.archetype})<\/option>`
-  ).join('');
-
-  const html = `<div class="v19-help">Choose two players. A public confrontation erupts between them — creating a lasting rivalry memory on both sides.<\/div>
-    <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
-      <div>
-        <label class="form-label">Player A<\/label>
-        <select class="form-select" id="rivalry-a">${opts}<\/select>
-      <\/div>
-      <div>
-        <label class="form-label">Player B<\/label>
-        <select class="form-select" id="rivalry-b">${opts}<\/select>
-      <\/div>
-      <button class="btn btn-fire" data-action="confirmRivalry">⚔️ Manufacture Rivalry<\/button>
-    <\/div>`;
-  openV19Modal('⚔️ Manufacture Rivalry', html);
-}
-
-function confirmRivalry() {
-  const aId = document.getElementById('rivalry-a')?.value;
-  const bId = document.getElementById('rivalry-b')?.value;
-  if(!aId || !bId || aId === bId) { notify('Pick two different players'); return; }
-  const a = G.cast.find(c=>c.id===aId), b = G.cast.find(c=>c.id===bId);
-  if(!a||!b) return;
-  closeModal('modal-v19');
-  useProducerPower('force_rivalry');
-  // Record rivalry memories on both sides at high intensity
-  recordMemory('rivalry', aId, bId, G.episode, 85);
-  recordMemory('rivalry', bId, aId, G.episode, 85);
-  // Also set negative relationship score
-  const key = [aId,bId].sort().join('|');
-  G.relationships[key] = Math.min(G.relationships[key]||50, 20);
-  G.dramaLevel = Math.min(5, G.dramaLevel + 1);
-  notify(`⚔️ ${a.name.split(' ')[0]} and ${b.name.split(' ')[0]} just became enemies`, 'twist');
-  renderStage(G.stageIndex);
-}
-
-// ─── PRODUCER BLINDSIDE ───────────────────────────────────────────────────────
-function producerBlindside() {
-  const ep = G.currentEpData;
-  if(!ep?.voteResult) { notify('Run the vote first — then override it'); return; }
-  const active = getActive().filter(c =>
-    !ep.eliminated || c.id !== ep.eliminated.id
-  );
-  const opts = active.map(c => {
-    const votes = ep.voteResult.tally[c.id] || 0;
-    return `<option value="${c.id}">${c.name} (${c.archetype}) — ${votes} vote${votes!==1?'s':''}<\/option>`;
-  }).join('');
-
-  const html = `<div class="v19-help">The vote has been counted — but you can override it. Choose who actually goes home tonight. The original vote result is discarded.<\/div>
-    <div style="margin-top:12px">
-      <label class="form-label">Send home instead<\/label>
-      <select class="form-select" id="blindside-target">${opts}<\/select>
-      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmBlindside">💥 Execute Blindside<\/button>
-    <\/div>`;
-  openV19Modal('💥 Producer Blindside', html);
-}
-
-function confirmBlindside() {
-  const targetId = document.getElementById('blindside-target')?.value;
-  if(!targetId) return;
-  const target = G.cast.find(c=>c.id===targetId);
-  if(!target) return;
-  closeModal('modal-v19');
-  useProducerPower('blindside');
-  const ep = G.currentEpData;
-  // Override the eliminated player
-  const old = ep.eliminated;
-  ep.eliminated = target;
-  ep._producerBlindside = true;
-  ep._originalEliminated = old;
-  // Record betrayal memories for everyone who voted the original target
-  (ep.voteResult?.individualVotes||[]).forEach(iv => {
-    if(iv.target.id === (old?.id)) {
-      recordMemory('betrayal', iv.target.id, 'producer', G.episode, 60);
-    }
-  });
-  notify(`💥 Producer blindside — ${target.name.split(' ')[0]} goes home instead`, 'twist');
-  renderStage(G.stageIndex);
-}
-
-// ─── GUIDED IDOL ─────────────────────────────────────────────────────────────
-function producerGuidedIdol() {
-  const active = getActive();
-  const opts = active.map(c =>
-    `<option value="${c.id}">${c.name} (${c.archetype})<\/option>`
-  ).join('');
-
-  const html = `<div class="v19-help">Choose a player. They'll find the hidden idol this episode — guaranteed. Useful for protecting a fan favourite or disrupting a dominant alliance.<\/div>
-    <div style="margin-top:12px">
-      <label class="form-label">Idol goes to<\/label>
-      <select class="form-select" id="guided-idol-target">${opts}<\/select>
-      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmGuidedIdol">🗺️ Plant the Idol<\/button>
-    <\/div>`;
-  openV19Modal('🗺️ Guided Idol Plant', html);
-}
-
-function confirmGuidedIdol() {
-  const targetId = document.getElementById('guided-idol-target')?.value;
-  if(!targetId) return;
-  const target = G.cast.find(c=>c.id===targetId);
-  if(!target) return;
-  closeModal('modal-v19');
-  useProducerPower('guided_idol');
-  if(!G.idolHolders.includes(targetId)) G.idolHolders.push(targetId);
-  const ep = G.currentEpData;
-  ep.idolFinder = target;
-  notify(`🗺️ ${target.name.split(' ')[0]} finds the hidden idol`, 'win');
-  renderStage(G.stageIndex);
-}
-
-// ─── FRACTURE ALLIANCE ────────────────────────────────────────────────────────
-function producerFractureAlliance() {
-  if(!G.alliances?.length) { notify('No active alliances to fracture'); return; }
-  const opts = G.alliances.map(a => {
-    const names = a.members.map(id => G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean).join(', ');
-    return `<option value="${a.id}">${names}<\/option>`;
-  }).join('');
-
-  const html = `<div class="v19-help">Choose an alliance to fracture. One member will betray the others this vote — and everyone will remember it.<\/div>
-    <div style="margin-top:12px">
-      <label class="form-label">Alliance to fracture<\/label>
-      <select class="form-select" id="fracture-target">${opts}<\/select>
-      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmFractureAlliance">🔥 Fracture It<\/button>
-    <\/div>`;
-  openV19Modal('🔥 Fracture Alliance', html);
-}
-
-function confirmFractureAlliance() {
-  const allianceId = document.getElementById('fracture-target')?.value;
-  if(!allianceId) return;
-  const alliance = G.alliances.find(a=>a.id===allianceId);
-  if(!alliance||alliance.members.length<2) return;
-  closeModal('modal-v19');
-  useProducerPower('fracture_alliance');
-  // Pick a random member as the betrayer
-  const betrayer = G.cast.find(c=>c.id===pick(alliance.members));
-  // Record betrayal memories on all other members
-  alliance.members.forEach(mid => {
-    if(mid === betrayer.id) return;
-    recordMemory('betrayal', mid, betrayer.id, G.episode, 90);
-    recordMemory('alliance_broken', mid, betrayer.id, G.episode, 85);
-  });
-  // Remove from alliance
-  alliance.members = alliance.members.filter(id=>id!==betrayer.id);
-  betrayer.allianceIds = (betrayer.allianceIds||[]).filter(id=>id!==allianceId);
-  G.dramaLevel = Math.min(5, G.dramaLevel + 2);
-  notify(`🔥 ${betrayer.name.split(' ')[0]} fractures the alliance — betrayal recorded`, 'twist');
-  renderStage(G.stageIndex);
-}
-
-// ─── CHALLENGE BOOST ──────────────────────────────────────────────────────────
-function producerChallengeBoost() {
-  const active = getActive();
-  const opts = active.map(c =>
-    `<option value="${c.id}">${c.name} — ${c.archetype} (phys:${c.physical} ment:${c.mental})<\/option>`
-  ).join('');
-
-  const html = `<div class="v19-help">Choose a player. They perform at their absolute peak this challenge — max stats, no randomness applied.<\/div>
-    <div style="margin-top:12px">
-      <label class="form-label">Boost this player<\/label>
-      <select class="form-select" id="boost-target">${opts}<\/select>
-      <button class="btn btn-fire" style="margin-top:12px;width:100%" data-action="confirmChallengeBoost">⚡ Apply Boost<\/button>
-    <\/div>`;
-  openV19Modal('⚡ Challenge Boost', html);
-}
-
-function confirmChallengeBoost() {
-  const targetId = document.getElementById('boost-target')?.value;
-  if(!targetId) return;
-  const target = G.cast.find(c=>c.id===targetId);
-  if(!target) return;
-  closeModal('modal-v19');
-  useProducerPower('challenge_boost');
-  G._challengeBoostId = targetId;
-  notify(`⚡ ${target.name.split(' ')[0]} will dominate the challenge`, 'win');
-}
-
-// ─── INTEL DROP ───────────────────────────────────────────────────────────────
-function producerIntelDrop() {
-  const ep = G.currentEpData;
-  if(!ep?.voteResult?.tally) { notify('No vote data yet — run the episode first'); return; }
-  const tally = ep.voteResult.tally;
-  const sorted = Object.entries(tally)
-    .sort((a,b)=>b[1]-a[1])
-    .map(([id,count]) => {
-      const p = G.cast.find(c=>c.id===id);
-      return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span>${p?.name||id} <span style="font-size:11px;color:var(--text2)">${p?.archetype||''}<\/span><\/span>
-        <strong>${count} vote${count!==1?'s':''}<\/strong>
-      <\/div>`;
-    }).join('');
-
-  const html = `<div class="v19-help">Host's eyes only. This is how the votes actually fell — before the parchments are read.<\/div>
-    <div style="margin-top:12px">${sorted}<\/div>
-    <button class="btn btn-outline" style="margin-top:14px;width:100%" data-action="closeV19Modal">Close<\/button>`;
-  useProducerPower('intel_drop');
-  openV19Modal('👁️ Intel Drop — Confidential', html);
-}
-
-// ===== EXPORTS =====
-
-
-
-// ===== save.js =====
-// No Signal — save.js
-// Save / load, autosave, export, demo loader
-
-// ===== DEMO =====
-function loadQuickDemo(){
-  G.cast=[];
-  [['Alex Carter','#E8450A','Strategic','The Strategist',8,7,9,6],['Morgan Rivera','#0EA5E9','Loyal','The Fan Favorite',5,10,7,8],
-   ['Casey Thompson','#16A34A','Villain','The Big Villain',9,6,8,10],['Jordan Kim','#9333EA','Hero','The Underdog',6,8,5,9],
-   ['Taylor Walsh','#EAB308','Chaotic','The Loose Cannon',7,9,6,7],['Sam Okafor','#EC4899','Social','The Social Butterfly',4,10,8,6],
-   ['Riley Nakamura','#06B6D4','Floater','The Quiet Threat',7,7,9,7],['Quinn Santos','#F97316','Hothead','The Challenge Beast',10,5,6,10],
-   ['Blake Bellamy','#84CC16','Peacemaker','The Sweetheart',5,9,7,8],['Drew Hassan','#6366F1','Schemer','The Manipulator',6,8,10,5],
-   ['Sage Nguyen','#14B8A6','Nerd','The Narrator',5,7,10,6],['Avery Cruz','#F43F5E','Romantic','The Duo',7,9,6,8],
-  ].forEach(([name,color,personality,archetype,phy,soc,men,end])=>G.cast.push(makeContestant({name,color,personality,archetype,physical:phy,social:soc,mental:men,endurance:end})));
-  G.teams=[{id:uid(),name:'Tribe Fang',color:'#E8450A'},{id:uid(),name:'Tribe Kota',color:'#0EA5E9'}];
-  G.cast.forEach((c,i)=>c.team=i%2);
-  G.settings={name:'No Signal: Demo Season',theme:'Tropical Volcanic Island',flavor:'drama',seed:'demo-v19',mergeEpisode:5,finaleSize:3,
-    voteSystem:'plurality',tiebreak:'fire',alliances:true,confessionals:true,drama:true,idols:true,jury:true,
-    interactions:true,streaks:true,log:true,twistFreq:20,randomness:35,allianceStr:65,idolDiff:'medium',
-    dramaRate:'medium',tone:'dramatic',showScores:true,showVotes:true,returnees:true};
-  G.twists=new Set(TWISTS_DATA.map(t=>t.id));
-  G.episode=1;G.merged=false;G.jury=[];G.episodeLog=[];G.dramaLevel=0;G.idolHolders=[];G.alliances=[];G.challengeWinStreaks={};G.extraVoteHolders=[];G.stealVoteHolders=[];
-  G.cast.forEach(c=>{c.eliminated=false;c.juryMember=false;c.votes=0;c.immunity=false;c.hasIdol=false;c.idolPlayed=false;c.challengeWins=0;c.allianceIds=[];c.elimEp=null;c.juryReturn=false;c._portrait=null;});
-  buildAlliances();
-  document.getElementById('header-ep-badge').style.display='flex';
-  showGameScreen(); computeAndStartEpisode();
-  notify('Demo season loaded! ⚡','win');
-}
-function continueGame(){showGameScreen();if(G.currentEpData)renderStage(G.stageIndex||0);}
-
-// ===== SAVE / LOAD =====
-const SAVE_VERSION=19;
-const SAVE_KEY='nosignal_save_v19';
-const LEGACY_SAVE_KEYS=['nosignal_save_v18','nosignal_save_v1'];
-
-function stripRuntimeFields(contestant){
-  const {_portrait,_portraitKey,...rest}=contestant||{};
-  return rest;
-}
-function buildSavePayload(){
-  return {
-    app:'No Signal', version:SAVE_VERSION, schema:'nosignal-season-save',
-    cast:G.cast.map(stripRuntimeFields), teams:G.teams, settings:G.settings, twists:[...G.twists],
-    relationships:G.relationships||{}, rngState:G.rngState,
-    episode:G.episode, merged:G.merged, jury:G.jury.map(j=>j.id),
-    dramaLevel:G.dramaLevel, idolHolders:G.idolHolders,
-    alliances:G.alliances, challengeWinStreaks:G.challengeWinStreaks,
-    extraVoteHolders:G.extraVoteHolders, stealVoteHolders:G.stealVoteHolders,
-    stageIndex:G.stageIndex, currentEpData:G.currentEpData,
-    memories:G.memories||[], placementHistory:G.placementHistory||[],
-    producerPowers:G.producerPowers||{},
-    perceivedRelationships:G.perceivedRelationships||{},
-    savedAt:Date.now()
-  };
-}
-function getSaveRaw(){
-  try{
-    const current=localStorage.getItem(SAVE_KEY);
-    if(current) return current;
-    for(const key of LEGACY_SAVE_KEYS){
-      const legacy=localStorage.getItem(key);
-      if(legacy) return legacy;
-    }
-  }catch(e){}
-  return null;
-}
-function migrateSaveIfNeeded(raw){
-  const save=JSON.parse(raw);
-  save.version=save.version||1;
-  save.schema=save.schema||'nosignal-season-save';
-  return save;
-}
-function downloadTextFile(filename, text, mime='application/json'){
-  const blob=new Blob([text],{type:mime});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),500);
-}
-function seasonSlug(){
-  const title=(G.settings&&G.settings.seasonName)||'no-signal-season';
-  return title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'no-signal-season';
-}
-function saveGame(silent=false){
-  try {
-    const save=buildSavePayload();
-    const json=JSON.stringify(save);
-    localStorage.setItem(SAVE_KEY,json);
-    // Keep a one-step recovery slot so a bad save/import is not fatal.
-    localStorage.setItem(SAVE_KEY+'_backup',json);
-    if(!silent) notify('💾 Game saved','win');
-    if(json.length>4*1024*1024) notify('⚠️ Save is large ('+Math.round(json.length/1024)+'KB) — export a backup or remove some photos');
-    return true;
-  } catch(e){
-    if(!silent) notify('Save failed — storage may be full');
-    console.error('Save failed:',e);
-    return false;
-  }
-}
-function hasSavedGame(){
-  return !!getSaveRaw();
-}
-function applyLoadedSave(save){
-  G.cast=save.cast||[];
-  G.teams=save.teams||[];
-  G.settings=Object.assign({}, G.settings||{}, save.settings||{});
-  G.twists=new Set(save.twists||TWISTS_DATA.map(t=>t.id));
-  G.relationships=save.relationships||{};
-  G.memories=save.memories||[];
-  G.placementHistory=save.placementHistory||[];
-  G.producerPowers=save.producerPowers||{};
-  G.perceivedRelationships=save.perceivedRelationships||{}; G.rngState=save.rngState||null;
-  G.episode=save.episode||1;
-  G.merged=!!save.merged;
-  G.jury=(save.jury||[]).map(id=>G.cast.find(c=>c.id===id)).filter(Boolean);
-  G.dramaLevel=save.dramaLevel||0;
-  G.idolHolders=save.idolHolders||[];
-  G.alliances=save.alliances||[];
-  G.challengeWinStreaks=save.challengeWinStreaks||{};
-  G.extraVoteHolders=save.extraVoteHolders||[];
-  G.stealVoteHolders=save.stealVoteHolders||[];
-  G.stageIndex=save.stageIndex||0;
-  G.currentEpData=save.currentEpData||null;
-  if(G.currentEpData){
-    const findById=id=>G.cast.find(c=>c.id===id);
-    ['eliminated','eliminated2','idolFinder','winner','runnerUp'].forEach(k=>{
-      if(G.currentEpData[k]&&G.currentEpData[k].id) G.currentEpData[k]=findById(G.currentEpData[k].id)||G.currentEpData[k];
-    });
-  }
-}
-function loadGame(){
-  try {
-    const raw=getSaveRaw();
-    if(!raw) return false;
-    const save=migrateSaveIfNeeded(raw);
-    applyLoadedSave(save);
-    // Re-save legacy saves under the v19 key after a successful migration.
-    saveGame(true);
-    document.getElementById('header-ep-badge').style.display='flex';
-    showGameScreen();
-    if(G.currentEpData) renderStage(G.stageIndex||0);
-    else computeAndStartEpisode();
-    notify('✅ Save loaded','win');
-    return true;
-  } catch(e){
-    console.error('Load failed:',e);
-    notify('Load failed — save may be corrupted');
-    return false;
-  }
-}
-function exportSaveFile(){
-  try{
-    const payload=buildSavePayload();
-    downloadTextFile(`${seasonSlug()}-v19-save.json`, JSON.stringify(payload,null,2));
-    notify('⬇ Save exported','win');
-  }catch(e){ console.error(e); notify('Export failed'); }
-}
-function openImportSave(){
-  const input=document.getElementById('save-import-input');
-  if(input) input.click();
-}
-function importSaveFile(event){
-  const file=event.target.files&&event.target.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    try{
-      const save=migrateSaveIfNeeded(String(reader.result||''));
-      if(!Array.isArray(save.cast)) throw new Error('Missing cast array');
-      localStorage.setItem(SAVE_KEY,JSON.stringify(save));
-      applyLoadedSave(save);
-      updateContinueButton();
-      notify('⬆ Save imported','win');
-    }catch(e){ console.error(e); notify('Import failed — not a valid No Signal save'); }
-    event.target.value='';
-  };
-  reader.readAsText(file);
-}
-function deleteSave(){
-  if(!confirm('Delete saved game permanently?')) return;
-  try{[SAVE_KEY,SAVE_KEY+'_backup',...LEGACY_SAVE_KEYS].forEach(k=>localStorage.removeItem(k));notify('Save deleted');updateContinueButton();}catch(e){}
-}
-function updateContinueButton(){
-  const wrap=document.getElementById('continue-btn-wrap');
-  if(!wrap) return;
-  wrap.style.display=hasSavedGame()?'flex':'none';
-}
-
-// ===== V19 AUTOSAVE / EXPORT SAFETY =====
-let _autosaveTimer=null;
-function queueAutosave(reason='change'){
-  clearTimeout(_autosaveTimer);
-  _autosaveTimer=setTimeout(()=>saveGame(true),700);
-}
-function markDirty(reason='change'){
-  queueAutosave(reason);
-}
-
-
-// ===== EXPORTS =====
-
-
-
-// ===== script_gen.js =====
+// ===== FILE: script_gen.js =====
 // No Signal — script_gen.js
 // Episode screenplay generator, Previously On, plain-text export
 
@@ -4540,238 +4038,696 @@ function downloadSeasonRecap(){
 // ===== EXPORTS =====
 
 
+// ===== FILE: features.js =====
+// No Signal — features.js
+// Tribe History, Profiles, Relationship Web, V19 Insights
 
-// ===== ai.js =====
-// No Signal — ai.js
-// Gemini API integration, prompt builder, AI dialogue generation
-
-// ===== GEMINI AI DIALOGUE GENERATION =====
-const GEMINI_KEY_STORE='nosignal_gemini_key';
-function showGeminiHelp(){openModal('modal-gemini-help');}
-async function testGeminiKey(){
-  const key=getGeminiKey();
-  if(!key){notify('Paste your API key first');return;}
-  notify('Testing key…');
-  const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
-  const errors=[];
-  for(const model of models){
-    try{
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{parts:[{text:'Say OK'}]}],generationConfig:{maxOutputTokens:5}})
-      });
-      if(res.ok){notify(`✅ Key works with ${model}`,'win');return;}
-      const err=await res.json().catch(()=>({}));
-      const msg=err?.error?.message||'';
-      errors.push(`${model}: ${res.status} — ${msg.slice(0,50)}`);
-      if(res.status===401||res.status===403){notify(`❌ Key invalid or restricted: ${msg.slice(0,60)}`);return;}
-    }catch(e){errors.push(`${model}: network error`);}
-  }
-  notify(`❌ Failed. First error: ${errors[0]||'unknown'}`);
-  console.log('All model errors:',errors);
+// ===== V19 INSIGHTS / RELATIONSHIP TOOLS =====
+function v19PlayerName(id){const p=G.cast.find(c=>c.id===id);return p?p.name:'Unknown';}
+function v19ActiveThreatScore(c){
+  const statAvg=((+c.physical||0)+(+c.social||0)+(+c.mental||0)+(+c.endurance||0))/4;
+  const wins=(+c.challengeWins||0)*1.6;
+  const idols=G.idolHolders&&G.idolHolders.includes(c.id)?2.2:0;
+  const alliance=(c.allianceIds||[]).length*0.7;
+  const juryPenalty=c.juryMember?-3:0;
+  return Math.max(0, Math.round((statAvg+wins+idols+alliance+juryPenalty)*10)/10);
 }
-function saveGeminiKey(val){
-  try{val=val.trim();if(val)localStorage.setItem(GEMINI_KEY_STORE,val);else localStorage.removeItem(GEMINI_KEY_STORE);}catch(e){}
+function v19SocialPowerScore(c){
+  const rel=v19RelationshipScoresFor(c.id);
+  const avg=rel.length?rel.reduce((a,b)=>a+b.score,0)/rel.length:50;
+  return Math.round(((+c.social||0)*6 + avg*0.4 + ((c.allianceIds||[]).length*8))*10)/10;
 }
-function getGeminiKey(){
-  try{return localStorage.getItem(GEMINI_KEY_STORE)||'';}catch(e){return '';}
-}
-function initGeminiKeyField(){
-  const el=document.getElementById('s-gemini-key');
-  if(el){const k=getGeminiKey();if(k) el.value=k;}
-}
-
-// Build the episode prompt for Gemini — tight, specific, structured
-function buildEpisodePrompt(ep){
-  const active=G.cast.filter(c=>!c.eliminated||(c.elimEp&&c.elimEp>=ep.ep));
-  const eliminated=ep.eliminated;
-  const tally=ep.voteResult?.tally||{};
-
-  // Narrative compression — use summaries not raw objects (~65% fewer tokens)
-  const recentSummaries=G.episodeLog
-    .filter(e=>e.summary&&e.ep<ep.ep).slice(-4)
-    .map(e=>e.summary).join(' / ');
-  const keyMemories=(G.memories||[])
-    .filter(m=>['betrayal','saved','idol_played_on'].includes(m.type)&&m.episode>=ep.ep-3)
-    .slice(0,6)
-    .map(m=>{
-      const s=G.cast.find(c=>c.id===m.subject),o=G.cast.find(c=>c.id===m.object);
-      return `${s?.name?.split(' ')[0]||'?'} ${m.type.replace(/_/g,' ')} ${o?.name?.split(' ')[0]||'?'}(ep${m.episode})`;
-    }).join('; ');
-  const allianceDesc=G.alliances
-    .map(a=>{
-      const names=a.members.map(id=>G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean);
-      return names.length>=2?names.join('+'):null;
-    }).filter(Boolean).join(' | ');
-  const voteLines=Object.entries(tally).map(([id,v])=>{
-    const p=G.cast.find(c=>c.id===id);
-    return p?`${v}v→${p.name.split(' ')[0]}(${p.archetype})`:null;
-  }).filter(Boolean).join(', ');
-  const confPlayers=(ep.confessionals||[]).map(c=>`${c.who.name} (${c.who.archetype}, ${c.who.personality}, ${c.who.challengeWins||0} challenge wins${G.idolHolders.includes(c.who.id)?' — has idol':''}${tally[c.who.id]?` — received ${tally[c.who.id]} vote(s)`:''})`).join('\n- ');
-  const interPlayers=(ep.interactions||[]).map(i=>`${i.a.name} (${i.a.archetype}/${i.a.personality}) + ${i.b.name} (${i.b.archetype}/${i.b.personality}), relationship score: ${v19RelScore(i.a.id,i.b.id)}/100`).join('\n- ');
-
-  return `Reality TV writer for "${G.settings.name||'No Signal'}" (Survivor-style, ${G.settings.theme||'remote island'}).
-Ep${ep.ep}/${G.settings.mergeEpisode||6}. ${G.merged?'POST-MERGE':'PRE-MERGE'}. ${active.length} remain.
-RECENT SEASON: ${recentSummaries||'Season start'}
-KEY MEMORIES: ${keyMemories||'None yet'}
-THIS EPISODE: ${ep.summary||''}
-ALLIANCES: ${allianceDesc||'None'}
-${ep.mergeHappened?'*** THE MERGE HAPPENED THIS EPISODE ***':''}
-CONFESSIONALS NEEDED (player/archetype/personality): ${confPlayers||'None'}
-INTERACTIONS (player pairs/rel score): ${interPlayers||'None'}
-
-Write the following in JSON format (no markdown, no backticks, pure JSON):
-{
-  "confessionals": [
-    { "playerId": "...", "text": "2-3 sentence confessional in first person, specific to their situation this episode, in the voice of their archetype and personality" }
-  ],
-  "interactions": [
-    { "playerIds": ["...", "..."], "text": "1-2 sentence third-person description of what happened between these two players, specific to their relationship score and episode events" }
-  ],
-  "exitSpeech": "2-3 sentence exit speech from ${eliminated?eliminated.name+' ('+eliminated.archetype+', '+eliminated.personality+')'  :'the eliminated player'}, in character",
-  "exitFinalWords": "3-4 sentence final words, reflective, in character for their archetype",
-  "hostComment": "1 sentence host quip reacting to tonight's vote specifically"
-}
-
-Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', ')}
-Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
-${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
-
-Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique.`;
-}
-
-// Call Gemini Flash API
-async function callGemini(prompt){
-  const key=getGeminiKey();
-  if(!key) return null;
-  // Try models in order of preference — free tier availability varies
-  const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
-  for(const model of models){
-    try{
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          contents:[{parts:[{text:prompt}]}],
-          generationConfig:{temperature:0.85,maxOutputTokens:1400,thinkingConfig:{thinkingBudget:0}}
-          // Note: NOT using responseMimeType — causes failures on some models/keys
-        })
-      });
-      if(!res.ok){
-        const err=await res.json().catch(()=>({}));
-        const msg=err?.error?.message||res.statusText||'Unknown error';
-        // 404 = model not found, try next; other errors = real problem
-        if(res.status===404||res.status===400) continue;
-        console.error(`Gemini ${model} error:`,msg);
-        notify(`AI error: ${msg.slice(0,80)}`);
-        return null;
+function v19RelationshipKey(a,b){return [a,b].sort().join('|');}
+function v19EnsureRelationships(){
+  if(!G.relationships) G.relationships={};
+  const ids=G.cast.map(c=>c.id);
+  ids.forEach((a,i)=>ids.slice(i+1).forEach(b=>{
+    const key=v19RelationshipKey(a,b);
+    if(G.relationships[key]==null){
+      const pa=G.cast.find(c=>c.id===a), pb=G.cast.find(c=>c.id===b);
+      let base=50;
+      if(pa&&pb){
+        if((pa.allianceIds||[]).some(x=>(pb.allianceIds||[]).includes(x))) base+=18;
+        if(pa.personality===pb.personality) base+=8;
+        if(pa.archetype===pb.archetype) base+=5;
+        base+=Math.round((((+pa.social||5)+(+pb.social||5))/2-5)*2);
       }
-      const data=await res.json();
-      const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-      if(!text){ console.error('Gemini returned empty text'); continue; }
-      // Strip markdown code fences if model wrapped the JSON
-      const clean=text.replace(/^```(?:json)?\s*/,'').replace(/\s*```\s*$/,'').trim();
-      // Find the JSON object within the response (model sometimes adds preamble)
-      const jsonMatch=clean.match(/\{[\s\S]*\}/);
-      if(!jsonMatch){ console.error('No JSON found in response:', clean.slice(0,200)); continue; }
-      return JSON.parse(jsonMatch[0]);
-    }catch(e){
-      console.error(`Gemini ${model} call failed:`,e);
-      if(e instanceof SyntaxError) continue; // bad JSON, try next model
-      notify(`AI connection error: ${e.message?.slice(0,60)||'Network error'}`);
-      return null;
+      G.relationships[key]=Math.max(5,Math.min(95,base));
+    }
+  }));
+  return G.relationships;
+}
+function v19RelationshipScoresFor(id){
+  v19EnsureRelationships();
+  return Object.entries(G.relationships).filter(([k])=>k.includes(id)).map(([k,score])=>{
+    const other=k.split('|').find(x=>x!==id);
+    return {id:other, name:v19PlayerName(other), score:+score||50};
+  }).sort((a,b)=>b.score-a.score);
+}
+function v19TopPairs(){
+  v19EnsureRelationships();
+  return Object.entries(G.relationships).map(([k,score])=>{
+    const [a,b]=k.split('|'); return {a,b,score:+score||50};
+  }).sort((x,y)=>y.score-x.score);
+}
+function openV19Modal(title,html){
+  document.getElementById('modal-v19-title').textContent=title;
+  document.getElementById('modal-v19-content').innerHTML=html;
+  openModal('modal-v19');
+}
+function showV19Insights(){
+  const active=getActive();
+  v19EnsureRelationships();
+  const threats=[...active].sort((a,b)=>v19ActiveThreatScore(b)-v19ActiveThreatScore(a));
+  const social=[...active].sort((a,b)=>v19SocialPowerScore(b)-v19SocialPowerScore(a));
+  const underdogs=[...active].sort((a,b)=>v19ActiveThreatScore(a)-v19ActiveThreatScore(b));
+  const leader=threats[0], socialBoss=social[0], underdog=underdogs[0];
+  let html=`<div class="v19-help">These are explainable v19 estimates, not hard-coded outcomes. They combine stats, challenge wins, idols, alliances and relationship strength so you can see why someone may become a target.<\/div>`;
+  html+=`<div class="v19-card-grid">
+    <div class="v19-insight-card"><div class="v19-insight-label">Biggest Threat<\/div><div class="v19-insight-value">${leader?leader.name:'—'}<\/div><div class="v19-insight-sub">Threat score ${leader?v19ActiveThreatScore(leader):0}<\/div><\/div>
+    <div class="v19-insight-card"><div class="v19-insight-label">Social Power<\/div><div class="v19-insight-value">${socialBoss?socialBoss.name:'—'}<\/div><div class="v19-insight-sub">Power score ${socialBoss?v19SocialPowerScore(socialBoss):0}<\/div><\/div>
+    <div class="v19-insight-card"><div class="v19-insight-label">Underdog<\/div><div class="v19-insight-value">${underdog?underdog.name:'—'}<\/div><div class="v19-insight-sub">Lowest visible threat<\/div><\/div>
+    <div class="v19-insight-card"><div class="v19-insight-label">Seed<\/div><div class="v19-insight-value" style="font-size:15px">${G.settings.seed||'Random'}<\/div><div class="v19-insight-sub">Replayable if a seed is set<\/div><\/div>
+  <\/div>`;
+  html+=`<table class="v19-table"><thead><tr><th>Player<\/th><th>Threat<\/th><th>Social<\/th><th>Wins<\/th><th>Idol<\/th><th>Read<\/th><\/tr><\/thead><tbody>`;
+  threats.forEach(c=>{
+    const threat=v19ActiveThreatScore(c), sp=v19SocialPowerScore(c);
+    const read=threat>=13?'Huge target':threat>=10?'Visible threat':sp>=75?'Protected socially':'Floating safely';
+    html+=`<tr><td><strong>${c.name}<\/strong><div style="font-size:10px;color:var(--text3)">${c.archetype} · ${c.personality}<\/div><\/td><td><span class="v19-score-pill">${threat}<\/span><\/td><td><span class="v19-score-pill">${sp}<\/span><\/td><td>${c.challengeWins||0}<\/td><td>${G.idolHolders.includes(c.id)?'💎':'—'}<\/td><td>${read}<\/td><\/tr>`;
+  });
+  html+=`<\/tbody><\/table><div class="modal-btns"><button class="btn btn-fire" onclick="exportV19SeasonReport()">⬇ Export readable report<\/button><\/div>`;
+  openV19Modal('🧠 v19 Game Insights',html);
+}
+
+// ===== TRIBE HISTORY TRACKER (BrantSteele-style placement timeline) =====
+function showTribeHistory(){
+  if(!G.placementHistory.length){ notify('No episodes played yet — history builds as you go'); return; }
+  // Order players by how far they got: still active first, then by elimination episode desc
+  const order=[...G.cast].sort((a,b)=>{
+    const ae=a.eliminated?(a.elimEp||0):999, be=b.eliminated?(b.elimEp||0):999;
+    if(ae!==be) return be-ae;
+    return a.name.localeCompare(b.name);
+  });
+  const eps=G.placementHistory;
+  let html=`<div class="th-wrap"><table class="th-table"><thead><tr><th class="th-name-col">Player<\/th>`;
+  eps.forEach(s=>{ html+=`<th title="Episode ${s.episode}">${s.episode}<\/th>`; });
+  html+=`<th>Result<\/th><\/tr><\/thead><tbody>`;
+  order.forEach(c=>{
+    html+=`<tr><td class="th-name-col"><span class="th-dot" style="background:${c.color}"><\/span>${c.name.split(' ')[0]}<\/td>`;
+    eps.forEach(s=>{
+      const ps=s.players[c.id];
+      if(!ps){ html+=`<td class="th-cell th-blank"><\/td>`; return; }
+      let cls='th-cell', label='', bg='';
+      if(ps.status==='eliminated'){ cls+=' th-elim'; label='OUT'; bg='#EF4444'; }
+      else if(ps.status==='out'){ cls+=' th-gone'; label=''; bg='transparent'; }
+      else if(ps.status==='rejoined'){ cls+=' th-rejoin'; label='↩'; bg='#F59E0B'; }
+      else if(ps.merged){ cls+=' th-merged'; label=ps.immune?'🛡':'•'; bg='#8B5CF6'; }
+      else if(ps.team!=null&&G.teams[ps.team]){ label=ps.immune?'🛡':''; bg=G.teams[ps.team].color; }
+      else { label=ps.immune?'🛡':'•'; bg='#94A3B8'; }
+      const title=`Ep ${s.episode}: ${ps.status}${ps.votesGot?` · ${ps.votesGot} vote(s)`:''}`;
+      html+=`<td class="${cls}" style="background:${bg};color:#fff" title="${title}">${label}<\/td>`;
+    });
+    const res=c.eliminated?`Ep ${c.elimEp||'?'}`:(c.winner?'WINNER 👑':'Still in');
+    html+=`<td class="th-result ${c.eliminated?'':'th-alive'}">${res}<\/td><\/tr>`;
+  });
+  html+=`<\/tbody><\/table><\/div>
+    <div class="th-legend">
+      <span><i style="background:#94A3B8"><\/i> Pre-merge<\/span>
+      <span><i style="background:#8B5CF6"><\/i> Merged<\/span>
+      <span><i style="background:#EF4444"><\/i> Voted out<\/span>
+      <span><i style="background:#F59E0B"><\/i> Rejoined<\/span>
+      <span>🛡 Immune<\/span>
+    <\/div>`;
+  openV19Modal('📊 Tribe History',html);
+}
+
+// ===== RELATIONSHIP WEB (visual graph, not a table) =====
+function showRelationshipWeb(){
+  const active=getActive();
+  if(active.length<2){ notify('Need at least 2 active players'); return; }
+  v19EnsureRelationships();
+  const N=active.length;
+  const size=Math.min(680, Math.max(340, N*46));
+  const cx=size/2, cy=size/2, R=size/2-54;
+  // node positions on a circle
+  const nodes=active.map((c,i)=>{
+    const ang=(i/N)*Math.PI*2 - Math.PI/2;
+    return { c, x:cx+Math.cos(ang)*R, y:cy+Math.sin(ang)*R };
+  });
+  let edges='';
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const a=nodes[i], b=nodes[j];
+      const score=v19RelScore(a.c.id,b.c.id); // 0-100
+      if(score<35 && score>20) continue; // skip neutral clutter
+      let col, w;
+      if(score>=65){ col='rgba(22,163,74,'; w=1+(score-65)/14; }
+      else if(score<=20){ col='rgba(220,38,38,'; w=1+(20-score)/12; }
+      else continue;
+      const op=Math.min(0.85, 0.25+Math.abs(score-42)/70);
+      edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${col}${op.toFixed(2)})" stroke-width="${w.toFixed(2)}"/>`;
     }
   }
-  notify('AI generation failed — no working model found. Check your key at aistudio.google.com');
-  return null;
-}
-
-// Generate AI dialogue for one episode and apply it
-async function generateAIDialogueForEp(ep,onProgress){
-  const key=getGeminiKey();
-  if(!key) return false;
-  onProgress&&onProgress('Sending episode data to Gemini…');
-  const prompt=buildEpisodePrompt(ep);
-  const result=await callGemini(prompt);
-  if(!result) return false;
-  // Apply confessionals
-  if(result.confessionals&&ep.confessionals){
-    result.confessionals.forEach(ai=>{
-      const conf=ep.confessionals.find(c=>c.who.id===ai.playerId);
-      if(conf&&ai.text) conf.text=ai.text;
-    });
-  }
-  // Apply interactions
-  if(result.interactions&&ep.interactions){
-    result.interactions.forEach((ai,i)=>{
-      if(ep.interactions[i]&&ai.text) ep.interactions[i].text=ai.text;
-    });
-  }
-  // Apply exit speech
-  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=result.exitSpeech;
-  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=result.exitFinalWords;
-  if(result.hostComment) ep._aiHostComment=result.hostComment;
-  ep._aiGenerated=true;
-  onProgress&&onProgress('AI dialogue applied ✓');
-  return true;
-}
-
-// Expose to script modal — "Generate with AI" button
-async function generateAIEpisodeScript(epNum){
-  const ep=G.episodeLog.find(e=>e.ep===epNum);
-  if(!ep){notify('Episode not found');return;}
-  const key=getGeminiKey();
-  if(!key){
-    notify('Add your free Gemini API key in Setup → General Settings');
-    showGeminiHelp();
-    return;
-  }
-  const btn=document.getElementById(`ai-gen-btn-${epNum}`);
-  if(btn){btn.disabled=true;btn.textContent='⏳ Contacting Gemini…';}
-  notify('Generating AI dialogue for Episode '+epNum+'…');
-  const ok=await generateAIDialogueForEp(ep,msg=>{
-    notify(msg);
-    if(btn) btn.textContent=`⏳ ${msg}`;
+  let dots='';
+  nodes.forEach(n=>{
+    // Clickable node — tap to see this player's history with others
+    dots+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="13" fill="${n.c.color}" stroke="#fff" stroke-width="2" style="cursor:pointer" onclick="showOneProfile('${n.c.id}')"/>`;
+    const lx=n.x, ly=n.y> cy ? n.y+26 : n.y-18;
+    dots+=`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text)" style="cursor:pointer" onclick="showOneProfile('${n.c.id}')">${n.c.name.split(' ')[0]}<\/text>`;
   });
-  if(ok){
-    notify('✨ Done! Script updated with AI dialogue','win');
-    setTimeout(()=>showEpisodeScripts(epNum),500);
-  } else {
-    if(btn){btn.disabled=false;btn.textContent='✨ Generate with AI — Retry';}
-  }
+  const svg=`<svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:${size}px;display:block;margin:0 auto">${edges}${dots}<\/svg>`;
+  const legend=`<div class="th-legend" style="justify-content:center;margin-top:10px">
+    <span><i style="background:rgba(22,163,74,0.8)"><\/i> Strong bond<\/span>
+    <span><i style="background:rgba(220,38,38,0.8)"><\/i> Rivalry<\/span>
+    <span style="color:var(--text2)">Line thickness = intensity<\/span>
+  <\/div>`;
+  openV19Modal('🕸️ Relationship Web', `<div class="v19-help">A live map of who's tight and who's clashing. Strong bonds in green, rivalries in red.<\/div>${svg}${legend}`);
+}
+// score helper that reads the v19 relationship store consistently
+function v19RelScore(idA,idB){
+  if(typeof v19PairScore==='function') return v19PairScore(idA,idB);
+  const key=[idA,idB].sort().join('|');
+  if(G.relationships&&G.relationships[key]!=null) return G.relationships[key];
+  // fallback derived score
+  const a=G.cast.find(c=>c.id===idA), b=G.cast.find(c=>c.id===idB);
+  if(!a||!b) return 50;
+  let s=50;
+  const shared=(a.allianceIds||[]).some(x=>(b.allianceIds||[]).includes(x));
+  if(shared) s+=30;
+  if(a.personality===b.personality) s+=8;
+  s+=((a.social||5)+(b.social||5))-10;
+  return Math.max(0,Math.min(100,Math.round(s)));
 }
 
-function toggleDarkMode(){
-  const isDark = document.documentElement.classList.toggle('dark');
-  document.getElementById('dark-toggle-btn').textContent = isDark ? '☀️' : '🌙';
-  try { localStorage.setItem('nosignal_darkmode', isDark ? '1' : '0'); } catch(e){}
+// ===== PLAYER PROFILES (per-player full season history) =====
+function showPlayerProfiles(){
+  const order=[...G.cast].sort((a,b)=>{
+    const ae=a.eliminated?(a.elimEp||0):999, be=b.eliminated?(b.elimEp||0):999;
+    if(ae!==be) return be-ae; return a.name.localeCompare(b.name);
+  });
+  let html=`<div class="v19-help">Tap a player for their full season story — placement, votes, challenges, alliances.<\/div><div class="pp-grid">`;
+  order.forEach(c=>{
+    const port=c.customImage
+      ? `<img src="${c.customImage}" style="width:54px;height:65px;object-fit:cover;object-position:top;border-radius:8px">`
+      : getPortrait(c).replace('width="120" height="145"','width="54" height="65"');
+    html+=`<div class="pp-card" onclick="showOneProfile('${c.id}')">
+      <div class="pp-port">${port}<\/div>
+      <div class="pp-name">${c.name.split(' ')[0]}<\/div>
+      <div class="pp-sub">${c.eliminated?`Out Ep ${c.elimEp||'?'}`:(c.winner?'👑 Winner':'Active')}<\/div>
+    <\/div>`;
+  });
+  html+=`<\/div>`;
+  openV19Modal('👤 Player Profiles',html);
 }
-function initDarkMode(){
-  let pref = '0';
-  try { pref = localStorage.getItem('nosignal_darkmode') || '0'; } catch(e){}
-  // Also respect system preference if no saved preference
-  if(pref === '0' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) pref = '1';
-  if(pref === '1'){
-    document.documentElement.classList.add('dark');
-    const btn = document.getElementById('dark-toggle-btn');
-    if(btn) btn.textContent = '☀️';
-  }
+function showOneProfile(id){
+  const c=G.cast.find(x=>x.id===id); if(!c) return;
+  let votesCast=0, votesGot=0, tcAppear=0, immunities=0;
+  G.episodeLog.forEach(ep=>{
+    if(ep.voteResult&&ep.voteResult.individualVotes){
+      ep.voteResult.individualVotes.forEach(v=>{
+        if(v.voter.id===c.id) votesCast++;
+        if(v.target.id===c.id) votesGot++;
+      });
+      if(ep.voteResult.individualVotes.some(v=>v.voter.id===c.id)) tcAppear++;
+    }
+    if(ep.challengeResult){
+      if(ep.challengeResult.type==='individual'&&ep.challengeResult.winner?.id===c.id) immunities++;
+      if(ep.challengeResult.type==='tribal'&&ep.challengeResult.winner?.ti===c.team) immunities++;
+    }
+  });
+  const allies=(c.allianceIds||[]).flatMap(aid=>{
+    const al=G.alliances.find(a=>a.id===aid);
+    return al?al.members.filter(m=>m!==c.id).map(m=>G.cast.find(x=>x.id===m)?.name.split(' ')[0]).filter(Boolean):[];
+  });
+  const port=c.customImage
+    ? `<img src="${c.customImage}" style="width:90px;height:109px;object-fit:cover;object-position:top;border-radius:10px">`
+    : getPortrait(c).replace('width="120" height="145"','width="90" height="109"');
+  let timeline='';
+  G.placementHistory.forEach(s=>{
+    const ps=s.players[c.id]; if(!ps||ps.status==='out') return;
+    let tag=ps.status==='eliminated'?'🔴 Voted out':ps.status==='rejoined'?'↩ Rejoined':ps.immune?'🛡 Immune':ps.merged?'Merged':'Safe';
+    timeline+=`<div class="pp-tl-row"><span class="pp-tl-ep">Ep ${s.episode}<\/span><span>${tag}${ps.votesGot?` · received ${ps.votesGot} vote(s)`:''}<\/span><\/div>`;
+  });
+  const html=`<div class="pp-detail">
+    <div class="pp-detail-head">
+      <div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.15)">${port}<\/div>
+      <div>
+        <div class="pp-detail-name">${c.name}<\/div>
+        <div class="pp-detail-arch">${c.archetype} · ${c.personality}<\/div>
+        <div class="pp-detail-status">${c.eliminated?`Eliminated Episode ${c.elimEp||'?'}${c.juryMember?' · Jury member':''}`:(c.winner?'👑 Sole Survivor':'Still in the game')}<\/div>
+      <\/div>
+    <\/div>
+    <div class="pp-stats">
+      <div class="pp-stat"><b>${immunities}<\/b><span>Immunities<\/span><\/div>
+      <div class="pp-stat"><b>${votesGot}<\/b><span>Votes received<\/span><\/div>
+      <div class="pp-stat"><b>${votesCast}<\/b><span>Votes cast<\/span><\/div>
+      <div class="pp-stat"><b>${tcAppear}<\/b><span>Tribals attended<\/span><\/div>
+      <div class="pp-stat"><b>${c.challengeWins||0}<\/b><span>Challenge wins<\/span><\/div>
+      <div class="pp-stat"><b>${G.idolHolders.includes(c.id)?'Yes':'No'}<\/b><span>Holds idol<\/span><\/div>
+    <\/div>
+    ${allies.length?`<div class="pp-section"><b>Alliance:<\/b> ${allies.join(', ')}<\/div>`:''}
+    <div class="pp-section"><b>Stats:<\/b> 💪${c.physical} 🧠${c.mental} ❤️${c.social} 🔋${c.endurance}<\/div>
+    ${c.archetypeHistory&&c.archetypeHistory.length?`<div class="pp-section"><b>Archetype evolution:<\/b> ${c.archetypeHistory.map(h=>`Ep${h.episode}: ${h.from} → ${h.to}`).join(' · ')}<\/div>`:''}
+    <div class="pp-section"><b>Season timeline:<\/b><\/div>
+    <div class="pp-timeline">${timeline||'<div style="color:var(--text2);font-size:13px">No episodes recorded yet.<\/div>'}<\/div>
+    <button class="btn btn-outline btn-sm" style="margin-top:14px" onclick="showPlayerProfiles()">← All profiles<\/button>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%" data-action="showRelHistoryPicker" data-player="${c.id}">🔗 View Relationship History<\/button>
+  <\/div>`;
+  openV19Modal(`👤 ${c.name}`,html);
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
-  initDarkMode();
-  initGeminiKeyField();
-  initTeams();renderTwistsGrid();
-  updateContinueButton();
-});
+
+function showV19Relationships(){
+  const pairs=v19TopPairs();
+  const strongest=pairs.slice(0,8), weakest=pairs.slice(-8).reverse();
+  let html=`<div class="v19-help">Relationship scores are generated from alliances, personality matches and social stats. You can use this as a production board for storylines and future vote logic.<\/div>`;
+  html+=`<h3 style="font-size:15px;margin:12px 0 6px">Strongest Bonds<\/h3>`;
+  strongest.forEach(p=>{html+=`<div class="v19-rel-row"><strong>${v19PlayerName(p.a)}<\/strong><div class="v19-rel-meter"><div class="v19-rel-fill" style="width:${p.score}%"><\/div><\/div><strong style="text-align:right">${v19PlayerName(p.b)}<\/strong><div style="grid-column:1/-1;font-size:11px;color:var(--text2)">Bond score ${p.score}/100<\/div><\/div>`});
+  html+=`<h3 style="font-size:15px;margin:18px 0 6px">Weakest Bonds / Rivalries<\/h3>`;
+  weakest.forEach(p=>{html+=`<div class="v19-rel-row"><strong>${v19PlayerName(p.a)}<\/strong><div class="v19-rel-meter"><div class="v19-rel-fill" style="width:${p.score}%;background:var(--elim)"><\/div><\/div><strong style="text-align:right">${v19PlayerName(p.b)}<\/strong><div style="grid-column:1/-1;font-size:11px;color:var(--text2)">Bond score ${p.score}/100<\/div><\/div>`});
+  openV19Modal('🕸️ v19 Relationship Board',html);
+}
+function buildV19SeasonReport(){
+  const lines=[];
+  lines.push(`${G.settings.name||'No Signal Season'} — v19 Report`);
+  lines.push(`Theme: ${G.settings.theme||'—'}`);
+  lines.push(`Seed: ${G.settings.seed||'Random'}`);
+  lines.push(`Episode: ${G.episode} | Phase: ${G.merged?'Post-merge':'Pre-merge'}`);
+  lines.push('');
+  lines.push('ACTIVE PLAYER READS');
+  getActive().sort((a,b)=>v19ActiveThreatScore(b)-v19ActiveThreatScore(a)).forEach(c=>{
+    lines.push(`- ${c.name}: threat ${v19ActiveThreatScore(c)}, social ${v19SocialPowerScore(c)}, wins ${c.challengeWins||0}${G.idolHolders.includes(c.id)?', has idol':''}`);
+  });
+  lines.push('');
+  lines.push('ELIMINATED');
+  G.cast.filter(c=>c.eliminated).sort((a,b)=>(a.elimEp||99)-(b.elimEp||99)).forEach(c=>lines.push(`- Ep ${c.elimEp||'?'}: ${c.name}${c.juryMember?' (jury)':''}`));
+  lines.push('');
+  lines.push('TOP RELATIONSHIPS');
+  v19TopPairs().slice(0,10).forEach(p=>lines.push(`- ${v19PlayerName(p.a)} + ${v19PlayerName(p.b)}: ${p.score}/100`));
+  return lines.join('\n');
+}
+function exportV19SeasonReport(){
+  downloadTextFile(`${seasonSlug()}-v19-report.txt`, buildV19SeasonReport(), 'text/plain');
+  notify('⬇ v19 report exported','win');
+}
+
+/* ===== v19 CLEANUP HELPERS =====
+   These helpers are intentionally non-invasive. Existing inline onclick handlers remain
+   for compatibility, but future controls can use data-action/data-payload and route here.
+   v19 adds seeded seasons, insight panels, relationship tools, and richer season export. */
+const NoSignalCleanup = (() => {
+  function safeJson(value) {
+    if (!value) return null;
+    try { return JSON.parse(value); } catch (_) { return value; }
+  }
+
+  function delegateActions(root = document) {
+    root.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      const payload = safeJson(target.dataset.payload);
+      const handler = window[action];
+      if (typeof handler === 'function') {
+        event.preventDefault();
+        Array.isArray(payload) ? handler(...payload) : handler(payload);
+      }
+    });
+  }
+
+  function saveGameSafe(reason = 'manual') {
+    if (typeof saveGame === 'function') {
+      try { saveGame(); return true; }
+      catch (err) { console.warn('Save failed:', reason, err); }
+    }
+    return false;
+  }
+
+  return { delegateActions, saveGameSafe };
+})();
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => NoSignalCleanup.delegateActions());
+} else {
+  NoSignalCleanup.delegateActions();
+}
+
+
+// ===== RELATIONSHIP HISTORY PANEL =====
+/**
+ * showRelationshipHistory(idA, idB)
+ * Shows the full episode-by-episode history between two players.
+ * The Jordan↔Casey table — every interaction, vote, and memory event
+ * with emotional weight, ordered chronologically.
+ * Called from player profiles, relationship web, and cast status.
+ */
+function showRelationshipHistory(idA, idB){
+  const a=G.cast.find(c=>c.id===idA), b=G.cast.find(c=>c.id===idB);
+  if(!a||!b) return;
+
+  // Gather all memory events involving both players
+  const events=[];
+  (G.memories||[]).forEach(m=>{
+    const involves=(m.subject===idA&&m.object===idB)||(m.subject===idB&&m.object===idA);
+    if(!involves) return;
+    const def=MEMORY_TYPES[m.type]||{sentiment:0};
+    const actor=G.cast.find(c=>c.id===m.subject);
+    const target=G.cast.find(c=>c.id===m.object);
+    events.push({
+      episode:m.episode,
+      type:m.type,
+      label:_memTypeLabel(m.type,actor,target),
+      intensity:m.intensity,
+      sentiment:def.sentiment,
+      actor,target,
+    });
+  });
+
+  // Also include alliance formation from G.alliances history
+  (G.alliances||[]).forEach(al=>{
+    if(al.members.includes(idA)&&al.members.includes(idB)){
+      events.push({
+        episode:1,type:'alliance_active',
+        label:`In alliance together`,
+        intensity:60,sentiment:1,actor:a,target:b,
+      });
+    }
+  });
+
+  // Sort by episode
+  events.sort((x,y)=>x.episode-y.episode||(x.sentiment-y.sentiment));
+
+  // Running score
+  let runningScore=50; // neutral baseline
+  const rows=events.map(ev=>{
+    const delta=Math.round(ev.sentiment*ev.intensity*0.4);
+    runningScore=Math.max(0,Math.min(100,runningScore+delta));
+    const col=delta>0?'var(--leaf)':delta<0?'var(--elim)':'var(--text2)';
+    const sign=delta>0?'+':'';
+    return `<tr>
+      <td class="rh-ep">Ep ${ev.episode}</td>
+      <td class="rh-event">${ev.label}</td>
+      <td class="rh-delta" style="color:${col}">${sign}${delta}</td>
+      <td class="rh-score">${runningScore}</td>
+    </tr>`;
+  }).join('');
+
+  // Current relationship score
+  const curScore=v19RelScore(idA,idB);
+  const scoreColor=curScore>=65?'var(--leaf)':curScore<=35?'var(--elim)':'var(--text2)';
+  const scoreLabel=curScore>=65?'Strong bond':curScore<=35?'Rivalry':'Neutral';
+
+  const portA=a.customImage
+    ?`<img src="${a.customImage}" style="width:48px;height:58px;object-fit:cover;object-position:top;border-radius:8px">`
+    :getPortrait(a).replace('width="120" height="145"','width="48" height="58"');
+  const portB=b.customImage
+    ?`<img src="${b.customImage}" style="width:48px;height:58px;object-fit:cover;object-position:top;border-radius:8px">`
+    :getPortrait(b).replace('width="120" height="145"','width="48" height="58"');
+
+  const html=`
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+      <div style="text-align:center">
+        <div style="width:48px;height:58px;border-radius:8px;overflow:hidden;margin:0 auto 4px">${portA}<\/div>
+        <div style="font-size:12px;font-weight:700">${a.name.split(' ')[0]}<\/div>
+        <div style="font-size:10px;color:var(--text2)">${a.archetype}<\/div>
+      <\/div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:22px">↔<\/div>
+        <div style="font-size:18px;font-weight:800;color:${scoreColor}">${curScore}<\/div>
+        <div style="font-size:11px;color:${scoreColor}">${scoreLabel}<\/div>
+      <\/div>
+      <div style="text-align:center">
+        <div style="width:48px;height:58px;border-radius:8px;overflow:hidden;margin:0 auto 4px">${portB}<\/div>
+        <div style="font-size:12px;font-weight:700">${b.name.split(' ')[0]}<\/div>
+        <div style="font-size:10px;color:var(--text2)">${b.archetype}<\/div>
+      <\/div>
+    <\/div>
+    ${events.length?`
+    <table class="rh-table">
+      <thead><tr>
+        <th>Ep<\/th><th>Event<\/th><th>Δ<\/th><th>Score<\/th>
+      <\/tr><\/thead>
+      <tbody>${rows}<\/tbody>
+    <\/table>
+    `:`<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px">No recorded history yet — history builds as episodes are played.<\/div>`}
+    <div style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center">Score: 0=bitter rivals · 50=neutral · 100=unbreakable bond<\/div>`;
+
+  openV19Modal(`🔗 ${a.name.split(' ')[0]} ↔ ${b.name.split(' ')[0]}`, html);
+}
+
+function _memTypeLabel(type, actor, target){
+  const an=actor?.name?.split(' ')[0]||'?';
+  const tn=target?.name?.split(' ')[0]||'?';
+  const labels={
+    betrayal:`${an} betrayed ${tn}`,
+    voted_for:`${an} voted against ${tn}`,
+    saved:`${an} spared ${tn}`,
+    idol_played_on:`${an} played idol for ${tn}`,
+    idol_played_against:`${an}'s idol blocked ${tn}'s votes`,
+    alliance_formed:`${an} and ${tn} strengthened their alliance`,
+    alliance_broken:`${an} broke alliance with ${tn}`,
+    challenge_beat:`${an} beat ${tn} in a challenge`,
+    rivalry:`${an} and ${tn} clashed`,
+    jury_speech:`${an} addressed ${tn} at the finale`,
+  };
+  return labels[type]||type.replace(/_/g,' ');
+}
+
+
+/**
+ * showRelHistoryPicker(playerId)
+ * Shows a picker to select which other player to compare history with.
+ */
+function showRelHistoryPicker(playerId){
+  const player=G.cast.find(c=>c.id===playerId);
+  if(!player) return;
+  const others=G.cast.filter(c=>c.id!==playerId);
+  const opts=others.map(c=>{
+    const score=v19RelScore(playerId,c.id);
+    const col=score>=65?'var(--leaf)':score<=35?'var(--elim)':'var(--text2)';
+    const port=c.customImage
+      ?`<img src="${c.customImage}" style="width:28px;height:34px;object-fit:cover;object-position:top;border-radius:5px">`
+      :getPortrait(c).replace('width="120" height="145"','width="28" height="34"');
+    return `<div class="rh-pick-row" data-action="showRelHistory" data-a="${playerId}" data-b="${c.id}">
+      <div style="width:28px;height:34px;border-radius:5px;overflow:hidden;flex-shrink:0">${port}<\/div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${c.name}<\/div>
+        <div style="font-size:10px;color:var(--text2)">${c.archetype}<\/div>
+      <\/div>
+      <div style="font-weight:700;font-size:14px;color:${col}">${score}<\/div>
+    <\/div>`;
+  }).join('');
+  openV19Modal(`🔗 ${player.name.split(' ')[0]}'s Relationships`,
+    `<div class="v19-help">Select a player to view your full history together — every vote, alliance, and memory event.<\/div><div style="margin-top:10px">${opts}<\/div>`);
+}
 
 
 // ===== EXPORTS =====
 
 
+// ===== FILE: save.js =====
+// No Signal — save.js
+// Save / load, autosave, export, demo loader
 
-// ===== ui.js =====
+// ===== DEMO =====
+function loadQuickDemo(){
+  G.cast=[];
+  [['Alex Carter','#E8450A','Strategic','The Strategist',8,7,9,6],['Morgan Rivera','#0EA5E9','Loyal','The Fan Favorite',5,10,7,8],
+   ['Casey Thompson','#16A34A','Villain','The Big Villain',9,6,8,10],['Jordan Kim','#9333EA','Hero','The Underdog',6,8,5,9],
+   ['Taylor Walsh','#EAB308','Chaotic','The Loose Cannon',7,9,6,7],['Sam Okafor','#EC4899','Social','The Social Butterfly',4,10,8,6],
+   ['Riley Nakamura','#06B6D4','Floater','The Quiet Threat',7,7,9,7],['Quinn Santos','#F97316','Hothead','The Challenge Beast',10,5,6,10],
+   ['Blake Bellamy','#84CC16','Peacemaker','The Sweetheart',5,9,7,8],['Drew Hassan','#6366F1','Schemer','The Manipulator',6,8,10,5],
+   ['Sage Nguyen','#14B8A6','Nerd','The Narrator',5,7,10,6],['Avery Cruz','#F43F5E','Romantic','The Duo',7,9,6,8],
+  ].forEach(([name,color,personality,archetype,phy,soc,men,end])=>G.cast.push(makeContestant({name,color,personality,archetype,physical:phy,social:soc,mental:men,endurance:end})));
+  G.teams=[{id:uid(),name:'Tribe Fang',color:'#E8450A'},{id:uid(),name:'Tribe Kota',color:'#0EA5E9'}];
+  G.cast.forEach((c,i)=>c.team=i%2);
+  G.settings={name:'No Signal: Demo Season',theme:'Tropical Volcanic Island',flavor:'drama',seed:'demo-v19',mergeEpisode:5,finaleSize:3,
+    voteSystem:'plurality',tiebreak:'fire',alliances:true,confessionals:true,drama:true,idols:true,jury:true,
+    interactions:true,streaks:true,log:true,twistFreq:20,randomness:35,allianceStr:65,idolDiff:'medium',
+    dramaRate:'medium',tone:'dramatic',showScores:true,showVotes:true,returnees:true};
+  G.twists=new Set(TWISTS_DATA.map(t=>t.id));
+  G.episode=1;G.merged=false;G.jury=[];G.episodeLog=[];G.dramaLevel=0;G.idolHolders=[];G.alliances=[];G.challengeWinStreaks={};G.extraVoteHolders=[];G.stealVoteHolders=[];
+  G.cast.forEach(c=>{c.eliminated=false;c.juryMember=false;c.votes=0;c.immunity=false;c.hasIdol=false;c.idolPlayed=false;c.challengeWins=0;c.allianceIds=[];c.elimEp=null;c.juryReturn=false;c._portrait=null;});
+  buildAlliances();
+  document.getElementById('header-ep-badge').style.display='flex';
+  showGameScreen(); computeAndStartEpisode();
+  notify('Demo season loaded! ⚡','win');
+}
+function continueGame(){showGameScreen();if(G.currentEpData)renderStage(G.stageIndex||0);}
+
+// ===== SAVE / LOAD =====
+const SAVE_VERSION=19;
+const SAVE_KEY='nosignal_save_v19';
+const LEGACY_SAVE_KEYS=['nosignal_save_v18','nosignal_save_v1'];
+
+function stripRuntimeFields(contestant){
+  const {_portrait,_portraitKey,...rest}=contestant||{};
+  return rest;
+}
+function buildSavePayload(){
+  return {
+    app:'No Signal', version:SAVE_VERSION, schema:'nosignal-season-save',
+    cast:G.cast.map(stripRuntimeFields), teams:G.teams, settings:G.settings, twists:[...G.twists],
+    relationships:G.relationships||{}, rngState:G.rngState,
+    episode:G.episode, merged:G.merged, jury:G.jury.map(j=>j.id),
+    dramaLevel:G.dramaLevel, idolHolders:G.idolHolders,
+    alliances:G.alliances, challengeWinStreaks:G.challengeWinStreaks,
+    extraVoteHolders:G.extraVoteHolders, stealVoteHolders:G.stealVoteHolders,
+    stageIndex:G.stageIndex, currentEpData:G.currentEpData,
+    memories:G.memories||[], placementHistory:G.placementHistory||[],
+    producerPowers:G.producerPowers||{},
+    perceivedRelationships:G.perceivedRelationships||{},
+    savedAt:Date.now()
+  };
+}
+function getSaveRaw(){
+  try{
+    const current=localStorage.getItem(SAVE_KEY);
+    if(current) return current;
+    for(const key of LEGACY_SAVE_KEYS){
+      const legacy=localStorage.getItem(key);
+      if(legacy) return legacy;
+    }
+  }catch(e){}
+  return null;
+}
+function migrateSaveIfNeeded(raw){
+  const save=JSON.parse(raw);
+  save.version=save.version||1;
+  save.schema=save.schema||'nosignal-season-save';
+  return save;
+}
+function downloadTextFile(filename, text, mime='application/json'){
+  const blob=new Blob([text],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),500);
+}
+function seasonSlug(){
+  const title=(G.settings&&G.settings.seasonName)||'no-signal-season';
+  return title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'no-signal-season';
+}
+function saveGame(silent=false){
+  try {
+    const save=buildSavePayload();
+    const json=JSON.stringify(save);
+    localStorage.setItem(SAVE_KEY,json);
+    // Keep a one-step recovery slot so a bad save/import is not fatal.
+    localStorage.setItem(SAVE_KEY+'_backup',json);
+    if(!silent) notify('💾 Game saved','win');
+    if(json.length>4*1024*1024) notify('⚠️ Save is large ('+Math.round(json.length/1024)+'KB) — export a backup or remove some photos');
+    return true;
+  } catch(e){
+    if(!silent) notify('Save failed — storage may be full');
+    console.error('Save failed:',e);
+    return false;
+  }
+}
+function hasSavedGame(){
+  return !!getSaveRaw();
+}
+function applyLoadedSave(save){
+  G.cast=save.cast||[];
+  G.teams=save.teams||[];
+  G.settings=Object.assign({}, G.settings||{}, save.settings||{});
+  G.twists=new Set(save.twists||TWISTS_DATA.map(t=>t.id));
+  G.relationships=save.relationships||{};
+  G.memories=save.memories||[];
+  G.placementHistory=save.placementHistory||[];
+  G.producerPowers=save.producerPowers||{};
+  G.perceivedRelationships=save.perceivedRelationships||{}; G.rngState=save.rngState||null;
+  G.episode=save.episode||1;
+  G.merged=!!save.merged;
+  G.jury=(save.jury||[]).map(id=>G.cast.find(c=>c.id===id)).filter(Boolean);
+  G.dramaLevel=save.dramaLevel||0;
+  G.idolHolders=save.idolHolders||[];
+  G.alliances=save.alliances||[];
+  G.challengeWinStreaks=save.challengeWinStreaks||{};
+  G.extraVoteHolders=save.extraVoteHolders||[];
+  G.stealVoteHolders=save.stealVoteHolders||[];
+  G.stageIndex=save.stageIndex||0;
+  G.currentEpData=save.currentEpData||null;
+  if(G.currentEpData){
+    const findById=id=>G.cast.find(c=>c.id===id);
+    ['eliminated','eliminated2','idolFinder','winner','runnerUp'].forEach(k=>{
+      if(G.currentEpData[k]&&G.currentEpData[k].id) G.currentEpData[k]=findById(G.currentEpData[k].id)||G.currentEpData[k];
+    });
+  }
+}
+function loadGame(){
+  try {
+    const raw=getSaveRaw();
+    if(!raw) return false;
+    const save=migrateSaveIfNeeded(raw);
+    applyLoadedSave(save);
+    // Re-save legacy saves under the v19 key after a successful migration.
+    saveGame(true);
+    document.getElementById('header-ep-badge').style.display='flex';
+    showGameScreen();
+    if(G.currentEpData) renderStage(G.stageIndex||0);
+    else computeAndStartEpisode();
+    notify('✅ Save loaded','win');
+    return true;
+  } catch(e){
+    console.error('Load failed:',e);
+    notify('Load failed — save may be corrupted');
+    return false;
+  }
+}
+function exportSaveFile(){
+  try{
+    const payload=buildSavePayload();
+    downloadTextFile(`${seasonSlug()}-v19-save.json`, JSON.stringify(payload,null,2));
+    notify('⬇ Save exported','win');
+  }catch(e){ console.error(e); notify('Export failed'); }
+}
+function openImportSave(){
+  const input=document.getElementById('save-import-input');
+  if(input) input.click();
+}
+function importSaveFile(event){
+  const file=event.target.files&&event.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const save=migrateSaveIfNeeded(String(reader.result||''));
+      if(!Array.isArray(save.cast)) throw new Error('Missing cast array');
+      localStorage.setItem(SAVE_KEY,JSON.stringify(save));
+      applyLoadedSave(save);
+      updateContinueButton();
+      notify('⬆ Save imported','win');
+    }catch(e){ console.error(e); notify('Import failed — not a valid No Signal save'); }
+    event.target.value='';
+  };
+  reader.readAsText(file);
+}
+function deleteSave(){
+  if(!confirm('Delete saved game permanently?')) return;
+  try{[SAVE_KEY,SAVE_KEY+'_backup',...LEGACY_SAVE_KEYS].forEach(k=>localStorage.removeItem(k));notify('Save deleted');updateContinueButton();}catch(e){}
+}
+function updateContinueButton(){
+  const wrap=document.getElementById('continue-btn-wrap');
+  if(!wrap) return;
+  wrap.style.display=hasSavedGame()?'flex':'none';
+}
+
+// ===== V19 AUTOSAVE / EXPORT SAFETY =====
+let _autosaveTimer=null;
+function queueAutosave(reason='change'){
+  clearTimeout(_autosaveTimer);
+  _autosaveTimer=setTimeout(()=>saveGame(true),700);
+}
+function markDirty(reason='change'){
+  queueAutosave(reason);
+}
+
+
+// ===== EXPORTS =====
+
+
+// ===== FILE: ui.js =====
 // No Signal — ui.js
 // All DOM rendering — screens, modals, stage builders, vote reveal
 
@@ -5719,10 +5675,26 @@ function renderFinaleNoJury(winner,finalists){
 
 
 // ===== EXPORTS =====
+window.toggleDarkMode=function(){
+  document.body.classList.toggle('light-mode');
+  const isLight=document.body.classList.contains('light-mode');
+  localStorage.setItem('ns-theme', isLight ? 'light':'dark');
+
+  const btn=document.getElementById('dark-toggle-btn');
+  if(btn) btn.textContent=isLight ? '☀️':'🌙';
+};
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const saved=localStorage.getItem('ns-theme');
+  if(saved==='light'){
+    document.body.classList.add('light-mode');
+    const btn=document.getElementById('dark-toggle-btn');
+    if(btn) btn.textContent='☀️';
+  }
+});
 
 
-
-// ===== main.js =====
+// ===== FILE: main.js =====
 // No Signal — main.js
 // Entry point — imports all modules and wires up the app
 
@@ -5849,3 +5821,23 @@ document.addEventListener('keydown',e=>{
     }
   }
 });
+
+
+// ===== NO SIGNAL HOTFIX BOOTSTRAP =====
+(function(){
+  // Robust dark/light mode: body.light-mode drives CSS variables.
+  window.toggleDarkMode = function(){
+    document.body.classList.toggle('light-mode');
+    const isLight = document.body.classList.contains('light-mode');
+    try { localStorage.setItem('ns-theme', isLight ? 'light' : 'dark'); } catch(e) {}
+    const btn = document.getElementById('dark-toggle-btn');
+    if(btn) btn.textContent = isLight ? '☀️' : '🌙';
+  };
+  document.addEventListener('DOMContentLoaded', function(){
+    try {
+      if(localStorage.getItem('ns-theme') === 'light') document.body.classList.add('light-mode');
+    } catch(e) {}
+    const btn = document.getElementById('dark-toggle-btn');
+    if(btn) btn.textContent = document.body.classList.contains('light-mode') ? '☀️' : '🌙';
+  });
+})();

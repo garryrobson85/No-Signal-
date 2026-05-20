@@ -1,0 +1,35 @@
+
+/* v19.4 responsive + theme hotfix */
+:root{
+  --bg:#080808; --panel:#111; --panel2:#171717; --text:#f5f5f5; --text2:#aaa; --muted:#777; --accent:#ff3b1f;
+}
+body.light-mode{
+  --bg:#f6f3ee; --panel:#ffffff; --panel2:#f1eee8; --text:#151515; --text2:#555; --muted:#777; --accent:#e3341c;
+  background:var(--bg); color:var(--text);
+}
+body.light-mode .app-header,
+body.light-mode .sidebar,
+body.light-mode .card,
+body.light-mode .setup-card,
+body.light-mode .config-card,
+body.light-mode .modal,
+body.light-mode .confessional-card,
+body.light-mode .episode-card{background:var(--panel)!important;color:var(--text)!important;}
+body.light-mode input, body.light-mode select, body.light-mode textarea{background:#fff!important;color:#151515!important;border-color:#ddd!important;}
+
+@media (min-width: 900px){
+  .app-shell,.setup-layout,.game-layout{display:grid!important;grid-template-columns:230px minmax(0,1fr)!important;min-height:calc(100vh - 72px)!important;}
+  .sidebar,.setup-sidebar,.game-sidebar{position:sticky!important;top:72px!important;height:calc(100vh - 72px)!important;overflow-y:auto!important;}
+  .main-content,.setup-main,.game-main,#screen-setup .screen-content,#screen-game .screen-content{width:100%!important;max-width:none!important;padding:36px 56px!important;overflow-y:auto!important;}
+  .setup-panel.active,.config-panel,.setup-form,.settings-form{width:100%!important;max-width:1100px!important;}
+  .config-grid,.form-grid,.settings-grid{display:grid!important;grid-template-columns:repeat(2,minmax(280px,1fr))!important;gap:24px!important;align-items:start!important;}
+  .wide-card,.full-width{grid-column:1 / -1!important;}
+  input,select,textarea,.input,.select{min-height:56px!important;font-size:16px!important;min-width:0!important;width:100%!important;box-sizing:border-box!important;}
+  .episode-feed,.script-content,.stage-wrap{max-width:1200px!important;margin-left:auto!important;margin-right:auto!important;}
+}
+@media (max-width:899px){
+  .app-shell,.setup-layout,.game-layout{display:block!important;}
+  .main-content,.setup-main,.game-main,#screen-setup .screen-content,#screen-game .screen-content{padding:18px!important;max-width:100%!important;}
+  .config-grid,.form-grid,.settings-grid{display:grid!important;grid-template-columns:1fr!important;gap:16px!important;}
+  input,select,textarea,.input,.select{min-height:52px!important;font-size:16px!important;width:100%!important;box-sizing:border-box!important;}
+}
