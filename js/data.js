@@ -49,6 +49,35 @@ function buildConfessionalText(player, ep){
   // Build a specific, contextual confessional from real state
   const lines=[];
 
+  // Episode 1 should feel like arrivals and first impressions, not voting history.
+  // No one has enough lived game yet to talk like they have already betrayed people.
+  if(ep.ep===1 && !ep.voteResult){
+    const tribeMates=G.cast.filter(c=>c.id!==player.id && c.team===player.team && c.status==='active')
+      .slice(0,3).map(c=>c.name.split(' ')[0]);
+    const tribeLine=tribeMates.length
+      ? `I'm still working out ${tribeMates.join(', ')}. First impressions matter out here, but they can lie to you.`
+      : `I'm trying to read the room before the room starts reading me.`;
+    const firstLines={
+      'The Strategist':`First day, I'm not trying to control the game. I'm trying to understand it. Who talks too much, who listens, who needs someone to trust.`,
+      'The Fan Favorite':`Walking onto the beach felt unreal. Everyone is smiling, but you can already feel people sizing each other up.`,
+      'The Challenge Beast':`I know people will look at me and think challenge threat. So day one is about being useful without looking too dangerous.`,
+      'The Manipulator':`Everyone wants to make a good first impression. I want to see which first impressions are fake.`,
+      'The Sweetheart':`I want people to feel comfortable around me. That sounds simple, but out here comfort can become trust.`,
+      'The Loose Cannon':`I promised myself I'd keep it calm on day one. I made that promise before I met everyone.`,
+      'The Quiet Threat':`Day one is perfect for me. Let the loud people become memorable. I'll become necessary.`,
+      'The Social Butterfly':`Names, stories, little details — I'm collecting all of it. The game starts with connection.`,
+      'The Big Villain':`Everyone is trying to be nice. Cute. I'm trying to find the people who can actually be useful.`,
+      'The Underdog':`I can already tell some people underestimated me when I walked in. Honestly, good. Let them.`,
+      'The Superfan':`I've watched this moment a hundred times in my head. Being here is different. The sand, the nerves, the eyes on you — it's real now.`,
+      'The Romantic':`There are some big personalities here. I'm trying to lead with warmth, but I know warmth alone won't keep me safe forever.`
+    };
+    const base=firstLines[player.archetype] || `First day out here, everyone is performing a version of themselves. I'm just trying to spot who feels real.`;
+    const challengeLine=wonChallenge
+      ? `Winning early feels good, but I need people to see it as tribe strength, not a reason to mark me out.`
+      : `For now, I need to settle in, learn names, and avoid becoming the easy first target.`;
+    return [base, tribeLine, challengeLine].slice(0,2).join(' ');
+  }
+
   // React to the vote if they were involved
   if(votesAgainstMe>0) lines.push(`${votesAgainstMe>1?`${votesAgainstMe} votes came my way`:'My name came up at tribal'}. I felt it. I knew. But I'm still here — and that tells me more about this game than any alliance meeting ever could.`);
   if(elimName&&ep.eliminated?.id!==player.id){

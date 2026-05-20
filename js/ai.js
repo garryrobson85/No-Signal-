@@ -94,7 +94,8 @@ Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', 
 Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
 ${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
 
-Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique.`;
+Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique.
+Important episode logic: if this is Episode 1 and no vote has happened yet, confessionals must be first-impression based only. Do not mention voting someone out, names coming up, betrayal, cracks, post-vote fallout, tribal paranoia, or "I made my call" before the first vote exists. Early Episode 1 should sound like arrival, tribe dynamics, sizing people up, shelter/camp, first challenge nerves, and cautious social reads.`;
 }
 
 // Call Gemini Flash API
