@@ -46,6 +46,37 @@ function buildConfessionalText(player, ep){
   const merged=G.merged;
   const active=getActive().length;
 
+  // Episode 1 happens before the audience has seen a vote, so keep it to first impressions.
+  // Do not let precomputed vote data leak into early confessionals.
+  if(ep.ep===1){
+    const firstImpressionLines=[
+      `${fn}: first day, first impressions — everyone is smiling, but everyone is measuring each other.`,
+      `I'm trying to work out who feels real and who is already performing for the cameras.`,
+      `Camp looks friendly on the surface, but you can feel the game starting underneath it.`,
+      `Nobody has shown their full hand yet. Right now I'm watching, listening, and deciding who I can actually trust.`,
+      `The first few conversations matter more than people think. This is where the season quietly begins.`
+    ];
+    const archFirst={
+      'The Strategist':`I'm not making big moves yet. Day one is about reading the room and finding the people who think two steps ahead.`,
+      'The Fan Favorite':`I want people to feel good around me early. First impressions can become protection later.`,
+      'The Big Villain':`Everyone wants to look harmless on day one. I'm more interested in who is pretending the hardest.`,
+      'The Underdog':`I know I might not look like the obvious power player, and honestly that might be useful.`,
+      'The Puppet Master':`The first web gets spun with tiny threads. A smile here, a promise there, and suddenly people feel connected.`,
+      'The Sweetheart':`I want to trust people, but this game makes even a friendly chat feel loaded.`,
+      'The Loose Cannon':`Everyone is trying to be normal. I give it about six hours before that falls apart.`,
+      'The Quiet Threat':`I don't need to be loud today. I need to be noticed by the right people and underestimated by everyone else.`,
+      'The Social Butterfly':`Names, stories, little details — I'm collecting all of it. Relationships start before strategy admits it exists.`,
+      'The Challenge Beast':`I want them to see strength, not threat. That line is thin already.`,
+      'The Superfan':`I've watched this moment a hundred times. Living it is completely different.`,
+      'The Coattail Rider':`Early on, I need to find where the numbers are forming and stay close enough to matter.`,
+      'The Wildfire':`The beach is calm right now, but I can already feel sparks.`,
+      'The Number':`Everybody needs numbers eventually. My job is to become one they don't want to lose.`
+    };
+    const lines=[archFirst[player.archetype]||firstImpressionLines[0], ...shuffle(firstImpressionLines).slice(0,1)];
+    if(wonChallenge) lines.push(`That first challenge told me a lot. Who panics, who leads, who listens — that matters.`);
+    return lines.slice(0,2).join(' ');
+  }
+
   // Build a specific, contextual confessional from real state
   const lines=[];
 

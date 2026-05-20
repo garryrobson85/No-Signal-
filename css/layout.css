@@ -78,3 +78,30 @@
 .setup-panel.active { display: block; }
 .setup-panel-title { font-family: 'Bebas Neue', cursive; font-size: 32px; color: var(--fire); margin-bottom: 4px; letter-spacing: 0.04em; }
 .setup-panel-sub { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+
+/* v19.1 setup usability patch: use the full laptop/tablet width instead of a narrow column */
+#screen-setup { min-height: calc(100vh - 57px); }
+.setup-content {
+  width: 100%;
+  max-width: none;
+  padding: 34px 44px 80px;
+}
+.setup-panel {
+  max-width: 1120px;
+}
+#panel-general .form-group,
+#panel-rules .form-group,
+#panel-twists .form-group {
+  max-width: 760px;
+}
+.form-input, .form-select, .form-textarea {
+  min-height: 46px;
+  font-size: 15px;
+}
+.form-row, .form-row-3 {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+@media (max-width: 900px) {
+  .setup-content { padding: 24px 28px 90px; }
+  .setup-panel { max-width: none; }
+}
