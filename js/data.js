@@ -83,6 +83,7 @@ function cleanNarrativeText(text, ep, fallback){
 // Generates a confessional grounded in what this player is actually experiencing
 function buildConfessionalText(player, ep){
   const fn=player.name.split(' ')[0];
+  const voiceTag=(player.personality||player.archetype||'').toLowerCase();
   const allies=(player.allianceIds||[]).flatMap(aid=>{
     const al=G.alliances.find(a=>a.id===aid);
     return al?al.members.filter(m=>m!==player.id).map(m=>G.cast.find(c=>c.id===m)?.name.split(' ')[0]).filter(Boolean):[];
@@ -121,7 +122,16 @@ function buildConfessionalText(player, ep){
       'The Superfan':`I've watched this moment a hundred times in my head. Being here is different. The sand, the nerves, the eyes on you — it's real now.`,
       'The Romantic':`There are some big personalities here. I'm trying to lead with warmth, but I know warmth alone won't keep me safe forever.`
     };
-    const base=firstLines[player.archetype] || `First day out here, everyone is performing a version of themselves. I'm just trying to spot who feels real.`;
+    const baseOptions=[
+      firstLines[player.archetype] || `First day out here, everyone is performing a version of themselves. I'm just trying to spot who feels real.`,
+      voiceTag.includes('villain') ? `Everyone is being polite because it is day one. I am being polite because it is useful.` : null,
+      voiceTag.includes('chaotic')||voiceTag.includes('wildcard') ? `I told myself I would play it cool. That lasted about ten minutes.` : null,
+      voiceTag.includes('loyal') ? `I am looking for people who feel steady. Out here, steady might be the rarest thing.` : null,
+      voiceTag.includes('social') ? `You learn a lot from who people choose to sit beside when nobody tells them where to go.` : null,
+      voiceTag.includes('nerd')||voiceTag.includes('strategic') ? `I am trying not to overthink it, which obviously means I am overthinking everything.` : null,
+      voiceTag.includes('underdog') ? `I can feel a few people looking past me already. That might be the first mistake they make.` : null
+    ].filter(Boolean);
+    const base=baseOptions[Math.abs((player.id||fn).toString().split('').reduce((a,ch)=>a+ch.charCodeAt(0),0))%baseOptions.length];
     const challengeLine=wonChallenge
       ? `Winning early feels good, but I need people to see it as tribe strength, not a reason to mark me out.`
       : `For now, I need to settle in, learn names, and avoid becoming the easy first target.`;
@@ -182,6 +192,16 @@ function buildInteractionText(a, b, ep){
   const merged=G.merged;
   const sameTeam=!merged&&a.team!=null&&a.team===b.team;
   const crossTeam=!merged&&!sameTeam&&a.team!=null&&b.team!=null;
+
+  if(ep?.ep===1){
+    const opts=[
+      `${an} and ${bn} traded first impressions while camp was still finding its rhythm. It sounded casual, but both were already taking notes.`,
+      `${an} tried to get a read on ${bn} without pushing too hard. Day one smiles can hide a lot.`,
+      `${bn} made an early effort with ${an}. It was friendly, careful, and just strategic enough to matter.`,
+      `${an} and ${bn} compared the mood around camp. Nobody said the word trust yet, but both were clearly looking for it.`
+    ];
+    return pick(opts);
+  }
 
   if(allied&&relScore>=60){
     const opts=[
@@ -253,10 +273,10 @@ function buildDramaText(ep){
 // Legacy templates kept as fallback strings (not functions anymore — functions replaced above)
 const INTERACTION_TEMPLATES_NEUTRAL = [
   (a,b)=>`${a} and ${b} had a long late-night conversation and found they have more in common than expected. A tentative alliance formed.`,
-  (a,b)=>`${b} tried to quietly flip ${a}'s vote before tribal but couldn't seal the deal.`,
+  (a,b)=>`${b} tried to quietly test whether ${a} could be useful later, but couldn't get a clear answer.`,
   (a,b)=>`${a} and ${b} were spotted whispering near the well. Nobody could hear it, but everyone noticed.`,
   (a,b)=>`${b} promised ${a} their loyalty — but their body language told a different story.`,
-  (a,b)=>`${a} tried to recruit ${b} into a larger voting bloc, with mixed results.`,
+  (a,b)=>`${a} tried to pull ${b} closer socially, with mixed results.`,
 ];
 const INTERACTION_TEMPLATES_IDOL=[
   (a,b)=>`${a} caught ${b} searching near the water well. The discovery created visible tension between them.`,

@@ -338,14 +338,14 @@ function computeAndStartEpisode(){
     } else { pool=active; }
     if(pool.length>=2){
       const pair=shuffle(pool).slice(0,2);
-      interactions.push({a:pair[0],b:pair[1],text:pickInteraction(pair[0],pair[1],null)});// ep not yet built — context added in script generator
+      interactions.push({a:pair[0],b:pair[1],text:pickInteraction(pair[0],pair[1],{ep})});
     }
     // Sometimes a cross-team interaction in pre-merge too (30% chance — like at challenges)
     if(!G.merged&&active.length>=4&&Math.random()<0.3){
       const teams=G.teams.map((_,ti)=>getTeamMembers(ti)).filter(t=>t.length>0);
       if(teams.length>=2){
         const a=pick(teams[0]),b=pick(teams[1]);
-        if(a&&b) interactions.push({a,b,text:pickInteraction(a,b,null),crossTeam:true});
+        if(a&&b) interactions.push({a,b,text:pickInteraction(a,b,{ep}),crossTeam:true});
       }
     }
   }

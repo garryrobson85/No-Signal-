@@ -1,5 +1,6 @@
 
 // ===== FILE: data.js =====
+
 // No Signal — data.js
 // All game constants, templates, dialogue banks — zero logic
 
@@ -85,6 +86,7 @@ function cleanNarrativeText(text, ep, fallback){
 // Generates a confessional grounded in what this player is actually experiencing
 function buildConfessionalText(player, ep){
   const fn=player.name.split(' ')[0];
+  const voiceTag=(player.personality||player.archetype||'').toLowerCase();
   const allies=(player.allianceIds||[]).flatMap(aid=>{
     const al=G.alliances.find(a=>a.id===aid);
     return al?al.members.filter(m=>m!==player.id).map(m=>G.cast.find(c=>c.id===m)?.name.split(' ')[0]).filter(Boolean):[];
@@ -123,7 +125,16 @@ function buildConfessionalText(player, ep){
       'The Superfan':`I've watched this moment a hundred times in my head. Being here is different. The sand, the nerves, the eyes on you — it's real now.`,
       'The Romantic':`There are some big personalities here. I'm trying to lead with warmth, but I know warmth alone won't keep me safe forever.`
     };
-    const base=firstLines[player.archetype] || `First day out here, everyone is performing a version of themselves. I'm just trying to spot who feels real.`;
+    const baseOptions=[
+      firstLines[player.archetype] || `First day out here, everyone is performing a version of themselves. I'm just trying to spot who feels real.`,
+      voiceTag.includes('villain') ? `Everyone is being polite because it is day one. I am being polite because it is useful.` : null,
+      voiceTag.includes('chaotic')||voiceTag.includes('wildcard') ? `I told myself I would play it cool. That lasted about ten minutes.` : null,
+      voiceTag.includes('loyal') ? `I am looking for people who feel steady. Out here, steady might be the rarest thing.` : null,
+      voiceTag.includes('social') ? `You learn a lot from who people choose to sit beside when nobody tells them where to go.` : null,
+      voiceTag.includes('nerd')||voiceTag.includes('strategic') ? `I am trying not to overthink it, which obviously means I am overthinking everything.` : null,
+      voiceTag.includes('underdog') ? `I can feel a few people looking past me already. That might be the first mistake they make.` : null
+    ].filter(Boolean);
+    const base=baseOptions[Math.abs((player.id||fn).toString().split('').reduce((a,ch)=>a+ch.charCodeAt(0),0))%baseOptions.length];
     const challengeLine=wonChallenge
       ? `Winning early feels good, but I need people to see it as tribe strength, not a reason to mark me out.`
       : `For now, I need to settle in, learn names, and avoid becoming the easy first target.`;
@@ -184,6 +195,16 @@ function buildInteractionText(a, b, ep){
   const merged=G.merged;
   const sameTeam=!merged&&a.team!=null&&a.team===b.team;
   const crossTeam=!merged&&!sameTeam&&a.team!=null&&b.team!=null;
+
+  if(ep?.ep===1){
+    const opts=[
+      `${an} and ${bn} traded first impressions while camp was still finding its rhythm. It sounded casual, but both were already taking notes.`,
+      `${an} tried to get a read on ${bn} without pushing too hard. Day one smiles can hide a lot.`,
+      `${bn} made an early effort with ${an}. It was friendly, careful, and just strategic enough to matter.`,
+      `${an} and ${bn} compared the mood around camp. Nobody said the word trust yet, but both were clearly looking for it.`
+    ];
+    return pick(opts);
+  }
 
   if(allied&&relScore>=60){
     const opts=[
@@ -255,10 +276,10 @@ function buildDramaText(ep){
 // Legacy templates kept as fallback strings (not functions anymore — functions replaced above)
 const INTERACTION_TEMPLATES_NEUTRAL = [
   (a,b)=>`${a} and ${b} had a long late-night conversation and found they have more in common than expected. A tentative alliance formed.`,
-  (a,b)=>`${b} tried to quietly flip ${a}'s vote before tribal but couldn't seal the deal.`,
+  (a,b)=>`${b} tried to quietly test whether ${a} could be useful later, but couldn't get a clear answer.`,
   (a,b)=>`${a} and ${b} were spotted whispering near the well. Nobody could hear it, but everyone noticed.`,
   (a,b)=>`${b} promised ${a} their loyalty — but their body language told a different story.`,
-  (a,b)=>`${a} tried to recruit ${b} into a larger voting bloc, with mixed results.`,
+  (a,b)=>`${a} tried to pull ${b} closer socially, with mixed results.`,
 ];
 const INTERACTION_TEMPLATES_IDOL=[
   (a,b)=>`${a} caught ${b} searching near the water well. The discovery created visible tension between them.`,
@@ -311,8 +332,11 @@ const CHALLENGE_DATA = [
 
 
 // ===== EXPORTS =====
+export { TWISTS_DATA, ARCHETYPES, PERSONALITIES, CHALLENGE_DATA, DRAMA_EVENTS, CONFESSIONAL_TEMPLATES, CONFESSIONAL_IDOL_TEMPLATES, INTERACTION_TEMPLATES_NEUTRAL, INTERACTION_TEMPLATES_IDOL, INTERACTION_TEMPLATES_ADVANTAGE, buildConfessionalText, buildInteractionText, buildDramaText, hasSwapOccurredByEpisode, hasMergeOccurredByEpisode, hiddenRelLabel, narrativeFallbackConfessional, narrativeFallbackInteraction, cleanNarrativeText };
+
 
 // ===== FILE: ai.js =====
+
 // No Signal — ai.js
 // Gemini API integration, prompt builder, AI dialogue generation
 
@@ -549,8 +573,11 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 // ===== EXPORTS =====
+export { callGemini, buildEpisodePrompt, generateAIDialogueForEp, generateAIEpisodeScript, testGeminiKey, showGeminiHelp, saveGeminiKey, getGeminiKey, initGeminiKeyField };
+
 
 // ===== FILE: portraits.js =====
+
 // No Signal — portraits.js
 // SVG portrait generator and custom image upload
 
@@ -831,8 +858,11 @@ function showCastStatus(){
 
 
 // ===== EXPORTS =====
+export { showCastStatus, generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage, clearImage, showBulkUpload };
+
 
 // ===== FILE: state.js =====
+
 // No Signal — state.js
 // Game state (G), utilities, contestant/team builders
 
@@ -1302,8 +1332,12 @@ function isPlayMode(){
 }
 
 // ===== EXPORTS =====
+export { updateGameSidebar, gsPlayerChip, G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
+         getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore, goHome, goSetup, showGameScreen, initTeams, renderCastList, addContestant, removeContestant, updateContestant, makeContestant, generateRandomCast, updateCastNavCount, renderTwistsGrid, updateTeamsPanel, autoAssignTeams, setupNav, startSeason, applyColor, pickColor, makeName, resetNamePool, buildAlliances, toggleReturneeSettings };
+
 
 // ===== FILE: memory.js =====
+
 // No Signal — memory.js
 // Persistent contestant memory system
 // Contestants remember betrayals, alliances, idol plays, saves, and rivalries.
@@ -1625,8 +1659,17 @@ function getMemorySummary(playerA, playerB){
 }
 
 // ===== EXPORTS =====
+export {
+  MEMORY_TYPES,
+  recordMemory, getMemories, memoryScore,
+  hasBetrayedBy, getStrongestMemory, getUnseenMemories,
+  getJuryBias, recordVoteMemories, recordIdolMemories,
+  memoryTargetBonus, getMemoryConfessionalLine, getMemorySummary,
+};
+
 
 // ===== FILE: evolution.js =====
+
 // No Signal — evolution.js
 // Dynamic archetype evolution system
 // Archetypes shift mid-season based on actual gameplay events.
@@ -1896,8 +1939,11 @@ function getArchetypeHistory(contestant) {
 }
 
 // ===== EXPORTS =====
+export { EVOLUTION_RULES, checkArchetypeEvolution, buildEvolutionDisplay, getArchetypeHistory, buildEvolutionCeremony };
+
 
 // ===== FILE: producer.js =====
+
 // No Signal — producer.js
 // Producer Mode — host agency tools that give the player meaningful decisions
 // These are deliberate interventions in the simulation, not random events.
@@ -2247,8 +2293,21 @@ function producerIntelDrop() {
 }
 
 // ===== EXPORTS =====
+export {
+  PRODUCER_POWERS, initProducerPowers, producerPowerUsed,
+  useProducerPower, producerUsesLeft,
+  showProducerPanel, executeProducerAction,
+  producerForceRivalry, confirmRivalry,
+  producerBlindside, confirmBlindside,
+  producerGuidedIdol, confirmGuidedIdol,
+  producerFractureAlliance, confirmFractureAlliance,
+  producerChallengeBoost, confirmChallengeBoost,
+  producerIntelDrop,
+};
+
 
 // ===== FILE: story.js =====
+
 // No Signal — story.js
 // Season Story Layer — the game reads its own season and identifies narrative highlights.
 // Transforms vote sequences into remembered character arcs.
@@ -2719,8 +2778,15 @@ function exportSeasonStory(){
 }
 
 // ===== EXPORTS =====
+export {
+  analyseSeasonStory, buildSeasonStoryCard, buildPlayerArc,
+  buildArcSummary, buildSeasonTagline,
+  showSeasonStory, exportSeasonStory,
+};
+
 
 // ===== FILE: engine.js =====
+
 // No Signal — engine.js
 // Episode engine, voting, challenges, alliances, idols
 // No DOM manipulation here.
@@ -3061,14 +3127,14 @@ function computeAndStartEpisode(){
     } else { pool=active; }
     if(pool.length>=2){
       const pair=shuffle(pool).slice(0,2);
-      interactions.push({a:pair[0],b:pair[1],text:pickInteraction(pair[0],pair[1],null)});// ep not yet built — context added in script generator
+      interactions.push({a:pair[0],b:pair[1],text:pickInteraction(pair[0],pair[1],{ep})});
     }
     // Sometimes a cross-team interaction in pre-merge too (30% chance — like at challenges)
     if(!G.merged&&active.length>=4&&Math.random()<0.3){
       const teams=G.teams.map((_,ti)=>getTeamMembers(ti)).filter(t=>t.length>0);
       if(teams.length>=2){
         const a=pick(teams[0]),b=pick(teams[1]);
-        if(a&&b) interactions.push({a,b,text:pickInteraction(a,b,null),crossTeam:true});
+        if(a&&b) interactions.push({a,b,text:pickInteraction(a,b,{ep}),crossTeam:true});
       }
     }
   }
@@ -3321,8 +3387,11 @@ function applyTwist(twist){
 
 
 // ===== EXPORTS =====
+export { getActive, rollChallenge, targetScore, getVoterAllies, pickVoteReason, runVote, resolveTie, resolveChallengerTie, idolFindChance, maybeGiveIdol, checkIdolPlay, getTwist, applyTwist, pickInteraction, computeAndStartEpisode, runChallengeWithChoice, capturePlacementSnapshot };
+
 
 // ===== FILE: script_gen.js =====
+
 // No Signal — script_gen.js
 // Episode screenplay generator, Previously On, plain-text export
 
@@ -4116,8 +4185,11 @@ function downloadSeasonRecap(){
 
 
 // ===== EXPORTS =====
+export { generateEpisodeScript, showEpisodeScripts, showSeasonRecap, generateSeasonRecap, copySeasonRecap, downloadSeasonRecap, scrollToScriptEp, copyScript, _buildPlainTextScript, _domToScriptText };
+
 
 // ===== FILE: features.js =====
+
 // No Signal — features.js
 // Tribe History, Profiles, Relationship Web, V19 Insights
 
@@ -4602,8 +4674,11 @@ function showRelHistoryPicker(playerId){
 
 
 // ===== EXPORTS =====
+export { showTribeHistory, showRelationshipWeb, showRelationshipHistory, showRelHistoryPicker, v19RelScore, showPlayerProfiles, showOneProfile, showV19Insights, showV19Relationships, v19EnsureRelationships, v19ActiveThreatScore, v19SocialPowerScore, exportV19SeasonReport };
+
 
 // ===== FILE: save.js =====
+
 // No Signal — save.js
 // Save / load, autosave, export, demo loader
 
@@ -4803,8 +4878,11 @@ function markDirty(reason='change'){
 
 
 // ===== EXPORTS =====
+export { saveGame, loadGame, hasSavedGame, deleteSave, updateContinueButton, queueAutosave, exportSaveFile, openImportSave, importSaveFile, loadQuickDemo, SAVE_KEY };
+
 
 // ===== FILE: ui.js =====
+
 // No Signal — ui.js
 // All DOM rendering — screens, modals, stage builders, vote reveal
 
@@ -4861,6 +4939,81 @@ function buildNotice(emoji, title, body, bgColor='var(--win-light)', borderColor
   </div>`;
 }
 
+
+
+// ===== CINEMATIC NARRATOR LAYER =====
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function firstName(p){return p?.name?.split(' ')[0]||'';}
+function teamNameFor(p){return (!G.merged && p?.team!=null && G.teams[p.team]) ? G.teams[p.team].name : (G.merged?'the merged tribe':'camp');}
+function lastCompletedEpisode(){return (G.episodeLog||[]).filter(e=>e.ep < (G.currentEpData?.ep||G.episode)).sort((a,b)=>b.ep-a.ep)[0]||null;}
+function getPhaseLabel(ep){return G.merged?'Post-Merge':'Pre-Merge';}
+function buildNarratorCard(label,title,body,opts={}){
+  const icon=opts.icon||'🎙️';
+  const cls=opts.cls||'';
+  return `<div class="narrator-card ${cls}">
+    <div class="narrator-kicker">${icon} ${escapeHtml(label)}</div>
+    ${title?`<div class="narrator-title">${escapeHtml(title)}</div>`:''}
+    <div class="narrator-body">${escapeHtml(body)}</div>
+  </div>`;
+}
+function buildEpisodeNarratorIntro(ep){
+  const active=getActive();
+  const season=G.settings?.name||'No Signal';
+  if(ep.isRejoinEpisode){
+    return buildNarratorCard('Narrator',`Episode ${ep.ep}: A Door Reopens`,`${ep.rejoinNames} returns to the game, and every comfortable plan suddenly becomes unstable.`,{icon:'🎙️',cls:'narrator-shock'});
+  }
+  if(ep.ep===1){
+    const teams=(!G.merged&&G.teams?.length)?G.teams.map((t,ti)=>`${t.name} (${getTeamMembers(ti).length})`).join(' against '):`${active.length} contestants`;
+    return buildNarratorCard('Opening Narration',`Welcome to ${season}`,`A new group of contestants has arrived with one goal: survive the vote and take control of the game. Tonight is about first impressions, first mistakes, and the first signs of who may be built for this. ${teams} begin the season with everything still to prove.`,{icon:'🔥',cls:'narrator-opening'});
+  }
+  const prev=lastCompletedEpisode();
+  let recap='Last time, the game began to take shape.';
+  if(prev){
+    const bits=[];
+    if(prev.challengeResult){
+      if(prev.challengeResult.type==='tribal') bits.push(`${prev.challengeResult.winner?.team?.name||'One tribe'} won immunity while ${prev.challengeResult.loser?.team?.name||'the losing tribe'} faced tribal council`);
+      else bits.push(`${prev.challengeResult.winner?.name||'One player'} won immunity`);
+    }
+    if(prev.idolPlay) bits.push(`${firstName(prev.idolPlay.idolPlayer)} played an idol`);
+    if(prev.eliminated) bits.push(`${prev.eliminated.name} was voted out`);
+    if(prev.eliminated2) bits.push(`${prev.eliminated2.name} also left the game`);
+    if(prev.noElim) bits.push('nobody went home');
+    if(bits.length) recap=`Previously on ${season}, ${bits.join(', ')}.`;
+  }
+  const pressure=G.merged?'individual survival replaces tribal loyalty':'tribal loyalty still matters, but private relationships are starting to matter more';
+  return buildNarratorCard('Previously on No Signal',`Episode ${ep.ep}`,`${recap} Tonight, ${pressure}. Every conversation could become tomorrow's problem.`,{icon:'📺',cls:'narrator-recap'});
+}
+function buildCampTransition(ep){
+  if(ep.ep===1) return buildNarratorCard('At Camp','First Impressions',`With names still fresh and trust still untested, the contestants begin the quiet work of reading each other.`,{icon:'🏕️'});
+  return buildNarratorCard('At Camp','The Social Game Moves',`Back at camp, small conversations carry heavy meaning. Some players build trust. Others only create suspicion.`,{icon:'🏕️'});
+}
+function buildChallengeNarrator(ep){
+  if(!ep.challengeResult) return buildNarratorCard('Host Transition','Time for the Challenge',`Camp talk can only take them so far. Now the ${G.merged?'players':'tribes'} must prove themselves where everyone can see.`,{icon:'🏆'});
+  const r=ep.challengeResult;
+  const result = r.type==='tribal'
+    ? `${r.winner?.team?.name||'One tribe'} has won immunity. ${r.loser?.team?.name||'The losing tribe'} will have to vote someone out tonight.`
+    : `${r.winner?.name||'One player'} has earned immunity, forcing everyone else to rethink the vote.`;
+  return buildNarratorCard('Narrator','Challenge Result',result,{icon:'🏆'});
+}
+function buildPreTribalNarrator(ep){
+  if(ep.noElim) return buildNarratorCard('Narrator','No Tribal Tonight',`The game gives them one night of relief, but nobody should mistake relief for safety.`,{icon:'🛡️'});
+  let target='the losing side';
+  if(ep.challengeResult?.type==='tribal') target=ep.challengeResult.loser?.team?.name||target;
+  return buildNarratorCard('Host Transition','Before Tribal Council',`${target} returns to camp with one job: decide who will not make it through the night. Nobody knows the final vote yet, and that uncertainty is where the game becomes dangerous.`,{icon:'🔦'});
+}
+function buildEliminationNarrator(ep){
+  if(ep.noElim||!ep.eliminated) return buildNarratorCard('Narrator','The Game Continues',`No torch is snuffed tonight, but the pressure does not disappear. It waits.`,{icon:'🎙️'});
+  const extra=ep.eliminated2?` ${ep.eliminated2.name} leaves as well, turning one vote into a season-shaping moment.`:'';
+  return buildNarratorCard('Closing Narration','The Tribe Has Spoken',`${ep.eliminated.name}'s game ends here.${extra} For everyone still standing, the lesson is simple: the game remembers every conversation.`,{icon:'🔥',cls:'narrator-closing'});
+}
+function buildNextTimeNarrator(ep){
+  if(ep.noElim) return buildNarratorCard('Next Time on No Signal','No Safety Lasts',`A night without an elimination gives the players time to breathe — and time to scheme.`,{icon:'📺',cls:'narrator-next'});
+  const active=getActive().filter(p=>!p.eliminated);
+  const names=shuffle(active).slice(0,2).map(p=>firstName(p)).filter(Boolean);
+  const hook=names.length>=2?`${names[0]} and ${names[1]} may be heading for a collision.`:`A new fault line opens in camp.`;
+  return buildNarratorCard('Next Time on No Signal','Pressure Builds',`${hook} The season is no longer about arriving. It is about surviving what people now think they know.`,{icon:'📺',cls:'narrator-next'});
+}
+
 // ===== STAGED RENDER =====
 
 function renderStage(idx){
@@ -4888,6 +5041,7 @@ function renderStage(idx){
 
   let html=buildEpisodeHeader(ep);
   html+=`<div id="stage-container">`;
+  html+=buildEpisodeNarratorIntro(ep);
   if(idx>=0) html+=buildStageCampLife(ep);
   if(idx>=1&&ep.challengeResult) html+=buildStageChallenge(ep);
   if(idx===1&&!ep.challengeResult) html+=buildChallengeChooser(ep);
@@ -4924,6 +5078,7 @@ function buildEpisodeHeader(ep){
 
 function buildStageCampLife(ep){
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏕️ Camp Life<\/div>`;
+  html+=buildCampTransition(ep);
 
   // ── ARCHETYPE EVOLUTIONS with ceremony ──────────────────────────────────
   if(G._pendingEvolutions&&G._pendingEvolutions.length){
@@ -5032,6 +5187,7 @@ function buildStageCampLife(ep){
 // HOST CHOOSES CHALLENGE
 function buildChallengeChooser(ep){
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏆 Choose the Challenge<\/div>`;
+  html+=buildChallengeNarrator(ep);
   html+=`<div class="host-panel"><div class="host-panel-title">HOST DECISION<\/div>
     <div class="host-panel-sub">You are the host. Pick which challenge the ${G.merged?'players':'tribes'} will compete in today.<\/div>
   <\/div>`;
@@ -5071,6 +5227,7 @@ function confirmChallenge(){
 function buildStageChallenge(ep){
   const r=ep.challengeResult; if(!r) return '';
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏆 The Challenge: ${r.name}<\/div>`;
+  html+=buildChallengeNarrator(ep);
   html+=`<div class="challenge-header-card" style="background:linear-gradient(135deg,#0EA5E910,#0EA5E905);border:1px solid #0EA5E930;border-radius:var(--radius-lg);padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:14px">
     <div style="font-size:40px">${r.icon||'🏆'}<\/div>
     <div><div style="font-size:18px;font-weight:700">${r.name}<\/div><div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">${r.flavor||''}<\/div><\/div>
@@ -5125,6 +5282,7 @@ function buildStageTribal(ep){
   if(!ep.voteResult) return '';
 
   let html=`<div class="stage-block anim-in"><div class="stage-label">🔦 Tribal Council<\/div>`;
+  html+=buildPreTribalNarrator(ep);
 
   // Atmosphere
   html+=`<div class="tribal-atmosphere">
@@ -5287,8 +5445,10 @@ function buildStageElimination(ep){
     if(G.settings.jury&&G.merged&&!G.jury.find(j=>j.id===ep.eliminated2.id)){ep.eliminated2.juryMember=true;G.jury.push(ep.eliminated2);}
   }
   let html=`<div class="stage-block anim-in"><div class="stage-label">🔦 The Tribe Has Spoken<\/div>`;
+  html+=buildEliminationNarrator(ep);
   html+=buildElimBanner(ep.eliminated);
   if(ep.eliminated2) html+=buildElimBanner(ep.eliminated2);
+  html+=buildNextTimeNarrator(ep);
   html+=`<\/div>`;
   updateGameSidebar();
   return html;
@@ -5752,6 +5912,7 @@ function renderFinaleNoJury(winner,finalists){
 
 
 // ===== EXPORTS =====
+export { buildBadge, buildPlayerChip, buildEventCard, buildNotice, renderStage, buildEpisodeHeader, buildStageCampLife, buildStageChallenge, buildChallengeChooser, buildStageTribal, buildStageElimination, buildStageNav, initVoteReveal, flipVote, revealAllVotes, updateRunningTally, revealElimination, selectChallenge, confirmChallenge, nextEpisode, showPlayerDetail, showJuryPanel, showSeasonStats, addDramaEvent, hostPlantIdol, hostGrantImmunity, applyHostImmunity, answerTribalQuestion };
 
 
 window.toggleDarkMode=function(){
@@ -5772,23 +5933,78 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 });
 
+
 // ===== FILE: main.js =====
+
 // No Signal — main.js
 // Entry point — imports all modules and wires up the app
 
 // ===== IMPORTS =====
 // ES module imports — load order is handled by the module system
+import { generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage,
+         clearImage, showBulkUpload, showCastStatus } from './portraits.js';
 
+import { G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
+         getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore,
+         goHome, goSetup, showGameScreen,
+         initTeams, renderCastList, addContestant, removeContestant,
+         updateContestant, makeContestant, generateRandomCast,
+         updateCastNavCount, renderTwistsGrid, updateTeamsPanel,
+         autoAssignTeams, setupNav, startSeason, applyColor,
+         pickColor, makeName, resetNamePool,
+         buildAlliances, updateGameSidebar, gsPlayerChip, toggleReturneeSettings } from './state.js';
 
+import { getActive, rollChallenge, targetScore, getVoterAllies,
+         pickVoteReason, runVote, resolveTie, resolveChallengerTie,
+         idolFindChance, maybeGiveIdol, checkIdolPlay, getTwist,
+         applyTwist, pickInteraction, computeAndStartEpisode,
+         runChallengeWithChoice, capturePlacementSnapshot } from './engine.js';
 
+import { buildBadge, buildPlayerChip, buildEventCard, buildNotice,
+         renderStage, buildEpisodeHeader, buildStageCampLife,
+         buildStageChallenge, buildChallengeChooser, buildStageTribal,
+         buildStageElimination, buildStageNav, initVoteReveal,
+         flipVote, revealAllVotes, updateRunningTally, revealElimination,
+         selectChallenge, confirmChallenge, nextEpisode, showPlayerDetail,
+         showJuryPanel, showSeasonStats,
+         addDramaEvent, hostPlantIdol, hostGrantImmunity,
+         applyHostImmunity, answerTribalQuestion } from './ui.js';
 
+import { generateEpisodeScript, showEpisodeScripts, showSeasonRecap, copySeasonRecap, downloadSeasonRecap,
+         scrollToScriptEp, copyScript } from './script_gen.js';
 
+import { showTribeHistory, showRelationshipWeb, showRelationshipHistory, showRelHistoryPicker, v19RelScore,
+         showPlayerProfiles, showOneProfile, showV19Insights,
+         showV19Relationships, exportV19SeasonReport } from './features.js';
 
+import { saveGame, loadGame, hasSavedGame, deleteSave,
+         updateContinueButton, queueAutosave, exportSaveFile,
+         openImportSave, importSaveFile, loadQuickDemo,
+         SAVE_KEY } from './save.js';
 
+import { EVOLUTION_RULES, checkArchetypeEvolution,
+         buildEvolutionDisplay, getArchetypeHistory, buildEvolutionCeremony } from './evolution.js';
 
+import { PRODUCER_POWERS, initProducerPowers, producerPowerUsed,
+         useProducerPower, producerUsesLeft,
+         showProducerPanel, executeProducerAction,
+         producerForceRivalry, confirmRivalry,
+         producerBlindside, confirmBlindside,
+         producerGuidedIdol, confirmGuidedIdol,
+         producerFractureAlliance, confirmFractureAlliance,
+         producerChallengeBoost, confirmChallengeBoost,
+         producerIntelDrop } from './producer.js';
 
+import { MEMORY_TYPES, recordMemory, getMemories, memoryScore,
+         hasBetrayedBy, getStrongestMemory, getUnseenMemories,
+         getJuryBias, recordVoteMemories, recordIdolMemories,
+         memoryTargetBonus, getMemoryConfessionalLine, getMemorySummary } from './memory.js';
 
+import { analyseSeasonStory, buildSeasonStoryCard, showSeasonStory, exportSeasonStory } from './story.js';
 
+import { callGemini, buildEpisodePrompt, generateAIDialogueForEp,
+         generateAIEpisodeScript, testGeminiKey, showGeminiHelp,
+         saveGeminiKey, getGeminiKey, initGeminiKeyField } from './ai.js';
 
 // ===== DELEGATED EVENT HANDLER =====
 // All data-action attributes in index.html are handled here.
@@ -5911,40 +6127,3 @@ document.addEventListener('keydown',e=>{
     }
   }
 });
-
-// ===== v19.5 ROBUST THEME PATCH =====
-(function(){
-  function applyTheme(mode){
-    const isLight = mode === 'light';
-    document.documentElement.classList.toggle('light', isLight);
-    document.documentElement.classList.toggle('dark', !isLight);
-    document.body.classList.toggle('light-mode', isLight);
-    try { localStorage.setItem('ns-theme', mode); localStorage.setItem('nosignal_darkmode', isLight ? '0' : '1'); } catch(e) {}
-    const btn = document.getElementById('dark-toggle-btn');
-    if(btn){
-      btn.textContent = isLight ? '🌙' : '☀️';
-      btn.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
-      btn.setAttribute('aria-label', btn.title);
-    }
-  }
-  window.toggleDarkMode = function(){
-    const isLight = document.documentElement.classList.contains('light') || document.body.classList.contains('light-mode');
-    applyTheme(isLight ? 'dark' : 'light');
-  };
-  document.addEventListener('DOMContentLoaded', function(){
-    let saved = null;
-    try { saved = localStorage.getItem('ns-theme'); } catch(e) {}
-    if(!saved){
-      try { saved = localStorage.getItem('nosignal_darkmode') === '0' ? 'light' : 'dark'; } catch(e) {}
-    }
-    applyTheme(saved === 'light' ? 'light' : 'dark');
-    const btn = document.getElementById('dark-toggle-btn');
-    if(btn){
-      btn.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); window.toggleDarkMode(); };
-    }
-  });
-  document.addEventListener('click', function(ev){
-    const btn = ev.target.closest && ev.target.closest('#dark-toggle-btn,[data-action="toggleDarkMode"]');
-    if(btn){ ev.preventDefault(); ev.stopPropagation(); window.toggleDarkMode(); }
-  }, true);
-})();

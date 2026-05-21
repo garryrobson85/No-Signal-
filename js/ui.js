@@ -54,6 +54,81 @@ function buildNotice(emoji, title, body, bgColor='var(--win-light)', borderColor
   </div>`;
 }
 
+
+
+// ===== CINEMATIC NARRATOR LAYER =====
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function firstName(p){return p?.name?.split(' ')[0]||'';}
+function teamNameFor(p){return (!G.merged && p?.team!=null && G.teams[p.team]) ? G.teams[p.team].name : (G.merged?'the merged tribe':'camp');}
+function lastCompletedEpisode(){return (G.episodeLog||[]).filter(e=>e.ep < (G.currentEpData?.ep||G.episode)).sort((a,b)=>b.ep-a.ep)[0]||null;}
+function getPhaseLabel(ep){return G.merged?'Post-Merge':'Pre-Merge';}
+function buildNarratorCard(label,title,body,opts={}){
+  const icon=opts.icon||'🎙️';
+  const cls=opts.cls||'';
+  return `<div class="narrator-card ${cls}">
+    <div class="narrator-kicker">${icon} ${escapeHtml(label)}</div>
+    ${title?`<div class="narrator-title">${escapeHtml(title)}</div>`:''}
+    <div class="narrator-body">${escapeHtml(body)}</div>
+  </div>`;
+}
+function buildEpisodeNarratorIntro(ep){
+  const active=getActive();
+  const season=G.settings?.name||'No Signal';
+  if(ep.isRejoinEpisode){
+    return buildNarratorCard('Narrator',`Episode ${ep.ep}: A Door Reopens`,`${ep.rejoinNames} returns to the game, and every comfortable plan suddenly becomes unstable.`,{icon:'🎙️',cls:'narrator-shock'});
+  }
+  if(ep.ep===1){
+    const teams=(!G.merged&&G.teams?.length)?G.teams.map((t,ti)=>`${t.name} (${getTeamMembers(ti).length})`).join(' against '):`${active.length} contestants`;
+    return buildNarratorCard('Opening Narration',`Welcome to ${season}`,`A new group of contestants has arrived with one goal: survive the vote and take control of the game. Tonight is about first impressions, first mistakes, and the first signs of who may be built for this. ${teams} begin the season with everything still to prove.`,{icon:'🔥',cls:'narrator-opening'});
+  }
+  const prev=lastCompletedEpisode();
+  let recap='Last time, the game began to take shape.';
+  if(prev){
+    const bits=[];
+    if(prev.challengeResult){
+      if(prev.challengeResult.type==='tribal') bits.push(`${prev.challengeResult.winner?.team?.name||'One tribe'} won immunity while ${prev.challengeResult.loser?.team?.name||'the losing tribe'} faced tribal council`);
+      else bits.push(`${prev.challengeResult.winner?.name||'One player'} won immunity`);
+    }
+    if(prev.idolPlay) bits.push(`${firstName(prev.idolPlay.idolPlayer)} played an idol`);
+    if(prev.eliminated) bits.push(`${prev.eliminated.name} was voted out`);
+    if(prev.eliminated2) bits.push(`${prev.eliminated2.name} also left the game`);
+    if(prev.noElim) bits.push('nobody went home');
+    if(bits.length) recap=`Previously on ${season}, ${bits.join(', ')}.`;
+  }
+  const pressure=G.merged?'individual survival replaces tribal loyalty':'tribal loyalty still matters, but private relationships are starting to matter more';
+  return buildNarratorCard('Previously on No Signal',`Episode ${ep.ep}`,`${recap} Tonight, ${pressure}. Every conversation could become tomorrow's problem.`,{icon:'📺',cls:'narrator-recap'});
+}
+function buildCampTransition(ep){
+  if(ep.ep===1) return buildNarratorCard('At Camp','First Impressions',`With names still fresh and trust still untested, the contestants begin the quiet work of reading each other.`,{icon:'🏕️'});
+  return buildNarratorCard('At Camp','The Social Game Moves',`Back at camp, small conversations carry heavy meaning. Some players build trust. Others only create suspicion.`,{icon:'🏕️'});
+}
+function buildChallengeNarrator(ep){
+  if(!ep.challengeResult) return buildNarratorCard('Host Transition','Time for the Challenge',`Camp talk can only take them so far. Now the ${G.merged?'players':'tribes'} must prove themselves where everyone can see.`,{icon:'🏆'});
+  const r=ep.challengeResult;
+  const result = r.type==='tribal'
+    ? `${r.winner?.team?.name||'One tribe'} has won immunity. ${r.loser?.team?.name||'The losing tribe'} will have to vote someone out tonight.`
+    : `${r.winner?.name||'One player'} has earned immunity, forcing everyone else to rethink the vote.`;
+  return buildNarratorCard('Narrator','Challenge Result',result,{icon:'🏆'});
+}
+function buildPreTribalNarrator(ep){
+  if(ep.noElim) return buildNarratorCard('Narrator','No Tribal Tonight',`The game gives them one night of relief, but nobody should mistake relief for safety.`,{icon:'🛡️'});
+  let target='the losing side';
+  if(ep.challengeResult?.type==='tribal') target=ep.challengeResult.loser?.team?.name||target;
+  return buildNarratorCard('Host Transition','Before Tribal Council',`${target} returns to camp with one job: decide who will not make it through the night. Nobody knows the final vote yet, and that uncertainty is where the game becomes dangerous.`,{icon:'🔦'});
+}
+function buildEliminationNarrator(ep){
+  if(ep.noElim||!ep.eliminated) return buildNarratorCard('Narrator','The Game Continues',`No torch is snuffed tonight, but the pressure does not disappear. It waits.`,{icon:'🎙️'});
+  const extra=ep.eliminated2?` ${ep.eliminated2.name} leaves as well, turning one vote into a season-shaping moment.`:'';
+  return buildNarratorCard('Closing Narration','The Tribe Has Spoken',`${ep.eliminated.name}'s game ends here.${extra} For everyone still standing, the lesson is simple: the game remembers every conversation.`,{icon:'🔥',cls:'narrator-closing'});
+}
+function buildNextTimeNarrator(ep){
+  if(ep.noElim) return buildNarratorCard('Next Time on No Signal','No Safety Lasts',`A night without an elimination gives the players time to breathe — and time to scheme.`,{icon:'📺',cls:'narrator-next'});
+  const active=getActive().filter(p=>!p.eliminated);
+  const names=shuffle(active).slice(0,2).map(p=>firstName(p)).filter(Boolean);
+  const hook=names.length>=2?`${names[0]} and ${names[1]} may be heading for a collision.`:`A new fault line opens in camp.`;
+  return buildNarratorCard('Next Time on No Signal','Pressure Builds',`${hook} The season is no longer about arriving. It is about surviving what people now think they know.`,{icon:'📺',cls:'narrator-next'});
+}
+
 // ===== STAGED RENDER =====
 
 function renderStage(idx){
@@ -81,6 +156,7 @@ function renderStage(idx){
 
   let html=buildEpisodeHeader(ep);
   html+=`<div id="stage-container">`;
+  html+=buildEpisodeNarratorIntro(ep);
   if(idx>=0) html+=buildStageCampLife(ep);
   if(idx>=1&&ep.challengeResult) html+=buildStageChallenge(ep);
   if(idx===1&&!ep.challengeResult) html+=buildChallengeChooser(ep);
@@ -117,6 +193,7 @@ function buildEpisodeHeader(ep){
 
 function buildStageCampLife(ep){
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏕️ Camp Life<\/div>`;
+  html+=buildCampTransition(ep);
 
   // ── ARCHETYPE EVOLUTIONS with ceremony ──────────────────────────────────
   if(G._pendingEvolutions&&G._pendingEvolutions.length){
@@ -225,6 +302,7 @@ function buildStageCampLife(ep){
 // HOST CHOOSES CHALLENGE
 function buildChallengeChooser(ep){
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏆 Choose the Challenge<\/div>`;
+  html+=buildChallengeNarrator(ep);
   html+=`<div class="host-panel"><div class="host-panel-title">HOST DECISION<\/div>
     <div class="host-panel-sub">You are the host. Pick which challenge the ${G.merged?'players':'tribes'} will compete in today.<\/div>
   <\/div>`;
@@ -264,6 +342,7 @@ function confirmChallenge(){
 function buildStageChallenge(ep){
   const r=ep.challengeResult; if(!r) return '';
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏆 The Challenge: ${r.name}<\/div>`;
+  html+=buildChallengeNarrator(ep);
   html+=`<div class="challenge-header-card" style="background:linear-gradient(135deg,#0EA5E910,#0EA5E905);border:1px solid #0EA5E930;border-radius:var(--radius-lg);padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:14px">
     <div style="font-size:40px">${r.icon||'🏆'}<\/div>
     <div><div style="font-size:18px;font-weight:700">${r.name}<\/div><div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">${r.flavor||''}<\/div><\/div>
@@ -318,6 +397,7 @@ function buildStageTribal(ep){
   if(!ep.voteResult) return '';
 
   let html=`<div class="stage-block anim-in"><div class="stage-label">🔦 Tribal Council<\/div>`;
+  html+=buildPreTribalNarrator(ep);
 
   // Atmosphere
   html+=`<div class="tribal-atmosphere">
@@ -480,8 +560,10 @@ function buildStageElimination(ep){
     if(G.settings.jury&&G.merged&&!G.jury.find(j=>j.id===ep.eliminated2.id)){ep.eliminated2.juryMember=true;G.jury.push(ep.eliminated2);}
   }
   let html=`<div class="stage-block anim-in"><div class="stage-label">🔦 The Tribe Has Spoken<\/div>`;
+  html+=buildEliminationNarrator(ep);
   html+=buildElimBanner(ep.eliminated);
   if(ep.eliminated2) html+=buildElimBanner(ep.eliminated2);
+  html+=buildNextTimeNarrator(ep);
   html+=`<\/div>`;
   updateGameSidebar();
   return html;

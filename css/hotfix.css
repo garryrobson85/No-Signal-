@@ -291,3 +291,18 @@ body.season-running #screen-setup *,
   #screen-game.active .game-sidebar{width:100%!important;height:auto!important;position:relative!important;top:auto!important;}
   #screen-game.active .game-main{padding:18px!important;}
 }
+
+
+/* v20 narrator layer */
+.narrator-card{border:1px solid rgba(255,255,255,.12);background:linear-gradient(135deg,rgba(255,69,24,.12),rgba(255,255,255,.035));border-left:4px solid var(--fire,#ff3b1f);border-radius:18px;padding:18px 20px;margin:14px 0 18px;box-shadow:0 10px 26px rgba(0,0,0,.18)}
+.narrator-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--fire2,#ff7a45);font-weight:800;margin-bottom:8px}
+.narrator-title{font-family:'Bebas Neue',Impact,sans-serif;font-size:30px;letter-spacing:.035em;color:var(--text,#fff);line-height:1;margin-bottom:8px}
+.narrator-body{font-size:15px;line-height:1.65;color:var(--text2,#d6d6d6);max-width:900px}
+.narrator-opening{background:linear-gradient(135deg,rgba(255,69,24,.18),rgba(255,180,70,.06))}
+.narrator-recap{border-left-color:#38bdf8;background:linear-gradient(135deg,rgba(56,189,248,.13),rgba(255,255,255,.035))}
+.narrator-closing{border-left-color:#f97316;background:linear-gradient(135deg,rgba(249,115,22,.14),rgba(0,0,0,.1))}
+.narrator-next{border-left-color:#a855f7;background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(255,255,255,.035))}
+.narrator-shock{border-left-color:#facc15;background:linear-gradient(135deg,rgba(250,204,21,.16),rgba(255,255,255,.035))}
+body.light-mode .narrator-card{background:linear-gradient(135deg,rgba(255,69,24,.09),rgba(255,255,255,.85));border-color:rgba(0,0,0,.1)}
+body.light-mode .narrator-body{color:#333}
+@media(max-width:700px){.narrator-card{padding:15px 16px;border-radius:15px}.narrator-title{font-size:24px}.narrator-body{font-size:14px;line-height:1.55}}
