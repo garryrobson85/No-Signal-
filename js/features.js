@@ -479,7 +479,3 @@ function showRelHistoryPicker(playerId){
   openV19Modal(`🔗 ${player.name.split(' ')[0]}'s Relationships`,
     `<div class="v19-help">Select a player to view your full history together — every vote, alliance, and memory event.<\/div><div style="margin-top:10px">${opts}<\/div>`);
 }
-
-
-// ===== EXPORTS =====
-export { showTribeHistory, showRelationshipWeb, showRelationshipHistory, showRelHistoryPicker, v19RelScore, showPlayerProfiles, showOneProfile, showV19Insights, showV19Relationships, v19EnsureRelationships, v19ActiveThreatScore, v19SocialPowerScore, exportV19SeasonReport };

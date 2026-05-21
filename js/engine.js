@@ -92,16 +92,16 @@ function targetScore(voter,target,allies,allianceStr,pool){
   if(!G.merged&&target.physical<=4) score+=3;
 
   // 5. Personal conflict: hothead or villain voters may have grudges
-  if((voter.personality==='Hothead'||voter.personality==='Villain')&&Math.random()<0.3) score+=2;
+  if((voter.personality==='Hothead'||voter.personality==='Villain')&&seededRandom()<0.3) score+=2;
 
   // 6. Memory bonus — past betrayals/saves modify targeting (see memory.js)
   if(G.memories&&G.memories.length) score+=memoryTargetBonus(voter,target);
 
   // 6. Drama-fuelled chaos: unpredictable flips at high drama
-  if(G.settings.drama&&G.dramaLevel>=4&&Math.random()<0.2) score+=rng(0,5);
+  if(G.settings.drama&&G.dramaLevel>=4&&seededRandom()<0.2) score+=rng(0,5);
 
   // 7. Small noise so we never get identical scores
-  score+=Math.random()*1.5;
+  score+=seededRandom()*1.5;
 
   return score;
 }
@@ -156,7 +156,7 @@ function runVote(pool,immune=null){
       .sort((a,b)=>b.s-a.s);
 
     let target=null;
-    const loyaltyRoll=Math.random();
+    const loyaltyRoll=seededRandom();
     // allianceStr is already 0-1; use directly
     // High loyalty = vote top-scored almost always; low = more randomness
     if(loyaltyRoll<allianceStr*0.7+0.25){
@@ -217,7 +217,7 @@ function resolveChallengerTie(tiedTeams){
 }
 function idolFindChance(){return{easy:0.20,medium:0.12,hard:0.06,rare:0.03}[G.settings.idolDiff]||0.12;}
 function maybeGiveIdol(){
-  if(!G.settings.idols||Math.random()>idolFindChance()) return null;
+  if(!G.settings.idols||seededRandom()>idolFindChance()) return null;
   const pool=getActive().filter(c=>!G.idolHolders.includes(c.id)); if(!pool.length) return null;
   const finder=pick(pool); G.idolHolders.push(finder.id); return finder;
 }
@@ -236,14 +236,14 @@ function checkIdolPlay(eliminated,pool){
   if(!G.idolHolders.includes(eliminated.id)) return null;
   // Idols cannot be played after final 6 — standard game rule
   if(getActive().length<=6){ notify(`${eliminated.name} holds an idol but it\'s now expired — too late to play!`); G.idolHolders=G.idolHolders.filter(id=>id!==eliminated.id); return null; }
-  if(Math.random()>0.65) return null;
+  if(seededRandom()>0.65) return null;
   G.idolHolders=G.idolHolders.filter(id=>id!==eliminated.id); eliminated.idolPlayed=true;
   const newPool=pool.filter(p=>p.id!==eliminated.id&&!p.immunity&&!p.eliminated);
   if(!newPool.length) return null;
   return{idolPlayer:eliminated,newElim:pick(newPool)};
 }
 function getTwist(){
-  if(Math.random()*100>G.settings.twistFreq) return null;
+  if(seededRandom()*100>G.settings.twistFreq) return null;
   const avail=TWISTS_DATA.filter(t=>G.twists.has(t.id)); if(!avail.length) return null;
   return pick(avail);
 }
@@ -259,6 +259,7 @@ function pickInteraction(a,b,ep){
 
 // ===== COMPUTE EPISODE =====
 function computeAndStartEpisode(){
+  try {
   const ep=G.episode, active=getActive();
   if(active.length<=G.settings.finaleSize){runFinale();return;}
 
@@ -315,14 +316,14 @@ function computeAndStartEpisode(){
   }
 
   let doubleElim=false,noElim=false,mergeHappened=false;
-  // Twists: block team swap post-merge and too early. Episode 1/2 should establish the cast before any reshuffle.
+  // Twists: block team swap post-merge
   const rawTwist=getTwist();
-  const twist=(rawTwist&&rawTwist.id==='swap'&&(G.merged||ep<3))?null:rawTwist;
+  const twist=(rawTwist&&rawTwist.id==='swap'&&G.merged)?null:rawTwist;
   let twistMsg='';
   if(twist){twistMsg=applyTwist(twist);if(twist.id==='double')doubleElim=true;if(twist.id==='noelim')noElim=true;}
 
   let dramaMsg='',idolFinder=null;
-  if(G.settings.drama&&Math.random()<(G.settings.dramaRate==='fast'?0.5:G.settings.dramaRate==='slow'?0.15:0.3)){dramaMsg=buildDramaText({ep:G.episode});G.dramaLevel=Math.min(G.dramaLevel+1,5);}
+  if(G.settings.drama&&seededRandom()<(G.settings.dramaRate==='fast'?0.5:G.settings.dramaRate==='slow'?0.15:0.3)){dramaMsg=buildDramaText({ep:G.episode});G.dramaLevel=Math.min(G.dramaLevel+1,5);}
   // Idols blocked after final 6
   if(active.length>6) idolFinder=maybeGiveIdol();
 
@@ -338,14 +339,14 @@ function computeAndStartEpisode(){
     } else { pool=active; }
     if(pool.length>=2){
       const pair=shuffle(pool).slice(0,2);
-      interactions.push({a:pair[0],b:pair[1],text:pickInteraction(pair[0],pair[1],{ep})});
+      interactions.push({a:pair[0],b:pair[1],text:pickInteraction(pair[0],pair[1],null)});// ep not yet built — context added in script generator
     }
     // Sometimes a cross-team interaction in pre-merge too (30% chance — like at challenges)
-    if(!G.merged&&active.length>=4&&Math.random()<0.3){
+    if(!G.merged&&active.length>=4&&seededRandom()<0.3){
       const teams=G.teams.map((_,ti)=>getTeamMembers(ti)).filter(t=>t.length>0);
       if(teams.length>=2){
         const a=pick(teams[0]),b=pick(teams[1]);
-        if(a&&b) interactions.push({a,b,text:pickInteraction(a,b,{ep}),crossTeam:true});
+        if(a&&b) interactions.push({a,b,text:pickInteraction(a,b,null),crossTeam:true});
       }
     }
   }
@@ -370,9 +371,15 @@ function computeAndStartEpisode(){
   G.stageIndex=0;
   updateGameSidebar();
   renderStage(0);
+  } catch(err) {
+    console.error('computeAndStartEpisode failed:',err);
+    notify('⚠️ Episode build failed — see console. Try Save → reload, or start a new season.');
+    // Leave G.stageIndex intact so the user can still try saving / exporting their season.
+  }
 }
 
 function runChallengeWithChoice(chosenChallenge){
+  try {
   const ep=G.currentEpData;
   const challengeName=chosenChallenge.name, challengeType=chosenChallenge.type;
   let challengeResult=null,winTeam=null,loseTeam=null,immuneWinner=null,challengeTieMsg='';
@@ -502,6 +509,10 @@ function runChallengeWithChoice(chosenChallenge){
   capturePlacementSnapshot(ep);
   G.episodeLog.push(ep); // always log for script generation
   renderStage(1);
+  } catch(err) {
+    console.error('runChallengeWithChoice failed:',err);
+    notify('⚠️ Challenge resolution failed — see console. Save and reload to recover.');
+  }
 }
 
 /**
@@ -589,13 +600,9 @@ function applyTwist(twist){
     case 'tribe_dissolve':{if(!G.merged&&G.teams.length>2){const sz=G.teams.map((t,ti)=>({ti,count:getTeamMembers(ti).length})).sort((a,b)=>a.count-b.count);const dis=sz[0];getTeamMembers(dis.ti).forEach(c=>{const others=G.teams.map((_,ti)=>ti).filter(ti=>ti!==dis.ti);c.team=pick(others);});return`Tribe ${G.teams[dis.ti].name} dissolved — members absorbed into other tribes.`;}return`A tribe restructuring occurred.`;}
     case 'exile':{const e=pick(getActive());return e?`${e.name} was sent to Exile Island.`:`Exile Island twist.`;}
     case 'challenge_advantage':{const l=pick(getActive());return l?`${l.name} earned a challenge advantage!`:`A challenge advantage was hidden.`;}
-    case 'new_alliance':{const a=getActive();if(a.length>=2){const[x,y]=shuffle(a).slice(0,2);const alId=uid();x.allianceIds.push(alId);y.allianceIds.push(alId);G.alliances.push({id:alId,members:[x.id,y.id],name:`Forced: ${x.name.split(' ')[0]}-${y.name.split(' ')[0]}`});return`${x.name} and ${y.name} were forced into a secret alliance.`;}return`Forced alliance twist.`;}
+    case 'new_alliance':{const a=getActive();if(a.length>=2){const[x,y]=shuffle(a).slice(0,2);const alId=uid();x.allianceIds.push(alId);y.allianceIds.push(alId);const al={id:alId,members:[x.id,y.id],name:`Forced: ${x.name.split(' ')[0]}-${y.name.split(' ')[0]}`};G.alliances.push(al);logAlliance('forced',al);return`${x.name} and ${y.name} were forced into a secret alliance.`;}return`Forced alliance twist.`;}
     case 'power_shift':{const top=getActive().sort((a,b)=>b.challengeWins-a.challengeWins)[0];if(top&&top.challengeWins>0){top.immunity=false;return`Power Shift! ${top.name} cannot compete for immunity tonight.`;}return`Power Shift — no effect yet.`;}
     case 'extra_vote':{const l=pick(getActive());if(l){G.extraVoteHolders.push(l.id);return`${l.name} found an extra vote advantage!`;}return`Extra vote hidden.`;}
     default: return`A twist activated.`;
   }
 }
-
-
-// ===== EXPORTS =====
-export { getActive, rollChallenge, targetScore, getVoterAllies, pickVoteReason, runVote, resolveTie, resolveChallengerTie, idolFindChance, maybeGiveIdol, checkIdolPlay, getTwist, applyTwist, pickInteraction, computeAndStartEpisode, runChallengeWithChoice, capturePlacementSnapshot };

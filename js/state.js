@@ -2,6 +2,10 @@
 // Game state (G), utilities, contestant/team builders
 
 // ===== STATE =====
+// Centralized project version — used in seed hashing and any place that needs it.
+// Bump on actual schema changes, not casual edits.
+const PROJECT_VERSION = 'no-signal-v4';
+
 let G = {
   cast:[], teams:[], settings:{},
   twists:new Set(TWISTS_DATA.map(t=>t.id)),
@@ -30,7 +34,7 @@ function hashSeed(str){
 }
 function seededRandom(){
   if(!G.settings||!G.settings.seed) return Math.random();
-  if(G.rngState==null) G.rngState=hashSeed(G.settings.seed+'|'+(G.episode||1)+'|no-signal-v19');
+  if(G.rngState==null) G.rngState=hashSeed(G.settings.seed+'|'+(G.episode||1)+'|'+PROJECT_VERSION);
   G.rngState=(Math.imul(1664525,G.rngState)+1013904223)>>>0;
   return G.rngState/4294967296;
 }
@@ -40,8 +44,26 @@ const shuffle=arr=>{let a=[...arr];for(let i=a.length-1;i>0;i--){let j=rng(0,i);
 const uid=()=>Math.random().toString(36).slice(2,8);
 const isOn=id=>document.getElementById(id)?.classList.contains('on');
 
-let _notifyQueue=[],_notifyShowing=false;
+// HTML escaping for any user-supplied string that flows into innerHTML / template literals.
+// Always escape: cast names, season name, tribe names, custom dialogue, anything imported via save file.
+// A contestant named '<img src=x onerror=alert(1)>' becomes inert text after this.
+function escapeHtml(s){
+  if(s==null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+// Shorthand for templates: `${esc(name)}` is easier on the eyes than the full name.
+const esc=escapeHtml;
+
+let _notifyQueue=[],_notifyShowing=false,_lastNotifyMsg='';
 function notify(msg,type='fire'){
+  // Collapse identical adjacent messages so progress flows like "Sending → Sending → Sending" don't stack.
+  if(msg===_lastNotifyMsg && _notifyShowing) return;
+  _lastNotifyMsg=msg;
   _notifyQueue.push({msg,type});
   if(!_notifyShowing) _showNextNotify();
 }
@@ -151,7 +173,7 @@ function renderCastList(){
           ${c.customImage?`<button class="cpu-clear-btn" onclick="clearImage('${c.id}')" title="Remove photo">✕<\/button>`:''}
         <\/div>
         <div style="flex:1;min-width:0">
-          <input class="cast-name-edit" value="${c.name}" oninput="updateContestant('${c.id}','name',this.value)" placeholder="Contestant name">
+          <input class="cast-name-edit" value="${esc(c.name)}" oninput="updateContestant('${c.id}','name',this.value)" placeholder="Contestant name">
           <div class="cpu-hint">${c.customImage?`<span style="color:var(--leaf);font-size:11px">✓ Custom photo<\/span>`:`<span style="color:var(--text3);font-size:11px">Click portrait to upload or change colour<\/span>`}<\/div>
           ${!c.customImage?`<button class="cpu-color-btn" onclick="pickColor('${c.id}')" style="margin-top:4px">🎨 Colour<\/button>`:''}
         <\/div>
@@ -184,8 +206,17 @@ function renderStatRow(stat,val,color,id){
 }
 function updateContestant(id,field,val){
   const c=G.cast.find(x=>x.id===id); if(!c) return;
+  // Names and other free-text fields must never carry raw HTML. Strip the dangerous metacharacters
+  // at the input boundary so display sites can safely interpolate.
+  if(field==='name' && typeof val==='string'){
+    val=val.replace(/[<>"'`]/g,'').slice(0,40);
+  }
   c[field]=val; c._portrait=null;
   if(field==='name'){c.initials=val.split(' ').map(w=>w[0]).join('').slice(0,2)||'?';}
+}
+function updateTeamName(idx,val){
+  if(!G.teams[idx]) return;
+  G.teams[idx].name=String(val||'').replace(/[<>"'`]/g,'').slice(0,30);
 }
 
 let _colorPickTarget=null,_teamColorTarget=null;
@@ -254,7 +285,7 @@ function renderTeamCards(){
     return `<div class="team-card" style="border-left-color:${t.color}">
       <div class="team-card-header">
         <div class="team-color-dot" style="background:${t.color}" onclick="pickTeamColor(${ti})" title="Change color"><\/div>
-        <input class="team-name-edit" value="${t.name}" oninput="G.teams[${ti}].name=this.value">
+        <input class="team-name-edit" value="${esc(t.name)}" oninput="updateTeamName(${ti},this.value)">
         <span class="badge badge-gray">${members.length} members<\/span>
       <\/div>
       <div class="team-members-area" id="team-area-${ti}">
@@ -321,18 +352,36 @@ function startSeason(){
   showGameScreen();
   computeAndStartEpisode();
 }
+// Records an alliance lifecycle event into G.allianceLog for later replay / story analysis.
+// Action is 'formed' | 'broken' | 'forced'. Episode defaults to current G.episode.
+function logAlliance(action, alliance, ep){
+  if(!G.allianceLog) G.allianceLog=[];
+  G.allianceLog.push({
+    action,
+    allianceId: alliance.id,
+    name: alliance.name,
+    members: [...(alliance.members||[])],
+    episode: ep||G.episode||1,
+    at: Date.now()
+  });
+}
+
 function buildAlliances(){
   G.alliances=[];
   const players=shuffle([...G.cast]);
   for(let i=0;i<players.length-1;i+=2){
     const a=players[i],b=players[i+1],alId=uid();
     a.allianceIds.push(alId);b.allianceIds.push(alId);
-    G.alliances.push({id:alId,members:[a.id,b.id],name:`${a.name.split(' ')[0]}-${b.name.split(' ')[0]} duo`});
+    const al={id:alId,members:[a.id,b.id],name:`${a.name.split(' ')[0]}-${b.name.split(' ')[0]} duo`};
+    G.alliances.push(al);
+    logAlliance('formed', al, 1);
   }
   if(players.length>=6){
     const trio=shuffle(players).slice(0,3),alId=uid();
     trio.forEach(p=>p.allianceIds.push(alId));
-    G.alliances.push({id:alId,members:trio.map(p=>p.id),name:`${trio[0].name.split(' ')[0]}'s trio`});
+    const al={id:alId,members:trio.map(p=>p.id),name:`${trio[0].name.split(' ')[0]}'s trio`};
+    G.alliances.push(al);
+    logAlliance('formed', al, 1);
   }
 }
 
@@ -465,7 +514,3 @@ function getPlayerView(){
 function isPlayMode(){
   return !!G.playerContestantId;
 }
-
-// ===== EXPORTS =====
-export { updateGameSidebar, gsPlayerChip, G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
-         getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore, goHome, goSetup, showGameScreen, initTeams, renderCastList, addContestant, removeContestant, updateContestant, makeContestant, generateRandomCast, updateCastNavCount, renderTwistsGrid, updateTeamsPanel, autoAssignTeams, setupNav, startSeason, applyColor, pickColor, makeName, resetNamePool, buildAlliances, toggleReturneeSettings };
