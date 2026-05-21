@@ -788,3 +788,7 @@ function downloadSeasonRecap(){
   URL.revokeObjectURL(a.href);
   notify('Downloaded ✓','win');
 }
+
+
+// ===== EXPORTS =====
+export { generateEpisodeScript, showEpisodeScripts, showSeasonRecap, generateSeasonRecap, copySeasonRecap, downloadSeasonRecap, scrollToScriptEp, copyScript, _buildPlainTextScript, _domToScriptText };

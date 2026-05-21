@@ -1,6 +1,72 @@
 // No Signal — main.js
-// Entry point — sets up event delegation and keyboard shortcuts.
-// All other JS files are loaded as classic scripts in index.html.
+// Entry point — imports all modules and wires up the app
+
+// ===== IMPORTS =====
+// ES module imports — load order is handled by the module system
+import { generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage,
+         clearImage, showBulkUpload, showCastStatus } from './portraits.js';
+
+import { G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
+         getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore,
+         goHome, goSetup, showGameScreen,
+         initTeams, renderCastList, addContestant, removeContestant,
+         updateContestant, makeContestant, generateRandomCast,
+         updateCastNavCount, renderTwistsGrid, updateTeamsPanel,
+         autoAssignTeams, setupNav, startSeason, applyColor,
+         pickColor, makeName, resetNamePool,
+         buildAlliances, updateGameSidebar, gsPlayerChip, toggleReturneeSettings } from './state.js';
+
+import { getActive, rollChallenge, targetScore, getVoterAllies,
+         pickVoteReason, runVote, resolveTie, resolveChallengerTie,
+         idolFindChance, maybeGiveIdol, checkIdolPlay, getTwist,
+         applyTwist, pickInteraction, computeAndStartEpisode,
+         runChallengeWithChoice, capturePlacementSnapshot } from './engine.js';
+
+import { buildBadge, buildPlayerChip, buildEventCard, buildNotice,
+         renderStage, buildEpisodeHeader, buildStageCampLife,
+         buildStageChallenge, buildChallengeChooser, buildStageTribal,
+         buildStageElimination, buildStageNav, initVoteReveal,
+         flipVote, revealAllVotes, updateRunningTally, revealElimination,
+         selectChallenge, confirmChallenge, nextEpisode, showPlayerDetail,
+         showJuryPanel, showSeasonStats,
+         addDramaEvent, hostPlantIdol, hostGrantImmunity,
+         applyHostImmunity, answerTribalQuestion } from './ui.js';
+
+import { generateEpisodeScript, showEpisodeScripts, showSeasonRecap, copySeasonRecap, downloadSeasonRecap,
+         scrollToScriptEp, copyScript } from './script_gen.js';
+
+import { showTribeHistory, showRelationshipWeb, showRelationshipHistory, showRelHistoryPicker, v19RelScore,
+         showPlayerProfiles, showOneProfile, showV19Insights,
+         showV19Relationships, exportV19SeasonReport } from './features.js';
+
+import { saveGame, loadGame, hasSavedGame, deleteSave,
+         updateContinueButton, queueAutosave, exportSaveFile,
+         openImportSave, importSaveFile, loadQuickDemo,
+         SAVE_KEY } from './save.js';
+
+import { EVOLUTION_RULES, checkArchetypeEvolution,
+         buildEvolutionDisplay, getArchetypeHistory, buildEvolutionCeremony } from './evolution.js';
+
+import { PRODUCER_POWERS, initProducerPowers, producerPowerUsed,
+         useProducerPower, producerUsesLeft,
+         showProducerPanel, executeProducerAction,
+         producerForceRivalry, confirmRivalry,
+         producerBlindside, confirmBlindside,
+         producerGuidedIdol, confirmGuidedIdol,
+         producerFractureAlliance, confirmFractureAlliance,
+         producerChallengeBoost, confirmChallengeBoost,
+         producerIntelDrop } from './producer.js';
+
+import { MEMORY_TYPES, recordMemory, getMemories, memoryScore,
+         hasBetrayedBy, getStrongestMemory, getUnseenMemories,
+         getJuryBias, recordVoteMemories, recordIdolMemories,
+         memoryTargetBonus, getMemoryConfessionalLine, getMemorySummary } from './memory.js';
+
+import { analyseSeasonStory, buildSeasonStoryCard, showSeasonStory, exportSeasonStory } from './story.js';
+
+import { callGemini, buildEpisodePrompt, generateAIDialogueForEp,
+         generateAIEpisodeScript, testGeminiKey, showGeminiHelp,
+         saveGeminiKey, getGeminiKey, initGeminiKeyField } from './ai.js';
 
 // ===== DELEGATED EVENT HANDLER =====
 // All data-action attributes in index.html are handled here.

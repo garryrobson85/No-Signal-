@@ -30,9 +30,60 @@ const TWISTS_DATA = [
 // These use real game state — player names, archetypes, vote outcomes, alliances —
 // so every line is specific to what actually happened, not generic filler.
 
+
+
+// ===== NARRATIVE GUARDRAILS =====
+// Keeps visible story text locked to what the audience/players know at that moment.
+function hasSwapOccurredByEpisode(ep){
+  return !!((ep&&ep.twist&&ep.twist.id==='swap') || (G.episodeLog||[]).some(e=>e.ep < (ep?.ep||999) && e.twist && e.twist.id==='swap'));
+}
+function hasMergeOccurredByEpisode(ep){
+  return !!((ep&&ep.mergeHappened) || (G.episodeLog||[]).some(e=>e.ep <= (ep?.ep||999) && e.mergeHappened));
+}
+function hiddenRelLabel(score){
+  score=Number(score)||50;
+  if(score>=70) return 'strong trust';
+  if(score>=56) return 'growing trust';
+  if(score>=42) return 'uncertain';
+  if(score>=28) return 'uneasy';
+  return 'open tension';
+}
+function narrativeFallbackConfessional(player, ep){
+  const safeEp={...ep, voteResult:null, eliminated:null, eliminated2:null, idolPlay:null};
+  return buildConfessionalText(player, safeEp);
+}
+function narrativeFallbackInteraction(a,b,ep){
+  const an=a.name.split(' ')[0], bn=b.name.split(' ')[0];
+  const score=(typeof v19RelScore==='function')?v19RelScore(a.id,b.id):50;
+  if(score>=65) return `${an} and ${bn} found a quiet moment at camp. There is trust there, but neither of them is ready to say everything out loud yet.`;
+  if(score<=35) return `${an} and ${bn} shared a short, careful conversation. Nothing exploded, but both walked away with more questions than answers.`;
+  if(ep?.ep===1) return `${an} and ${bn} compared first impressions around camp. It was friendly enough, but this early nobody really knows what anyone is hiding.`;
+  return `${an} and ${bn} checked in with each other before the challenge. The conversation stayed light, but both were listening for more than words.`;
+}
+function cleanNarrativeText(text, ep, fallback){
+  if(!text) return fallback||'';
+  let t=String(text)
+    .replace(/\b\d{1,3}\s*\/\s*100\s*(?:relationship\s*)?(?:score|bond|trust)?\b/gi,'a private read')
+    .replace(/\b(?:relationship|bond|trust|threat)\s*score\s*(?:of|is|:)?\s*\d{1,3}\b/gi,'private read')
+    .replace(/\b\d{1,3}\s*(?:score|rating)\b/gi,'private read')
+    .replace(/\bunderlying strategy beneath .*? persona\b/gi,'something under the surface')
+    .replace(/\s+/g,' ')
+    .trim();
+  const lower=t.toLowerCase();
+  const noSwap=!hasSwapOccurredByEpisode(ep);
+  const noMerge=!hasMergeOccurredByEpisode(ep);
+  const impossible=[];
+  if(noSwap) impossible.push('tribe swap','swap happened','after the swap','post-swap','new tribe','swapped tribes','tribe swapped');
+  if(noMerge) impossible.push('post-merge','after the merge','merge vote','merged tribe','jury management','jury vote');
+  if(ep?.ep===1) impossible.push('resume move','big move resume','tribal history','for weeks','all season long');
+  if(impossible.some(term=>lower.includes(term))) return fallback||'';
+  return t;
+}
+
 // Generates a confessional grounded in what this player is actually experiencing
 function buildConfessionalText(player, ep){
   const fn=player.name.split(' ')[0];
+  const voiceTag=(player.personality||player.archetype||'').toLowerCase();
   const allies=(player.allianceIds||[]).flatMap(aid=>{
     const al=G.alliances.find(a=>a.id===aid);
     return al?al.members.filter(m=>m!==player.id).map(m=>G.cast.find(c=>c.id===m)?.name.split(' ')[0]).filter(Boolean):[];
@@ -48,6 +99,44 @@ function buildConfessionalText(player, ep){
 
   // Build a specific, contextual confessional from real state
   const lines=[];
+
+  // Episode 1 should feel like arrivals and first impressions, not voting history.
+  // No one has enough lived game yet to talk like they have already betrayed people.
+  if(ep.ep===1 && !ep.voteResult){
+    const tribeMates=G.cast.filter(c=>c.id!==player.id && c.team===player.team && c.status==='active')
+      .slice(0,3).map(c=>c.name.split(' ')[0]);
+    const tribeLine=tribeMates.length
+      ? `I'm still working out ${tribeMates.join(', ')}. First impressions matter out here, but they can lie to you.`
+      : `I'm trying to read the room before the room starts reading me.`;
+    const firstLines={
+      'The Strategist':`First day, I'm not trying to control the game. I'm trying to understand it. Who talks too much, who listens, who needs someone to trust.`,
+      'The Fan Favorite':`Walking onto the beach felt unreal. Everyone is smiling, but you can already feel people sizing each other up.`,
+      'The Challenge Beast':`I know people will look at me and think challenge threat. So day one is about being useful without looking too dangerous.`,
+      'The Manipulator':`Everyone wants to make a good first impression. I want to see which first impressions are fake.`,
+      'The Sweetheart':`I want people to feel comfortable around me. That sounds simple, but out here comfort can become trust.`,
+      'The Loose Cannon':`I promised myself I'd keep it calm on day one. I made that promise before I met everyone.`,
+      'The Quiet Threat':`Day one is perfect for me. Let the loud people become memorable. I'll become necessary.`,
+      'The Social Butterfly':`Names, stories, little details — I'm collecting all of it. The game starts with connection.`,
+      'The Big Villain':`Everyone is trying to be nice. Cute. I'm trying to find the people who can actually be useful.`,
+      'The Underdog':`I can already tell some people underestimated me when I walked in. Honestly, good. Let them.`,
+      'The Superfan':`I've watched this moment a hundred times in my head. Being here is different. The sand, the nerves, the eyes on you — it's real now.`,
+      'The Romantic':`There are some big personalities here. I'm trying to lead with warmth, but I know warmth alone won't keep me safe forever.`
+    };
+    const baseOptions=[
+      firstLines[player.archetype] || `First day out here, everyone is performing a version of themselves. I'm just trying to spot who feels real.`,
+      voiceTag.includes('villain') ? `Everyone is being polite because it is day one. I am being polite because it is useful.` : null,
+      voiceTag.includes('chaotic')||voiceTag.includes('wildcard') ? `I told myself I would play it cool. That lasted about ten minutes.` : null,
+      voiceTag.includes('loyal') ? `I am looking for people who feel steady. Out here, steady might be the rarest thing.` : null,
+      voiceTag.includes('social') ? `You learn a lot from who people choose to sit beside when nobody tells them where to go.` : null,
+      voiceTag.includes('nerd')||voiceTag.includes('strategic') ? `I am trying not to overthink it, which obviously means I am overthinking everything.` : null,
+      voiceTag.includes('underdog') ? `I can feel a few people looking past me already. That might be the first mistake they make.` : null
+    ].filter(Boolean);
+    const base=baseOptions[Math.abs((player.id||fn).toString().split('').reduce((a,ch)=>a+ch.charCodeAt(0),0))%baseOptions.length];
+    const challengeLine=wonChallenge
+      ? `Winning early feels good, but I need people to see it as tribe strength, not a reason to mark me out.`
+      : `For now, I need to settle in, learn names, and avoid becoming the easy first target.`;
+    return [base, tribeLine, challengeLine].slice(0,2).join(' ');
+  }
 
   // React to the vote if they were involved
   if(votesAgainstMe>0) lines.push(`${votesAgainstMe>1?`${votesAgainstMe} votes came my way`:'My name came up at tribal'}. I felt it. I knew. But I'm still here — and that tells me more about this game than any alliance meeting ever could.`);
@@ -103,6 +192,16 @@ function buildInteractionText(a, b, ep){
   const merged=G.merged;
   const sameTeam=!merged&&a.team!=null&&a.team===b.team;
   const crossTeam=!merged&&!sameTeam&&a.team!=null&&b.team!=null;
+
+  if(ep?.ep===1){
+    const opts=[
+      `${an} and ${bn} traded first impressions while camp was still finding its rhythm. It sounded casual, but both were already taking notes.`,
+      `${an} tried to get a read on ${bn} without pushing too hard. Day one smiles can hide a lot.`,
+      `${bn} made an early effort with ${an}. It was friendly, careful, and just strategic enough to matter.`,
+      `${an} and ${bn} compared the mood around camp. Nobody said the word trust yet, but both were clearly looking for it.`
+    ];
+    return pick(opts);
+  }
 
   if(allied&&relScore>=60){
     const opts=[
@@ -174,10 +273,10 @@ function buildDramaText(ep){
 // Legacy templates kept as fallback strings (not functions anymore — functions replaced above)
 const INTERACTION_TEMPLATES_NEUTRAL = [
   (a,b)=>`${a} and ${b} had a long late-night conversation and found they have more in common than expected. A tentative alliance formed.`,
-  (a,b)=>`${b} tried to quietly flip ${a}'s vote before tribal but couldn't seal the deal.`,
+  (a,b)=>`${b} tried to quietly test whether ${a} could be useful later, but couldn't get a clear answer.`,
   (a,b)=>`${a} and ${b} were spotted whispering near the well. Nobody could hear it, but everyone noticed.`,
   (a,b)=>`${b} promised ${a} their loyalty — but their body language told a different story.`,
-  (a,b)=>`${a} tried to recruit ${b} into a larger voting bloc, with mixed results.`,
+  (a,b)=>`${a} tried to pull ${b} closer socially, with mixed results.`,
 ];
 const INTERACTION_TEMPLATES_IDOL=[
   (a,b)=>`${a} caught ${b} searching near the water well. The discovery created visible tension between them.`,
@@ -227,3 +326,7 @@ const CHALLENGE_DATA = [
   {name:'Coconut Chop',type:'social',flavor:'Each tribe member chops ropes to drop coconuts — targeting who they want out. Strategy in plain sight.',icon:'🥥'},
   {name:'Stacking Blocks',type:'mental',flavor:'Build a tower of letter blocks spelling out a phrase — while balancing it on a wobble board.',icon:'🏗️'},
 ];
+
+
+// ===== EXPORTS =====
+export { TWISTS_DATA, ARCHETYPES, PERSONALITIES, CHALLENGE_DATA, DRAMA_EVENTS, CONFESSIONAL_TEMPLATES, CONFESSIONAL_IDOL_TEMPLATES, INTERACTION_TEMPLATES_NEUTRAL, INTERACTION_TEMPLATES_IDOL, INTERACTION_TEMPLATES_ADVANTAGE, buildConfessionalText, buildInteractionText, buildDramaText, hasSwapOccurredByEpisode, hasMergeOccurredByEpisode, hiddenRelLabel, narrativeFallbackConfessional, narrativeFallbackInteraction, cleanNarrativeText };

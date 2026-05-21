@@ -35,10 +35,6 @@ const MEMORY_TYPES = {
  * Adds a new memory event to G.memories[].
  * Called from engine.js after significant game events.
  */
-// Hard cap on memory list size. By the finale a season can accumulate a few hundred
-// memory events; without a cap, the save payload bloats and getMemories scans slow down.
-// 250 is comfortably above what a full season needs while keeping save size sane.
-const MEMORY_HARD_CAP = 250;
 function recordMemory(type, subjectId, objectId, episode, intensity=50){
   if(!G.memories) G.memories=[];
   // Don't duplicate identical events in same episode
@@ -48,16 +44,6 @@ function recordMemory(type, subjectId, objectId, episode, intensity=50){
   );
   if(dupe) return;
   G.memories.push({ type, subject:subjectId, object:objectId, episode, intensity, seen:false });
-  // Prune if over cap — drop the lowest score (oldest + lowest intensity first).
-  if(G.memories.length > MEMORY_HARD_CAP){
-    G.memories.sort((a,b)=>{
-      // Score: higher = keep. Recent + intense beats old + weak.
-      const sa = (a.episode||0)*2 + (a.intensity||0)/10;
-      const sb = (b.episode||0)*2 + (b.intensity||0)/10;
-      return sb - sa;
-    });
-    G.memories.length = MEMORY_HARD_CAP;
-  }
 }
 
 /**
@@ -331,3 +317,12 @@ function getMemorySummary(playerA, playerB){
   if(score<-40) return `The tension between ${an} and ${bn} has been building for weeks.`;
   return null;
 }
+
+// ===== EXPORTS =====
+export {
+  MEMORY_TYPES,
+  recordMemory, getMemories, memoryScore,
+  hasBetrayedBy, getStrongestMemory, getUnseenMemories,
+  getJuryBias, recordVoteMemories, recordIdolMemories,
+  memoryTargetBonus, getMemoryConfessionalLine, getMemorySummary,
+};
