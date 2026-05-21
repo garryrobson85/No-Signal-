@@ -332,7 +332,6 @@ const CHALLENGE_DATA = [
 
 
 // ===== EXPORTS =====
-export { TWISTS_DATA, ARCHETYPES, PERSONALITIES, CHALLENGE_DATA, DRAMA_EVENTS, CONFESSIONAL_TEMPLATES, CONFESSIONAL_IDOL_TEMPLATES, INTERACTION_TEMPLATES_NEUTRAL, INTERACTION_TEMPLATES_IDOL, INTERACTION_TEMPLATES_ADVANTAGE, buildConfessionalText, buildInteractionText, buildDramaText, hasSwapOccurredByEpisode, hasMergeOccurredByEpisode, hiddenRelLabel, narrativeFallbackConfessional, narrativeFallbackInteraction, cleanNarrativeText };
 
 
 // ===== FILE: ai.js =====
@@ -573,7 +572,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 // ===== EXPORTS =====
-export { callGemini, buildEpisodePrompt, generateAIDialogueForEp, generateAIEpisodeScript, testGeminiKey, showGeminiHelp, saveGeminiKey, getGeminiKey, initGeminiKeyField };
 
 
 // ===== FILE: portraits.js =====
@@ -858,7 +856,6 @@ function showCastStatus(){
 
 
 // ===== EXPORTS =====
-export { showCastStatus, generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage, clearImage, showBulkUpload };
 
 
 // ===== FILE: state.js =====
@@ -1332,8 +1329,6 @@ function isPlayMode(){
 }
 
 // ===== EXPORTS =====
-export { updateGameSidebar, gsPlayerChip, G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
-         getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore, goHome, goSetup, showGameScreen, initTeams, renderCastList, addContestant, removeContestant, updateContestant, makeContestant, generateRandomCast, updateCastNavCount, renderTwistsGrid, updateTeamsPanel, autoAssignTeams, setupNav, startSeason, applyColor, pickColor, makeName, resetNamePool, buildAlliances, toggleReturneeSettings };
 
 
 // ===== FILE: memory.js =====
@@ -1659,13 +1654,6 @@ function getMemorySummary(playerA, playerB){
 }
 
 // ===== EXPORTS =====
-export {
-  MEMORY_TYPES,
-  recordMemory, getMemories, memoryScore,
-  hasBetrayedBy, getStrongestMemory, getUnseenMemories,
-  getJuryBias, recordVoteMemories, recordIdolMemories,
-  memoryTargetBonus, getMemoryConfessionalLine, getMemorySummary,
-};
 
 
 // ===== FILE: evolution.js =====
@@ -1939,7 +1927,6 @@ function getArchetypeHistory(contestant) {
 }
 
 // ===== EXPORTS =====
-export { EVOLUTION_RULES, checkArchetypeEvolution, buildEvolutionDisplay, getArchetypeHistory, buildEvolutionCeremony };
 
 
 // ===== FILE: producer.js =====
@@ -2293,17 +2280,6 @@ function producerIntelDrop() {
 }
 
 // ===== EXPORTS =====
-export {
-  PRODUCER_POWERS, initProducerPowers, producerPowerUsed,
-  useProducerPower, producerUsesLeft,
-  showProducerPanel, executeProducerAction,
-  producerForceRivalry, confirmRivalry,
-  producerBlindside, confirmBlindside,
-  producerGuidedIdol, confirmGuidedIdol,
-  producerFractureAlliance, confirmFractureAlliance,
-  producerChallengeBoost, confirmChallengeBoost,
-  producerIntelDrop,
-};
 
 
 // ===== FILE: story.js =====
@@ -2778,11 +2754,6 @@ function exportSeasonStory(){
 }
 
 // ===== EXPORTS =====
-export {
-  analyseSeasonStory, buildSeasonStoryCard, buildPlayerArc,
-  buildArcSummary, buildSeasonTagline,
-  showSeasonStory, exportSeasonStory,
-};
 
 
 // ===== FILE: engine.js =====
@@ -3387,7 +3358,6 @@ function applyTwist(twist){
 
 
 // ===== EXPORTS =====
-export { getActive, rollChallenge, targetScore, getVoterAllies, pickVoteReason, runVote, resolveTie, resolveChallengerTie, idolFindChance, maybeGiveIdol, checkIdolPlay, getTwist, applyTwist, pickInteraction, computeAndStartEpisode, runChallengeWithChoice, capturePlacementSnapshot };
 
 
 // ===== FILE: script_gen.js =====
@@ -4185,7 +4155,6 @@ function downloadSeasonRecap(){
 
 
 // ===== EXPORTS =====
-export { generateEpisodeScript, showEpisodeScripts, showSeasonRecap, generateSeasonRecap, copySeasonRecap, downloadSeasonRecap, scrollToScriptEp, copyScript, _buildPlainTextScript, _domToScriptText };
 
 
 // ===== FILE: features.js =====
@@ -4674,7 +4643,6 @@ function showRelHistoryPicker(playerId){
 
 
 // ===== EXPORTS =====
-export { showTribeHistory, showRelationshipWeb, showRelationshipHistory, showRelHistoryPicker, v19RelScore, showPlayerProfiles, showOneProfile, showV19Insights, showV19Relationships, v19EnsureRelationships, v19ActiveThreatScore, v19SocialPowerScore, exportV19SeasonReport };
 
 
 // ===== FILE: save.js =====
@@ -4878,7 +4846,6 @@ function markDirty(reason='change'){
 
 
 // ===== EXPORTS =====
-export { saveGame, loadGame, hasSavedGame, deleteSave, updateContinueButton, queueAutosave, exportSaveFile, openImportSave, importSaveFile, loadQuickDemo, SAVE_KEY };
 
 
 // ===== FILE: ui.js =====
@@ -5912,7 +5879,6 @@ function renderFinaleNoJury(winner,finalists){
 
 
 // ===== EXPORTS =====
-export { buildBadge, buildPlayerChip, buildEventCard, buildNotice, renderStage, buildEpisodeHeader, buildStageCampLife, buildStageChallenge, buildChallengeChooser, buildStageTribal, buildStageElimination, buildStageNav, initVoteReveal, flipVote, revealAllVotes, updateRunningTally, revealElimination, selectChallenge, confirmChallenge, nextEpisode, showPlayerDetail, showJuryPanel, showSeasonStats, addDramaEvent, hostPlantIdol, hostGrantImmunity, applyHostImmunity, answerTribalQuestion };
 
 
 window.toggleDarkMode=function(){
@@ -5941,70 +5907,17 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 // ===== IMPORTS =====
 // ES module imports — load order is handled by the module system
-import { generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage,
-         clearImage, showBulkUpload, showCastStatus } from './portraits.js';
 
-import { G, rng, pick, shuffle, uid, notify, openModal, closeModal, getPortrait,
-         getPlayerView, isPlayMode, getPerceivedScore, setPerceivedScore,
-         goHome, goSetup, showGameScreen,
-         initTeams, renderCastList, addContestant, removeContestant,
-         updateContestant, makeContestant, generateRandomCast,
-         updateCastNavCount, renderTwistsGrid, updateTeamsPanel,
-         autoAssignTeams, setupNav, startSeason, applyColor,
-         pickColor, makeName, resetNamePool,
-         buildAlliances, updateGameSidebar, gsPlayerChip, toggleReturneeSettings } from './state.js';
 
-import { getActive, rollChallenge, targetScore, getVoterAllies,
-         pickVoteReason, runVote, resolveTie, resolveChallengerTie,
-         idolFindChance, maybeGiveIdol, checkIdolPlay, getTwist,
-         applyTwist, pickInteraction, computeAndStartEpisode,
-         runChallengeWithChoice, capturePlacementSnapshot } from './engine.js';
 
-import { buildBadge, buildPlayerChip, buildEventCard, buildNotice,
-         renderStage, buildEpisodeHeader, buildStageCampLife,
-         buildStageChallenge, buildChallengeChooser, buildStageTribal,
-         buildStageElimination, buildStageNav, initVoteReveal,
-         flipVote, revealAllVotes, updateRunningTally, revealElimination,
-         selectChallenge, confirmChallenge, nextEpisode, showPlayerDetail,
-         showJuryPanel, showSeasonStats,
-         addDramaEvent, hostPlantIdol, hostGrantImmunity,
-         applyHostImmunity, answerTribalQuestion } from './ui.js';
 
-import { generateEpisodeScript, showEpisodeScripts, showSeasonRecap, copySeasonRecap, downloadSeasonRecap,
-         scrollToScriptEp, copyScript } from './script_gen.js';
 
-import { showTribeHistory, showRelationshipWeb, showRelationshipHistory, showRelHistoryPicker, v19RelScore,
-         showPlayerProfiles, showOneProfile, showV19Insights,
-         showV19Relationships, exportV19SeasonReport } from './features.js';
 
-import { saveGame, loadGame, hasSavedGame, deleteSave,
-         updateContinueButton, queueAutosave, exportSaveFile,
-         openImportSave, importSaveFile, loadQuickDemo,
-         SAVE_KEY } from './save.js';
 
-import { EVOLUTION_RULES, checkArchetypeEvolution,
-         buildEvolutionDisplay, getArchetypeHistory, buildEvolutionCeremony } from './evolution.js';
 
-import { PRODUCER_POWERS, initProducerPowers, producerPowerUsed,
-         useProducerPower, producerUsesLeft,
-         showProducerPanel, executeProducerAction,
-         producerForceRivalry, confirmRivalry,
-         producerBlindside, confirmBlindside,
-         producerGuidedIdol, confirmGuidedIdol,
-         producerFractureAlliance, confirmFractureAlliance,
-         producerChallengeBoost, confirmChallengeBoost,
-         producerIntelDrop } from './producer.js';
 
-import { MEMORY_TYPES, recordMemory, getMemories, memoryScore,
-         hasBetrayedBy, getStrongestMemory, getUnseenMemories,
-         getJuryBias, recordVoteMemories, recordIdolMemories,
-         memoryTargetBonus, getMemoryConfessionalLine, getMemorySummary } from './memory.js';
 
-import { analyseSeasonStory, buildSeasonStoryCard, showSeasonStory, exportSeasonStory } from './story.js';
 
-import { callGemini, buildEpisodePrompt, generateAIDialogueForEp,
-         generateAIEpisodeScript, testGeminiKey, showGeminiHelp,
-         saveGeminiKey, getGeminiKey, initGeminiKeyField } from './ai.js';
 
 // ===== DELEGATED EVENT HANDLER =====
 // All data-action attributes in index.html are handled here.
