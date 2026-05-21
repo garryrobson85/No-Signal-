@@ -32,6 +32,56 @@ const TWISTS_DATA = [
 // These use real game state — player names, archetypes, vote outcomes, alliances —
 // so every line is specific to what actually happened, not generic filler.
 
+
+
+// ===== NARRATIVE GUARDRAILS =====
+// Keeps visible story text locked to what the audience/players know at that moment.
+function hasSwapOccurredByEpisode(ep){
+  return !!((ep&&ep.twist&&ep.twist.id==='swap') || (G.episodeLog||[]).some(e=>e.ep < (ep?.ep||999) && e.twist && e.twist.id==='swap'));
+}
+function hasMergeOccurredByEpisode(ep){
+  return !!((ep&&ep.mergeHappened) || (G.episodeLog||[]).some(e=>e.ep <= (ep?.ep||999) && e.mergeHappened));
+}
+function hiddenRelLabel(score){
+  score=Number(score)||50;
+  if(score>=70) return 'strong trust';
+  if(score>=56) return 'growing trust';
+  if(score>=42) return 'uncertain';
+  if(score>=28) return 'uneasy';
+  return 'open tension';
+}
+function narrativeFallbackConfessional(player, ep){
+  const safeEp={...ep, voteResult:null, eliminated:null, eliminated2:null, idolPlay:null};
+  return buildConfessionalText(player, safeEp);
+}
+function narrativeFallbackInteraction(a,b,ep){
+  const an=a.name.split(' ')[0], bn=b.name.split(' ')[0];
+  const score=(typeof v19RelScore==='function')?v19RelScore(a.id,b.id):50;
+  if(score>=65) return `${an} and ${bn} found a quiet moment at camp. There is trust there, but neither of them is ready to say everything out loud yet.`;
+  if(score<=35) return `${an} and ${bn} shared a short, careful conversation. Nothing exploded, but both walked away with more questions than answers.`;
+  if(ep?.ep===1) return `${an} and ${bn} compared first impressions around camp. It was friendly enough, but this early nobody really knows what anyone is hiding.`;
+  return `${an} and ${bn} checked in with each other before the challenge. The conversation stayed light, but both were listening for more than words.`;
+}
+function cleanNarrativeText(text, ep, fallback){
+  if(!text) return fallback||'';
+  let t=String(text)
+    .replace(/\b\d{1,3}\s*\/\s*100\s*(?:relationship\s*)?(?:score|bond|trust)?\b/gi,'a private read')
+    .replace(/\b(?:relationship|bond|trust|threat)\s*score\s*(?:of|is|:)?\s*\d{1,3}\b/gi,'private read')
+    .replace(/\b\d{1,3}\s*(?:score|rating)\b/gi,'private read')
+    .replace(/\bunderlying strategy beneath .*? persona\b/gi,'something under the surface')
+    .replace(/\s+/g,' ')
+    .trim();
+  const lower=t.toLowerCase();
+  const noSwap=!hasSwapOccurredByEpisode(ep);
+  const noMerge=!hasMergeOccurredByEpisode(ep);
+  const impossible=[];
+  if(noSwap) impossible.push('tribe swap','swap happened','after the swap','post-swap','new tribe','swapped tribes','tribe swapped');
+  if(noMerge) impossible.push('post-merge','after the merge','merge vote','merged tribe','jury management','jury vote');
+  if(ep?.ep===1) impossible.push('resume move','big move resume','tribal history','for weeks','all season long');
+  if(impossible.some(term=>lower.includes(term))) return fallback||'';
+  return t;
+}
+
 // Generates a confessional grounded in what this player is actually experiencing
 function buildConfessionalText(player, ep){
   const fn=player.name.split(' ')[0];
@@ -262,7 +312,6 @@ const CHALLENGE_DATA = [
 
 // ===== EXPORTS =====
 
-
 // ===== FILE: ai.js =====
 // No Signal — ai.js
 // Gemini API integration, prompt builder, AI dialogue generation
@@ -309,6 +358,12 @@ function buildEpisodePrompt(ep){
   const active=G.cast.filter(c=>!c.eliminated||(c.elimEp&&c.elimEp>=ep.ep));
   const eliminated=ep.eliminated;
   const tally=ep.voteResult?.tally||{};
+  const swapKnown=hasSwapOccurredByEpisode(ep);
+  const mergeKnown=hasMergeOccurredByEpisode(ep);
+  const forbiddenTopics=[];
+  if(!swapKnown) forbiddenTopics.push('tribe swap','swap','post-swap','new tribe','swapped tribes');
+  if(!mergeKnown) forbiddenTopics.push('merge','post-merge','jury','final tribal');
+  if(ep.ep===1) forbiddenTopics.push('blindside','betrayal','resume','voting bloc','for weeks','all season');
 
   // Narrative compression — use summaries not raw objects (~65% fewer tokens)
   const recentSummaries=G.episodeLog
@@ -331,15 +386,16 @@ function buildEpisodePrompt(ep){
     return p?`${v}v→${p.name.split(' ')[0]}(${p.archetype})`:null;
   }).filter(Boolean).join(', ');
   const confPlayers=(ep.confessionals||[]).map(c=>`${c.who.name} (${c.who.archetype}, ${c.who.personality}, ${c.who.challengeWins||0} challenge wins${G.idolHolders.includes(c.who.id)?' — has idol':''}${tally[c.who.id]?` — received ${tally[c.who.id]} vote(s)`:''})`).join('\n- ');
-  const interPlayers=(ep.interactions||[]).map(i=>`${i.a.name} (${i.a.archetype}/${i.a.personality}) + ${i.b.name} (${i.b.archetype}/${i.b.personality}), relationship score: ${v19RelScore(i.a.id,i.b.id)}/100`).join('\n- ');
+  const interPlayers=(ep.interactions||[]).map(i=>`${i.a.name} (${i.a.archetype}/${i.a.personality}) + ${i.b.name} (${i.b.archetype}/${i.b.personality}), relationship read: ${hiddenRelLabel(v19RelScore(i.a.id,i.b.id))}`).join('\n- ');
 
   return `Reality TV writer for "${G.settings.name||'No Signal'}" (Survivor-style, ${G.settings.theme||'remote island'}).
-Ep${ep.ep}/${G.settings.mergeEpisode||6}. ${G.merged?'POST-MERGE':'PRE-MERGE'}. ${active.length} remain.
+Ep${ep.ep}/${G.settings.mergeEpisode||6}. ${mergeKnown?'POST-MERGE':'PRE-MERGE'}. ${active.length} remain.
 RECENT SEASON: ${recentSummaries||'Season start'}
 KEY MEMORIES: ${keyMemories||'None yet'}
 THIS EPISODE: ${ep.summary||''}
 ALLIANCES: ${allianceDesc||'None'}
 ${ep.mergeHappened?'*** THE MERGE HAPPENED THIS EPISODE ***':''}
+${ep.twist&&ep.twist.id==='swap'?'*** A TRIBE SWAP HAPPENED THIS EPISODE ***':''}
 CONFESSIONALS NEEDED (player/archetype/personality): ${confPlayers||'None'}
 INTERACTIONS (player pairs/rel score): ${interPlayers||'None'}
 
@@ -360,9 +416,10 @@ Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', 
 Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
 ${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
 
-Rules: Stay in character. Make dialogue specific — reference names, archetypes, alliances, challenge result, vote tally, idols, and recent memories only when they actually exist in the episode data. No generic lines. Keep every confessional unique. Do not reuse the same sentence structure across players.
-Continuity rules: write like a real reality-TV episode, not disconnected quote fragments. Each player should react to their own position. Do not invent relationships, votes, eliminations, betrayals, or strategy that is not listed above.
-Timing rules: camp-life confessionals happen BEFORE the vote reveal, so they must not say who is gone, who voted whom, or "I made my call". Post-vote material belongs only in exitSpeech, exitFinalWords, and hostComment. If this is Episode 1, early dialogue must be first-impressions, shelter/camp, tribe dynamics, and first challenge nerves only.`;
+Rules: Stay in character. Make dialogue specific, but ONLY use events listed in THIS EPISODE or RECENT SEASON. Never invent production events. Never mention hidden numbers, relationship scores, trust scores, percentages, AI/system data, or archetype mechanics in visible prose.
+Timeline lock: forbidden topics right now = ${forbiddenTopics.join(', ')||'none'}. If a topic is forbidden, do not hint at it or use synonyms.
+Episode 1 rule: before the first vote reveal, confessionals must be first-impression based only: arrivals, tribe dynamics, camp work, first challenge nerves, cautious social reads. No vote fallout, betrayal talk, cracks, resumes, swaps, merge, jury, or future-game language.
+Style: write like a real edited reality show, not analytics. Use uncertainty and human reads: "I can't tell if Presley is genuine" not "the 52/100 score shows...".`;
 }
 
 // Call Gemini Flash API
@@ -423,19 +480,19 @@ async function generateAIDialogueForEp(ep,onProgress){
   if(result.confessionals&&ep.confessionals){
     result.confessionals.forEach(ai=>{
       const conf=ep.confessionals.find(c=>c.who.id===ai.playerId);
-      if(conf&&ai.text) conf.text=ai.text;
+      if(conf&&ai.text) conf.text=cleanNarrativeText(ai.text, ep, narrativeFallbackConfessional(conf.who, ep));
     });
   }
   // Apply interactions
   if(result.interactions&&ep.interactions){
     result.interactions.forEach((ai,i)=>{
-      if(ep.interactions[i]&&ai.text) ep.interactions[i].text=ai.text;
+      if(ep.interactions[i]&&ai.text){ const it=ep.interactions[i]; it.text=cleanNarrativeText(ai.text, ep, narrativeFallbackInteraction(it.a,it.b,ep)); }
     });
   }
   // Apply exit speech
-  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=result.exitSpeech;
-  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=result.exitFinalWords;
-  if(result.hostComment) ep._aiHostComment=result.hostComment;
+  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=cleanNarrativeText(result.exitSpeech, ep, '');
+  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=cleanNarrativeText(result.exitFinalWords, ep, '');
+  if(result.hostComment) ep._aiHostComment=cleanNarrativeText(result.hostComment, ep, '');
   ep._aiGenerated=true;
   onProgress&&onProgress('AI dialogue applied ✓');
   return true;
@@ -492,7 +549,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 // ===== EXPORTS =====
-
 
 // ===== FILE: portraits.js =====
 // No Signal — portraits.js
@@ -776,7 +832,6 @@ function showCastStatus(){
 
 // ===== EXPORTS =====
 
-
 // ===== FILE: state.js =====
 // No Signal — state.js
 // Game state (G), utilities, contestant/team builders
@@ -842,13 +897,13 @@ function goHome(){
   // Auto-save if there's an active game
   if(G.currentEpData&&G.cast.length) saveGame(true);
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  const homeScreen=document.getElementById('screen-home'); homeScreen.classList.add('active'); homeScreen.style.display='flex'; homeScreen.removeAttribute('aria-hidden'); document.body.classList.remove('season-running');
+  document.getElementById('screen-home').classList.add('active');
   document.getElementById('header-ep-badge').style.display='none';
   updateContinueButton();
 }
 function goSetup(){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  const setupScreen=document.getElementById('screen-setup'); setupScreen.classList.add('active'); setupScreen.style.display='flex'; setupScreen.removeAttribute('aria-hidden'); document.body.classList.remove('season-running');
+  document.getElementById('screen-setup').classList.add('active');
   if(!G.cast.length) generateRandomCast(12);
   renderTwistsGrid();
   setupNav('general',document.querySelector('[data-panel="general"]'));
@@ -1118,22 +1173,8 @@ function buildAlliances(){
 
 // ===== GAME SCREEN =====
 function showGameScreen(){
-  document.querySelectorAll('.screen').forEach(s=>{
-    s.classList.remove('active');
-    s.style.display='none';
-    s.setAttribute('aria-hidden','true');
-  });
-  const game=document.getElementById('screen-game');
-  game.classList.add('active');
-  game.style.display='flex';
-  game.removeAttribute('aria-hidden');
-  const setup=document.getElementById('screen-setup');
-  if(setup){
-    setup.classList.remove('active');
-    setup.style.display='none';
-    setup.setAttribute('aria-hidden','true');
-  }
-  document.body.classList.add('season-running');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-game').classList.add('active');
   updateGameSidebar();
 }
 function updateGameSidebar(){
@@ -1261,7 +1302,6 @@ function isPlayMode(){
 }
 
 // ===== EXPORTS =====
-
 
 // ===== FILE: memory.js =====
 // No Signal — memory.js
@@ -1586,7 +1626,6 @@ function getMemorySummary(playerA, playerB){
 
 // ===== EXPORTS =====
 
-
 // ===== FILE: evolution.js =====
 // No Signal — evolution.js
 // Dynamic archetype evolution system
@@ -1857,7 +1896,6 @@ function getArchetypeHistory(contestant) {
 }
 
 // ===== EXPORTS =====
-
 
 // ===== FILE: producer.js =====
 // No Signal — producer.js
@@ -2209,7 +2247,6 @@ function producerIntelDrop() {
 }
 
 // ===== EXPORTS =====
-
 
 // ===== FILE: story.js =====
 // No Signal — story.js
@@ -2683,7 +2720,6 @@ function exportSeasonStory(){
 
 // ===== EXPORTS =====
 
-
 // ===== FILE: engine.js =====
 // No Signal — engine.js
 // Episode engine, voting, challenges, alliances, idols
@@ -3002,9 +3038,9 @@ function computeAndStartEpisode(){
   }
 
   let doubleElim=false,noElim=false,mergeHappened=false;
-  // Twists: block team swap post-merge
+  // Twists: block team swap post-merge and too early. Episode 1/2 should establish the cast before any reshuffle.
   const rawTwist=getTwist();
-  const twist=(rawTwist&&rawTwist.id==='swap'&&G.merged)?null:rawTwist;
+  const twist=(rawTwist&&rawTwist.id==='swap'&&(G.merged||ep<3))?null:rawTwist;
   let twistMsg='';
   if(twist){twistMsg=applyTwist(twist);if(twist.id==='double')doubleElim=true;if(twist.id==='noelim')noElim=true;}
 
@@ -3059,7 +3095,7 @@ function computeAndStartEpisode(){
   renderStage(0);
 }
 
-async function runChallengeWithChoice(chosenChallenge){
+function runChallengeWithChoice(chosenChallenge){
   const ep=G.currentEpData;
   const challengeName=chosenChallenge.name, challengeType=chosenChallenge.type;
   let challengeResult=null,winTeam=null,loseTeam=null,immuneWinner=null,challengeTieMsg='';
@@ -3185,17 +3221,6 @@ async function runChallengeWithChoice(chosenChallenge){
   // Stores ~50 tokens instead of sending raw episode objects to Gemini
   ep.summary = buildEpisodeSummary(ep);
 
-  // If a Gemini key is saved, use it automatically for cohesive episode dialogue.
-  // The sim still has local fallback text, but Gemini should replace it before the episode renders.
-  if(getGeminiKey&&getGeminiKey()){
-    try{
-      notify('✨ Gemini is writing episode dialogue…');
-      await generateAIDialogueForEp(ep);
-    }catch(e){
-      console.warn('Gemini auto dialogue failed, using local fallback:', e);
-    }
-  }
-
   // Snapshot placement state for the Tribe History tracker
   capturePlacementSnapshot(ep);
   G.episodeLog.push(ep); // always log for script generation
@@ -3296,7 +3321,6 @@ function applyTwist(twist){
 
 
 // ===== EXPORTS =====
-
 
 // ===== FILE: script_gen.js =====
 // No Signal — script_gen.js
@@ -4093,7 +4117,6 @@ function downloadSeasonRecap(){
 
 // ===== EXPORTS =====
 
-
 // ===== FILE: features.js =====
 // No Signal — features.js
 // Tribe History, Profiles, Relationship Web, V19 Insights
@@ -4580,7 +4603,6 @@ function showRelHistoryPicker(playerId){
 
 // ===== EXPORTS =====
 
-
 // ===== FILE: save.js =====
 // No Signal — save.js
 // Save / load, autosave, export, demo loader
@@ -4782,7 +4804,6 @@ function markDirty(reason='change'){
 
 // ===== EXPORTS =====
 
-
 // ===== FILE: ui.js =====
 // No Signal — ui.js
 // All DOM rendering — screens, modals, stage builders, vote reveal
@@ -4901,48 +4922,6 @@ function buildEpisodeHeader(ep){
   <\/div>`;
 }
 
-
-function buildPreVoteConfessionalText(player, ep){
-  const fn=player.name.split(' ')[0];
-  const teamMates=G.cast.filter(c=>c.id!==player.id && c.status==='active' && (!G.merged ? c.team===player.team : true))
-    .slice(0,3).map(c=>c.name.split(' ')[0]);
-  const allies=(player.allianceIds||[]).flatMap(aid=>{
-    const al=G.alliances.find(a=>a.id===aid);
-    return al?al.members.filter(m=>m!==player.id).map(m=>G.cast.find(c=>c.id===m)?.name.split(' ')[0]).filter(Boolean):[];
-  });
-  const wonTeamChallenge=ep.challengeResult && !G.merged && ep.challengeResult.winner?.ti===player.team;
-  const lostTeamChallenge=ep.challengeResult && !G.merged && ep.challengeResult.loser?.ti===player.team;
-  const wonIndividual=ep.challengeResult && G.merged && ep.challengeResult.winner?.id===player.id;
-
-  if(ep.ep===1){
-    const options=[
-      `First impressions are everything right now. I'm watching how people talk, who listens, and who already wants to be the centre of camp.`,
-      `Everyone is still smiling, but you can feel the game underneath it. I'm trying to be useful without becoming obvious.`,
-      teamMates.length?`I'm getting a read on ${teamMates.join(', ')}. Day one is all about figuring out who feels real and who is performing.`:`I'm trying to read the room before the room starts reading me.`
-    ];
-    return pick(options);
-  }
-
-  if(wonIndividual){
-    return `Winning immunity gives me room to breathe, but it also puts a light on me. Tonight I can listen more than I talk.`;
-  }
-  if(wonTeamChallenge){
-    return `Winning as a tribe helps, but comfort is dangerous out here. The second you feel safe, someone else starts planning ahead.`;
-  }
-  if(lostTeamChallenge){
-    if(allies.length){
-      return `${allies.slice(0,2).join(' and ')} are the people I feel closest to, but losing changes the temperature fast. Tonight is about reading the room before it reads me.`;
-    }
-    return `Losing the challenge changed everything. People are being careful with their words, and that usually means names are starting to move.`;
-  }
-  if(allies.length){
-    const allyText=allies.slice(0,2).join(' and ');
-    const verb=allies.slice(0,2).length===1?'is':'are';
-    return `${allyText} ${verb} important to my game, but every episode tests whether trust is real or just convenient.`;
-  }
-  return `The game feels quieter than it looks. Little conversations, small looks, people walking away at the wrong time — that's where the truth is.`;
-}
-
 function buildStageCampLife(ep){
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏕️ Camp Life<\/div>`;
 
@@ -5036,14 +5015,14 @@ function buildStageCampLife(ep){
           <div class="interaction-name">${b.name}<\/div>
         <\/div>
       <\/div>
-      <div class="event-card-body" style="margin-top:10px;clear:both">${text}<\/div>
+      <div class="event-card-body" style="margin-top:10px;clear:both">${cleanNarrativeText((G.stageIndex<2?narrativeFallbackInteraction(a,b,ep):text), ep, narrativeFallbackInteraction(a,b,ep))}<\/div>
     <\/div>`;});}
   if(ep.confessionals.length){ep.confessionals.forEach(c=>{
     const cp=getPortrait(c.who).replace('width="120" height="145"','width="44" height="53"');
     html+=`<div class="confessional-card"><div class="conf-header">
       <div class="conf-portrait" style="flex-shrink:0;border-radius:8px;overflow:hidden;line-height:0;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${cp}<\/div>
       <div><div class="conf-name">${c.who.name}<\/div><div class="conf-label">${c.who.archetype} · ${c.who.personality}<\/div><\/div>
-    <\/div><div class="conf-text">${buildPreVoteConfessionalText(c.who,ep)}<\/div><\/div>`;});}
+    <\/div><div class="conf-text">${cleanNarrativeText((G.stageIndex<2?narrativeFallbackConfessional(c.who,ep):c.text), ep, narrativeFallbackConfessional(c.who,ep))}<\/div><\/div>`;});}
   if(!ep.dramaMsg&&!ep.idolFinder&&!ep.interactions.length&&!ep.confessionals.length&&!ep.twist&&!ep.mergeHappened)
     html+=`<div style="font-size:13px;color:var(--text2);padding:8px 0">A quiet day at camp. Everyone conserving energy before the challenge.<\/div>`;
   html+=`<\/div>`;
@@ -5773,6 +5752,8 @@ function renderFinaleNoJury(winner,finalists){
 
 
 // ===== EXPORTS =====
+
+
 window.toggleDarkMode=function(){
   document.body.classList.toggle('light-mode');
   const isLight=document.body.classList.contains('light-mode');
@@ -5791,13 +5772,24 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 });
 
-
 // ===== FILE: main.js =====
 // No Signal — main.js
 // Entry point — imports all modules and wires up the app
 
 // ===== IMPORTS =====
 // ES module imports — load order is handled by the module system
+
+
+
+
+
+
+
+
+
+
+
+
 // ===== DELEGATED EVENT HANDLER =====
 // All data-action attributes in index.html are handled here.
 // This replaces ~40 inline onclick="fn()" calls with a single listener,
@@ -5919,27 +5911,6 @@ document.addEventListener('keydown',e=>{
     }
   }
 });
-
-
-// ===== NO SIGNAL HOTFIX BOOTSTRAP =====
-(function(){
-  // Robust dark/light mode: body.light-mode drives CSS variables.
-  window.toggleDarkMode = function(){
-    document.body.classList.toggle('light-mode');
-    const isLight = document.body.classList.contains('light-mode');
-    try { localStorage.setItem('ns-theme', isLight ? 'light' : 'dark'); } catch(e) {}
-    const btn = document.getElementById('dark-toggle-btn');
-    if(btn) btn.textContent = isLight ? '☀️' : '🌙';
-  };
-  document.addEventListener('DOMContentLoaded', function(){
-    try {
-      if(localStorage.getItem('ns-theme') === 'light') document.body.classList.add('light-mode');
-    } catch(e) {}
-    const btn = document.getElementById('dark-toggle-btn');
-    if(btn) btn.textContent = document.body.classList.contains('light-mode') ? '☀️' : '🌙';
-  });
-})();
-
 
 // ===== v19.5 ROBUST THEME PATCH =====
 (function(){

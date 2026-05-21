@@ -208,14 +208,14 @@ function buildStageCampLife(ep){
           <div class="interaction-name">${b.name}<\/div>
         <\/div>
       <\/div>
-      <div class="event-card-body" style="margin-top:10px;clear:both">${text}<\/div>
+      <div class="event-card-body" style="margin-top:10px;clear:both">${cleanNarrativeText((G.stageIndex<2?narrativeFallbackInteraction(a,b,ep):text), ep, narrativeFallbackInteraction(a,b,ep))}<\/div>
     <\/div>`;});}
   if(ep.confessionals.length){ep.confessionals.forEach(c=>{
     const cp=getPortrait(c.who).replace('width="120" height="145"','width="44" height="53"');
     html+=`<div class="confessional-card"><div class="conf-header">
       <div class="conf-portrait" style="flex-shrink:0;border-radius:8px;overflow:hidden;line-height:0;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${cp}<\/div>
       <div><div class="conf-name">${c.who.name}<\/div><div class="conf-label">${c.who.archetype} · ${c.who.personality}<\/div><\/div>
-    <\/div><div class="conf-text">${c.text}<\/div><\/div>`;});}
+    <\/div><div class="conf-text">${cleanNarrativeText((G.stageIndex<2?narrativeFallbackConfessional(c.who,ep):c.text), ep, narrativeFallbackConfessional(c.who,ep))}<\/div><\/div>`;});}
   if(!ep.dramaMsg&&!ep.idolFinder&&!ep.interactions.length&&!ep.confessionals.length&&!ep.twist&&!ep.mergeHappened)
     html+=`<div style="font-size:13px;color:var(--text2);padding:8px 0">A quiet day at camp. Everyone conserving energy before the challenge.<\/div>`;
   html+=`<\/div>`;

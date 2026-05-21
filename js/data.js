@@ -30,6 +30,56 @@ const TWISTS_DATA = [
 // These use real game state — player names, archetypes, vote outcomes, alliances —
 // so every line is specific to what actually happened, not generic filler.
 
+
+
+// ===== NARRATIVE GUARDRAILS =====
+// Keeps visible story text locked to what the audience/players know at that moment.
+function hasSwapOccurredByEpisode(ep){
+  return !!((ep&&ep.twist&&ep.twist.id==='swap') || (G.episodeLog||[]).some(e=>e.ep < (ep?.ep||999) && e.twist && e.twist.id==='swap'));
+}
+function hasMergeOccurredByEpisode(ep){
+  return !!((ep&&ep.mergeHappened) || (G.episodeLog||[]).some(e=>e.ep <= (ep?.ep||999) && e.mergeHappened));
+}
+function hiddenRelLabel(score){
+  score=Number(score)||50;
+  if(score>=70) return 'strong trust';
+  if(score>=56) return 'growing trust';
+  if(score>=42) return 'uncertain';
+  if(score>=28) return 'uneasy';
+  return 'open tension';
+}
+function narrativeFallbackConfessional(player, ep){
+  const safeEp={...ep, voteResult:null, eliminated:null, eliminated2:null, idolPlay:null};
+  return buildConfessionalText(player, safeEp);
+}
+function narrativeFallbackInteraction(a,b,ep){
+  const an=a.name.split(' ')[0], bn=b.name.split(' ')[0];
+  const score=(typeof v19RelScore==='function')?v19RelScore(a.id,b.id):50;
+  if(score>=65) return `${an} and ${bn} found a quiet moment at camp. There is trust there, but neither of them is ready to say everything out loud yet.`;
+  if(score<=35) return `${an} and ${bn} shared a short, careful conversation. Nothing exploded, but both walked away with more questions than answers.`;
+  if(ep?.ep===1) return `${an} and ${bn} compared first impressions around camp. It was friendly enough, but this early nobody really knows what anyone is hiding.`;
+  return `${an} and ${bn} checked in with each other before the challenge. The conversation stayed light, but both were listening for more than words.`;
+}
+function cleanNarrativeText(text, ep, fallback){
+  if(!text) return fallback||'';
+  let t=String(text)
+    .replace(/\b\d{1,3}\s*\/\s*100\s*(?:relationship\s*)?(?:score|bond|trust)?\b/gi,'a private read')
+    .replace(/\b(?:relationship|bond|trust|threat)\s*score\s*(?:of|is|:)?\s*\d{1,3}\b/gi,'private read')
+    .replace(/\b\d{1,3}\s*(?:score|rating)\b/gi,'private read')
+    .replace(/\bunderlying strategy beneath .*? persona\b/gi,'something under the surface')
+    .replace(/\s+/g,' ')
+    .trim();
+  const lower=t.toLowerCase();
+  const noSwap=!hasSwapOccurredByEpisode(ep);
+  const noMerge=!hasMergeOccurredByEpisode(ep);
+  const impossible=[];
+  if(noSwap) impossible.push('tribe swap','swap happened','after the swap','post-swap','new tribe','swapped tribes','tribe swapped');
+  if(noMerge) impossible.push('post-merge','after the merge','merge vote','merged tribe','jury management','jury vote');
+  if(ep?.ep===1) impossible.push('resume move','big move resume','tribal history','for weeks','all season long');
+  if(impossible.some(term=>lower.includes(term))) return fallback||'';
+  return t;
+}
+
 // Generates a confessional grounded in what this player is actually experiencing
 function buildConfessionalText(player, ep){
   const fn=player.name.split(' ')[0];
@@ -259,4 +309,4 @@ const CHALLENGE_DATA = [
 
 
 // ===== EXPORTS =====
-export { TWISTS_DATA, ARCHETYPES, PERSONALITIES, CHALLENGE_DATA, DRAMA_EVENTS, CONFESSIONAL_TEMPLATES, CONFESSIONAL_IDOL_TEMPLATES, INTERACTION_TEMPLATES_NEUTRAL, INTERACTION_TEMPLATES_IDOL, INTERACTION_TEMPLATES_ADVANTAGE, buildConfessionalText, buildInteractionText, buildDramaText };
+export { TWISTS_DATA, ARCHETYPES, PERSONALITIES, CHALLENGE_DATA, DRAMA_EVENTS, CONFESSIONAL_TEMPLATES, CONFESSIONAL_IDOL_TEMPLATES, INTERACTION_TEMPLATES_NEUTRAL, INTERACTION_TEMPLATES_IDOL, INTERACTION_TEMPLATES_ADVANTAGE, buildConfessionalText, buildInteractionText, buildDramaText, hasSwapOccurredByEpisode, hasMergeOccurredByEpisode, hiddenRelLabel, narrativeFallbackConfessional, narrativeFallbackInteraction, cleanNarrativeText };

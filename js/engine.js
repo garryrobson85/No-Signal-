@@ -315,9 +315,9 @@ function computeAndStartEpisode(){
   }
 
   let doubleElim=false,noElim=false,mergeHappened=false;
-  // Twists: block team swap post-merge
+  // Twists: block team swap post-merge and too early. Episode 1/2 should establish the cast before any reshuffle.
   const rawTwist=getTwist();
-  const twist=(rawTwist&&rawTwist.id==='swap'&&G.merged)?null:rawTwist;
+  const twist=(rawTwist&&rawTwist.id==='swap'&&(G.merged||ep<3))?null:rawTwist;
   let twistMsg='';
   if(twist){twistMsg=applyTwist(twist);if(twist.id==='double')doubleElim=true;if(twist.id==='noelim')noElim=true;}
 

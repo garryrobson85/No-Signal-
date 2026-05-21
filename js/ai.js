@@ -43,6 +43,12 @@ function buildEpisodePrompt(ep){
   const active=G.cast.filter(c=>!c.eliminated||(c.elimEp&&c.elimEp>=ep.ep));
   const eliminated=ep.eliminated;
   const tally=ep.voteResult?.tally||{};
+  const swapKnown=hasSwapOccurredByEpisode(ep);
+  const mergeKnown=hasMergeOccurredByEpisode(ep);
+  const forbiddenTopics=[];
+  if(!swapKnown) forbiddenTopics.push('tribe swap','swap','post-swap','new tribe','swapped tribes');
+  if(!mergeKnown) forbiddenTopics.push('merge','post-merge','jury','final tribal');
+  if(ep.ep===1) forbiddenTopics.push('blindside','betrayal','resume','voting bloc','for weeks','all season');
 
   // Narrative compression — use summaries not raw objects (~65% fewer tokens)
   const recentSummaries=G.episodeLog
@@ -65,15 +71,16 @@ function buildEpisodePrompt(ep){
     return p?`${v}v→${p.name.split(' ')[0]}(${p.archetype})`:null;
   }).filter(Boolean).join(', ');
   const confPlayers=(ep.confessionals||[]).map(c=>`${c.who.name} (${c.who.archetype}, ${c.who.personality}, ${c.who.challengeWins||0} challenge wins${G.idolHolders.includes(c.who.id)?' — has idol':''}${tally[c.who.id]?` — received ${tally[c.who.id]} vote(s)`:''})`).join('\n- ');
-  const interPlayers=(ep.interactions||[]).map(i=>`${i.a.name} (${i.a.archetype}/${i.a.personality}) + ${i.b.name} (${i.b.archetype}/${i.b.personality}), relationship score: ${v19RelScore(i.a.id,i.b.id)}/100`).join('\n- ');
+  const interPlayers=(ep.interactions||[]).map(i=>`${i.a.name} (${i.a.archetype}/${i.a.personality}) + ${i.b.name} (${i.b.archetype}/${i.b.personality}), relationship read: ${hiddenRelLabel(v19RelScore(i.a.id,i.b.id))}`).join('\n- ');
 
   return `Reality TV writer for "${G.settings.name||'No Signal'}" (Survivor-style, ${G.settings.theme||'remote island'}).
-Ep${ep.ep}/${G.settings.mergeEpisode||6}. ${G.merged?'POST-MERGE':'PRE-MERGE'}. ${active.length} remain.
+Ep${ep.ep}/${G.settings.mergeEpisode||6}. ${mergeKnown?'POST-MERGE':'PRE-MERGE'}. ${active.length} remain.
 RECENT SEASON: ${recentSummaries||'Season start'}
 KEY MEMORIES: ${keyMemories||'None yet'}
 THIS EPISODE: ${ep.summary||''}
 ALLIANCES: ${allianceDesc||'None'}
 ${ep.mergeHappened?'*** THE MERGE HAPPENED THIS EPISODE ***':''}
+${ep.twist&&ep.twist.id==='swap'?'*** A TRIBE SWAP HAPPENED THIS EPISODE ***':''}
 CONFESSIONALS NEEDED (player/archetype/personality): ${confPlayers||'None'}
 INTERACTIONS (player pairs/rel score): ${interPlayers||'None'}
 
@@ -94,8 +101,10 @@ Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', 
 Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
 ${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
 
-Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique.
-Important episode logic: if this is Episode 1 and no vote has happened yet, confessionals must be first-impression based only. Do not mention voting someone out, names coming up, betrayal, cracks, post-vote fallout, tribal paranoia, or "I made my call" before the first vote exists. Early Episode 1 should sound like arrival, tribe dynamics, sizing people up, shelter/camp, first challenge nerves, and cautious social reads.`;
+Rules: Stay in character. Make dialogue specific, but ONLY use events listed in THIS EPISODE or RECENT SEASON. Never invent production events. Never mention hidden numbers, relationship scores, trust scores, percentages, AI/system data, or archetype mechanics in visible prose.
+Timeline lock: forbidden topics right now = ${forbiddenTopics.join(', ')||'none'}. If a topic is forbidden, do not hint at it or use synonyms.
+Episode 1 rule: before the first vote reveal, confessionals must be first-impression based only: arrivals, tribe dynamics, camp work, first challenge nerves, cautious social reads. No vote fallout, betrayal talk, cracks, resumes, swaps, merge, jury, or future-game language.
+Style: write like a real edited reality show, not analytics. Use uncertainty and human reads: "I can't tell if Presley is genuine" not "the 52/100 score shows...".`;
 }
 
 // Call Gemini Flash API
@@ -156,19 +165,19 @@ async function generateAIDialogueForEp(ep,onProgress){
   if(result.confessionals&&ep.confessionals){
     result.confessionals.forEach(ai=>{
       const conf=ep.confessionals.find(c=>c.who.id===ai.playerId);
-      if(conf&&ai.text) conf.text=ai.text;
+      if(conf&&ai.text) conf.text=cleanNarrativeText(ai.text, ep, narrativeFallbackConfessional(conf.who, ep));
     });
   }
   // Apply interactions
   if(result.interactions&&ep.interactions){
     result.interactions.forEach((ai,i)=>{
-      if(ep.interactions[i]&&ai.text) ep.interactions[i].text=ai.text;
+      if(ep.interactions[i]&&ai.text){ const it=ep.interactions[i]; it.text=cleanNarrativeText(ai.text, ep, narrativeFallbackInteraction(it.a,it.b,ep)); }
     });
   }
   // Apply exit speech
-  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=result.exitSpeech;
-  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=result.exitFinalWords;
-  if(result.hostComment) ep._aiHostComment=result.hostComment;
+  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=cleanNarrativeText(result.exitSpeech, ep, '');
+  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=cleanNarrativeText(result.exitFinalWords, ep, '');
+  if(result.hostComment) ep._aiHostComment=cleanNarrativeText(result.hostComment, ep, '');
   ep._aiGenerated=true;
   onProgress&&onProgress('AI dialogue applied ✓');
   return true;
