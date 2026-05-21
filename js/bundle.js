@@ -360,8 +360,9 @@ Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', 
 Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
 ${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
 
-Rules: Stay in character. Make dialogue specific — reference names, archetypes, what actually happened. No generic lines. Keep each confessional unique. Confessionals that appear before Tribal Council must not reveal who is eliminated, who voted for whom, or post-vote fallout. Use suspense: uncertainty, reads, nerves, alliances, challenge pressure.
-Important episode logic: if this is Episode 1 and no vote has happened yet, confessionals must be first-impression based only. Do not mention voting someone out, names coming up, betrayal, cracks, post-vote fallout, tribal paranoia, or "I made my call" before the first vote exists. Early Episode 1 should sound like arrival, tribe dynamics, sizing people up, shelter/camp, first challenge nerves, and cautious social reads.`;
+Rules: Stay in character. Make dialogue specific — reference names, archetypes, alliances, challenge result, vote tally, idols, and recent memories only when they actually exist in the episode data. No generic lines. Keep every confessional unique. Do not reuse the same sentence structure across players.
+Continuity rules: write like a real reality-TV episode, not disconnected quote fragments. Each player should react to their own position. Do not invent relationships, votes, eliminations, betrayals, or strategy that is not listed above.
+Timing rules: camp-life confessionals happen BEFORE the vote reveal, so they must not say who is gone, who voted whom, or "I made my call". Post-vote material belongs only in exitSpeech, exitFinalWords, and hostComment. If this is Episode 1, early dialogue must be first-impressions, shelter/camp, tribe dynamics, and first challenge nerves only.`;
 }
 
 // Call Gemini Flash API
@@ -3058,7 +3059,7 @@ function computeAndStartEpisode(){
   renderStage(0);
 }
 
-function runChallengeWithChoice(chosenChallenge){
+async function runChallengeWithChoice(chosenChallenge){
   const ep=G.currentEpData;
   const challengeName=chosenChallenge.name, challengeType=chosenChallenge.type;
   let challengeResult=null,winTeam=null,loseTeam=null,immuneWinner=null,challengeTieMsg='';
@@ -3183,6 +3184,17 @@ function runChallengeWithChoice(chosenChallenge){
   // Build a compressed narrative summary for AI prompt efficiency
   // Stores ~50 tokens instead of sending raw episode objects to Gemini
   ep.summary = buildEpisodeSummary(ep);
+
+  // If a Gemini key is saved, use it automatically for cohesive episode dialogue.
+  // The sim still has local fallback text, but Gemini should replace it before the episode renders.
+  if(getGeminiKey&&getGeminiKey()){
+    try{
+      notify('✨ Gemini is writing episode dialogue…');
+      await generateAIDialogueForEp(ep);
+    }catch(e){
+      console.warn('Gemini auto dialogue failed, using local fallback:', e);
+    }
+  }
 
   // Snapshot placement state for the Tribe History tracker
   capturePlacementSnapshot(ep);
@@ -4924,7 +4936,9 @@ function buildPreVoteConfessionalText(player, ep){
     return `Losing the challenge changed everything. People are being careful with their words, and that usually means names are starting to move.`;
   }
   if(allies.length){
-    return `${allies.slice(0,2).join(' and ')} are important to my game, but every episode tests whether trust is real or just convenient.`;
+    const allyText=allies.slice(0,2).join(' and ');
+    const verb=allies.slice(0,2).length===1?'is':'are';
+    return `${allyText} ${verb} important to my game, but every episode tests whether trust is real or just convenient.`;
   }
   return `The game feels quieter than it looks. Little conversations, small looks, people walking away at the wrong time — that's where the truth is.`;
 }
