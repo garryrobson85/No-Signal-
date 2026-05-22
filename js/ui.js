@@ -227,11 +227,15 @@ function buildStageCampLife(ep){
   if(ep.twist) html+=`<div class="twist-banner"><div class="twist-banner-title">${ep.twist.icon} ${ep.twist.name}<\/div><div class="twist-banner-desc">${ep.twistMsg}<\/div><\/div>`;
   if(ep.dramaMsg) html+=`<div class="event-card type-drama"><div class="event-card-type">Camp Drama<\/div><div class="event-card-body">🎭 ${ep.dramaMsg}<\/div><\/div>`;
   if(ep.idolFinder) html+=`<div class="event-card type-idol"><div class="event-card-type">Idol Found<\/div><div class="event-card-title">💎 ${ep.idolFinder.name} found a hidden immunity idol<\/div><div class="event-card-body">They slipped away from camp undetected. Their secret could change everything.<\/div><\/div>`;
-  if(ep.interactions.length){ep.interactions.forEach(({a,b,text})=>{
+  if(ep.interactions.length){ep.interactions.forEach(i=>{
+    const {a,b,text,_source} = i;
     const pa=getPortrait(a).replace('width="120" height="145"','width="56" height="68"');
     const pb=getPortrait(b).replace('width="120" height="145"','width="56" height="68"');
+    const srcBadge = _source==='ai'
+      ? `<span title="AI generated" style="font-size:10px;opacity:0.45;float:right;margin-top:-2px">✨<\/span>`
+      : `<span title="Engine generated" style="font-size:9px;opacity:0.25;float:right;font-style:normal;font-family:'DM Mono',monospace;margin-top:-1px">T<\/span>`;
     html+=`<div class="event-card type-interaction">
-      <div class="event-card-type">Player Interaction<\/div>
+      <div class="event-card-type">Player Interaction ${srcBadge}<\/div>
       <div class="interaction-players">
         <div class="interaction-player">
           <div class="interaction-portrait">${pa}<\/div>
@@ -246,10 +250,17 @@ function buildStageCampLife(ep){
       <div class="event-card-body" style="margin-top:10px;clear:both">${text}<\/div>
     <\/div>`;});}
   if(ep.confessionals.length){ep.confessionals.forEach(c=>{
+    // Skip if vote hasn't resolved yet — text is __PENDING__ until runChallengeWithChoice fills it
+    if(!c.text || c.text.includes('__PENDING__')) return;
     const cp=getPortrait(c.who).replace('width="120" height="145"','width="44" height="53"');
-    html+=`<div class="confessional-card"><div class="conf-header">
+    // Source badge: ✨ = AI-generated, ⚙ = engine template
+    const srcBadge = c._source==='ai'
+      ? `<span title="AI generated" style="font-size:10px;opacity:0.55;margin-left:auto;padding-left:6px;flex-shrink:0">✨</span>`
+      : `<span title="Engine generated" style="font-size:9px;opacity:0.3;margin-left:auto;padding-left:6px;flex-shrink:0;font-style:normal;font-family:'DM Mono',monospace">T</span>`;
+    html+=`<div class="confessional-card"><div class="conf-header" style="display:flex;align-items:center;gap:8px">
       <div class="conf-portrait" style="flex-shrink:0;border-radius:8px;overflow:hidden;line-height:0;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${cp}<\/div>
-      <div><div class="conf-name">${c.who.name}<\/div><div class="conf-label">${c.who.archetype} · ${c.who.personality}<\/div><\/div>
+      <div style="flex:1;min-width:0"><div class="conf-name">${c.who.name}<\/div><div class="conf-label">${c.who.archetype} · ${c.who.personality}<\/div><\/div>
+      ${srcBadge}
     <\/div><div class="conf-text">${c.text}<\/div><\/div>`;});}
   if(!ep.dramaMsg&&!ep.idolFinder&&!ep.interactions.length&&!ep.confessionals.length&&!ep.twist&&!ep.mergeHappened)
     html+=`<div style="font-size:13px;color:var(--text2);padding:8px 0">A quiet day at camp. Everyone conserving energy before the challenge.<\/div>`;

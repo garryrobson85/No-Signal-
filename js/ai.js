@@ -254,13 +254,13 @@ async function generateAIDialogueForEp(ep,onProgress){
   if(result.confessionals&&ep.confessionals){
     result.confessionals.forEach(ai=>{
       const conf=ep.confessionals.find(c=>c.who.id===ai.playerId);
-      if(conf&&ai.text) conf.text=cleanNarrativeText(ai.text);
+      if(conf&&ai.text){ conf.text=cleanNarrativeText(ai.text); conf._source='ai'; }
     });
   }
   // Apply interactions
   if(result.interactions&&ep.interactions){
     result.interactions.forEach((ai,i)=>{
-      if(ep.interactions[i]&&ai.text) ep.interactions[i].text=cleanNarrativeText(ai.text);
+      if(ep.interactions[i]&&ai.text){ ep.interactions[i].text=cleanNarrativeText(ai.text); ep.interactions[i]._source='ai'; }
     });
   }
   // Apply exit content
@@ -294,8 +294,8 @@ async function generateAIEpisodeScript(epNum){
     if(btn) btn.textContent=`⏳ ${msg}`;
   });
   if(ok){
-    notify('✨ Done! Script updated with AI dialogue','win');
-    setTimeout(()=>showEpisodeScripts(epNum),500);
+    notify('✨ AI dialogue applied','win');
+    setTimeout(()=>showEpisodeScripts(epNum),400);
   } else {
     if(btn){btn.disabled=false;btn.textContent='✨ Generate with AI — Retry';}
   }
@@ -321,6 +321,10 @@ function initDarkMode(){
 document.addEventListener('DOMContentLoaded',()=>{
   initDarkMode();
   initGeminiKeyField();
-  // Note: initTeams, renderTwistsGrid, updateContinueButton are called
-  // from their own modules (state.js / save.js) — not duplicated here
+  // Stamp the display version from the JS constant so HTML never needs a manual edit
+  const verLabel = document.getElementById('app-version-label');
+  if(verLabel && typeof APP_VERSION !== 'undefined') verLabel.textContent = APP_VERSION;
+  // Show the resume/save buttons if a saved game exists
+  updateContinueButton();
+  // Note: initTeams, renderTwistsGrid are called from their own modules (state.js)
 });

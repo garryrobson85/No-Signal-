@@ -495,12 +495,14 @@ function runChallengeWithChoice(chosenChallenge){
   // Now fill in confessionals with real episode context (vote outcome, eliminated player, etc.)
   ep.confessionals=(ep.confessionals||[]).map(conf=>({
     ...conf,
-    text:conf.text==='__PENDING__'?buildConfessionalText(conf.who,ep):conf.text
+    text:conf.text==='__PENDING__'?buildConfessionalText(conf.who,ep):conf.text,
+    _source: conf._source || 'engine'   // ai.js overwrites this with 'ai' when Gemini runs
   }));
   // Update interactions too now that we have the full ep
   ep.interactions=(ep.interactions||[]).map(i=>({
     ...i,
-    text:buildInteractionText(i.a,i.b,ep)
+    text:buildInteractionText(i.a,i.b,ep),
+    _source: i._source || 'engine'
   }));
   // Store evolution events on ep for recap export
   ep.evolutionEvents = G._pendingEvolutions||[];
@@ -512,7 +514,31 @@ function runChallengeWithChoice(chosenChallenge){
   // Snapshot placement state for the Tribe History tracker
   capturePlacementSnapshot(ep);
   G.episodeLog.push(ep); // always log for script generation
-  renderStage(1);
+
+  // ── AI-BEFORE-RENDER ─────────────────────────────────────────────────────
+  // If a Gemini key is set, generate AI dialogue NOW — before the player sees
+  // any text. renderStage(1) rebuilds ALL stages from 0 upward, so by the time
+  // the player sees anything, every confessional / interaction / narration is AI.
+  // Fallback: if no key or AI fails → render immediately with engine templates.
+  const _aiKey = typeof getGeminiKey === 'function' && getGeminiKey();
+  if(_aiKey){
+    const _c = document.getElementById('ep-view-container');
+    if(_c) _c.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:16px;min-height:200px">
+      <div style="font-size:36px;animation:pulse-fire 1.5s ease-in-out infinite">✨<\/div>
+      <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:0.05em;color:var(--fire)">Writing Episode ${ep.ep}…<\/div>
+      <div id="ai-progress-msg" style="font-size:13px;color:var(--text2)">Contacting Gemini…<\/div>
+    <\/div>`;
+    generateAIDialogueForEp(ep, msg => {
+      const el = document.getElementById('ai-progress-msg');
+      if(el) el.textContent = msg;
+    }).then(() => {
+      renderStage(1);
+    }).catch(() => {
+      renderStage(1); // AI failed — engine text is already set, render it
+    });
+  } else {
+    renderStage(1);
+  }
   } catch(err) {
     console.error('runChallengeWithChoice failed:',err);
     notify('⚠️ Challenge resolution failed — see console. Save and reload to recover.');

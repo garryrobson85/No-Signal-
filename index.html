@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>No Signal v19</title>
+<title>No Signal</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔥</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   
 
@@ -37,17 +38,17 @@
     <div class="home-hero">
       <div class="home-fire-wrap">🏕️</div>
       <div class="home-title">NO<br>SIGNAL</div>
-      <div class="home-sub">Cast. Compete. Survive. <span style="opacity:.55">v19</span></div>
+      <div class="home-sub">Cast. Compete. Survive. <span style="opacity:.55" id="app-version-label">v1.1</span></div>
       <div class="home-btns">
         <button class="btn btn-fire" data-action="goSetup">🔥 New Season</button>
         <button class="btn btn-ghost" data-action="loadQuickDemo">⚡ Quick Demo</button>
       </div>
-      <div id="continue-btn-wrap" style="margin-top:16px;display:none;flex-direction:column;gap:8px;align-items:center">
-        <button class="btn btn-fire btn-sm" data-action="loadGame">▶ Resume Saved Season</button>
-        <div class="flex gap-8" style="flex-wrap:wrap;justify-content:center">
-          <button class="btn btn-ghost btn-sm" data-action="exportSaveFile" style="font-size:11px">⬇ Export save</button>
+      <div id="continue-btn-wrap" style="margin-top:14px;display:none;flex-direction:column;gap:10px;align-items:center">
+        <button class="btn btn-outline" style="min-width:200px;font-size:15px;padding:12px 24px" data-action="loadGame">▶ Resume Saved Season</button>
+        <div class="flex gap-8" style="flex-wrap:wrap;justify-content:center;opacity:0.7">
           <button class="btn btn-ghost btn-sm" data-action="openImportSave" style="font-size:11px">⬆ Import save</button>
-          <button class="btn btn-ghost btn-sm" data-action="deleteSave" style="font-size:11px;opacity:0.6">🗑 Delete save</button>
+          <button class="btn btn-ghost btn-sm" data-action="exportSaveFile" style="font-size:11px">⬇ Export save</button>
+          <button class="btn btn-ghost btn-sm" data-action="deleteSave" style="font-size:11px;opacity:0.6">🗑 Delete</button>
         </div>
         <input id="save-import-input" type="file" accept="application/json,.json" style="display:none" onchange="importSaveFile(event)">
       </div>
@@ -127,6 +128,10 @@
           </div>
           <div style="font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5">When set, episode scripts use Gemini Flash to write unique dialogue — confessionals, exit speeches, interactions — based on what actually happened that episode. Key is stored on your device only, never shared.</div>
         </div>
+        <div class="divider"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Merge Episode</label>
             <input type="number" class="form-input" id="s-merge" value="6" min="2" max="20">
           </div>
           <div class="form-group">
