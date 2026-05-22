@@ -486,15 +486,19 @@ function flipVote(i){
     if(hint){hint.textContent='← flip this one';hint.style.color='var(--fire)';}
     return;
   }
+  // Sound + haptic + particles on reveal
+  if(typeof sfxVote==='function') sfxVote();
+  if(typeof hapticVote==='function') hapticVote();
+  if(typeof nsFlash==='function') nsFlash();
+  if(typeof nsBurst==='function'){
+    const r=parchment.getBoundingClientRect();
+    nsBurst(r.left+r.width/2, r.top+r.height/2, 14, '#E8450A');
+  }
   parchment.classList.add('flipped');
   const v=_orderedVotes[i];
-
-  // No colour change on flip — tiles stay neutral throughout the reveal
-
   _revealedVotes[v.target.id]=(_revealedVotes[v.target.id]||0)+1;
   _voteRevealIdx++;
   updateRunningTally(ep);
-
   if(_voteRevealIdx>=_totalVotes){
     const nav=document.getElementById('tribal-nav-inner');
     if(nav) nav.innerHTML=`<button class="btn btn-fire" onclick="revealElimination()" style="animation:pulse-fire 1.5s infinite">🔦 The tribe has spoken…<\/button>`;
@@ -529,6 +533,13 @@ function updateRunningTally(ep){
 
 function buildStageElimination(ep){
   if(ep.noElim||!ep.eliminated) return`<div class="stage-block anim-in"><div class="stage-label">✅ Result<\/div><div class="event-card type-merge"><div class="event-card-body">No one was eliminated.<\/div><\/div><\/div>`;
+  // Fire elimination effects
+  setTimeout(()=>{
+    if(typeof sfxElim==='function') sfxElim();
+    if(typeof hapticElim==='function') hapticElim();
+    if(typeof nsElimBurst==='function') nsElimBurst();
+    if(typeof nsFlash==='function') nsFlash();
+  }, 200);
   if(!ep.eliminated.eliminated){
     ep.eliminated.eliminated=true; ep.eliminated.elimEp=ep.ep;
     if(G.settings.jury&&G.merged&&!G.jury.find(j=>j.id===ep.eliminated.id)){ep.eliminated.juryMember=true;G.jury.push(ep.eliminated);}

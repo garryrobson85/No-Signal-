@@ -319,12 +319,11 @@ function initDarkMode(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
-  initDarkMode();
   initGeminiKeyField();
-  // Stamp the display version from the JS constant so HTML never needs a manual edit
+  // Stamp display version
   const verLabel = document.getElementById('app-version-label');
   if(verLabel && typeof APP_VERSION !== 'undefined') verLabel.textContent = APP_VERSION;
-  // Show the resume/save buttons if a saved game exists
+  // Show resume button if save exists
   updateContinueButton();
-  // Note: initTeams, renderTwistsGrid are called from their own modules (state.js)
+  // Note: dark mode, sound, particles handled by sound.js
 });

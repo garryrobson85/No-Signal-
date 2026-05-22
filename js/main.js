@@ -61,8 +61,15 @@ document.addEventListener('click', function(e){
     // Modals
     case 'closeModal':        if(modal) closeModal(modal); break;
 
-    // Dark mode
+    // Dark mode / sound
     case 'toggleDarkMode':    toggleDarkMode(); break;
+    case 'toggleNsSound':     toggleNsSound(); break;
+
+    // Drawer + theme
+    case 'openDrawer':        openDrawer(); break;
+    case 'closeDrawer':       closeDrawer(); break;
+    case 'nsToggle':          if(el.dataset.key) nsToggle(el.dataset.key); break;
+    case 'setTheme':          if(el.dataset.theme) setTheme(el.dataset.theme); break;
 
     // Season Story
     case 'showSeasonStory':    showSeasonStory(); break;

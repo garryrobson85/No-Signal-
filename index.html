@@ -2,13 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>No Signal</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔥</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  
-
-  <!-- Styles -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>No Signal</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔥</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
@@ -16,38 +13,89 @@
   <link rel="stylesheet" href="css/dark.css">
 </head>
 <body>
+
+<!-- Particle canvas + screen flash -->
+<canvas id="ns-particles"></canvas>
+<div id="ns-flash"></div>
+
+<!-- Settings Drawer -->
+<div class="drawer-backdrop" id="drawer-backdrop" data-action="closeDrawer"></div>
+<div class="drawer" id="settings-drawer">
+  <div class="drawer-head">
+    <div class="drawer-title">Settings</div>
+    <button class="drawer-close" data-action="closeDrawer">✕</button>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-label">Audio & Feel</div>
+    <div class="toggle-row">
+      <div class="toggle-info"><div class="toggle-title">Sound Effects</div><div class="toggle-desc">Tone cues on votes, wins, eliminations</div></div>
+      <div class="toggle-switch" id="ns-t-sound" data-action="nsToggle" data-key="sound"></div>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><div class="toggle-title">Haptic Feedback</div><div class="toggle-desc">Vibration on key moments (mobile)</div></div>
+      <div class="toggle-switch on" id="ns-t-haptic" data-action="nsToggle" data-key="haptic"></div>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><div class="toggle-title">Screen Flash</div><div class="toggle-desc">Flash on vote reveal and elimination</div></div>
+      <div class="toggle-switch on" id="ns-t-flash" data-action="nsToggle" data-key="flash"></div>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><div class="toggle-title">Particle Effects</div><div class="toggle-desc">Ember bursts on key game moments</div></div>
+      <div class="toggle-switch on" id="ns-t-particles" data-action="nsToggle" data-key="particles"></div>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><div class="toggle-title">CRT Scanlines</div><div class="toggle-desc">Broadcast overlay effect</div></div>
+      <div class="toggle-switch on" id="ns-t-scanlines" data-action="nsToggle" data-key="scanlines"></div>
+    </div>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-label">Colour Theme</div>
+    <div class="theme-grid" id="theme-grid">
+      <div class="theme-opt sel" data-action="setTheme" data-theme="default">SIGNAL LOST</div>
+      <div class="theme-opt" data-action="setTheme" data-theme="arctic">ARCTIC DARK</div>
+      <div class="theme-opt" data-action="setTheme" data-theme="jungle">JUNGLE HEAT</div>
+      <div class="theme-opt" data-action="setTheme" data-theme="void">DEEP VOID</div>
+    </div>
+  </div>
+</div>
+
 <div id="app">
+
+  <!-- ══ HEADER ══ -->
   <div class="app-header">
     <div class="logo">
-      <div class="logo-flame">🔥</div>
+      <div class="logo-mark"></div>
       <div>
-        <div class="logo-text">NO SIGNAL</div>
-        <div class="logo-sub">Reality Competition Simulator</div>
+        <div class="logo-text"><span>NO</span> SIGNAL</div>
+        <div class="logo-sub">Reality Competition Sim</div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <button class="dark-toggle-btn" data-action="toggleDarkMode" id="dark-toggle-btn" title="Toggle dark/light mode">🌙</button>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
       <div id="header-ep-badge" style="display:none" class="header-ep-badge">
         <span id="hdr-ep-txt"></span>
       </div>
+      <button class="dark-toggle-btn" id="sound-hdr-btn" data-action="toggleNsSound" title="Sound">🔇</button>
+      <button class="dark-toggle-btn" data-action="openDrawer" title="Settings">⚙</button>
     </div>
   </div>
 
-  <!-- ===================== HOME ===================== -->
+  <!-- ══ HOME ══ -->
   <div id="screen-home" class="screen active">
     <div class="home-hero">
-      <div class="home-fire-wrap">🏕️</div>
-      <div class="home-title">NO<br>SIGNAL</div>
-      <div class="home-sub">Cast. Compete. Survive. <span style="opacity:.55" id="app-version-label">v1.1</span></div>
+      <div class="home-title">
+        <span class="line1">NO</span>
+        <span class="line2">SIGNAL</span>
+      </div>
+      <div class="home-sub">Cast. Compete. Survive. <span id="app-version-label">v1.1.2</span></div>
       <div class="home-btns">
         <button class="btn btn-fire" data-action="goSetup">🔥 New Season</button>
         <button class="btn btn-ghost" data-action="loadQuickDemo">⚡ Quick Demo</button>
       </div>
       <div id="continue-btn-wrap" style="margin-top:14px;display:none;flex-direction:column;gap:10px;align-items:center">
-        <button class="btn btn-outline" style="min-width:200px;font-size:15px;padding:12px 24px" data-action="loadGame">▶ Resume Saved Season</button>
-        <div class="flex gap-8" style="flex-wrap:wrap;justify-content:center;opacity:0.7">
-          <button class="btn btn-ghost btn-sm" data-action="openImportSave" style="font-size:11px">⬆ Import save</button>
-          <button class="btn btn-ghost btn-sm" data-action="exportSaveFile" style="font-size:11px">⬇ Export save</button>
+        <button class="btn btn-outline" style="min-width:220px;font-size:15px;padding:13px 24px" data-action="loadGame">▶ Resume Saved Season</button>
+        <div class="flex gap-8" style="flex-wrap:wrap;justify-content:center;opacity:0.65">
+          <button class="btn btn-ghost btn-sm" data-action="openImportSave" style="font-size:11px">⬆ Import</button>
+          <button class="btn btn-ghost btn-sm" data-action="exportSaveFile" style="font-size:11px">⬇ Export</button>
           <button class="btn btn-ghost btn-sm" data-action="deleteSave" style="font-size:11px;opacity:0.6">🗑 Delete</button>
         </div>
         <input id="save-import-input" type="file" accept="application/json,.json" style="display:none" onchange="importSaveFile(event)">
@@ -55,40 +103,35 @@
     </div>
   </div>
 
-  <!-- ===================== SETUP ===================== -->
+  <!-- ══ SETUP ══ -->
   <div id="screen-setup" class="screen">
     <div class="setup-sidebar">
-      <div style="padding:20px 20px 14px">
-        <div style="font-size:12px;color:rgba(255,255,255,0.3);letter-spacing:0.08em;text-transform:uppercase;font-weight:600">Season Setup</div>
+      <div style="padding:16px 16px 12px">
+        <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase">Season Setup</div>
       </div>
-      <div class="setup-nav-item active" data-action="setupNav" data-panel="general" data-panel="general">
-        <span class="nav-icon">⚙️</span>
-        <span class="nav-label">General</span>
+      <div class="setup-nav-item active" data-action="setupNav" data-panel="general">
+        <span class="nav-icon">⚙️</span><span class="nav-label">General</span>
       </div>
-      <div class="setup-nav-item" data-action="setupNav" data-panel="cast" data-panel="cast">
-        <span class="nav-icon">👥</span>
-        <span class="nav-label">Cast</span>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="cast">
+        <span class="nav-icon">👥</span><span class="nav-label">Cast</span>
         <span class="nav-count" id="cast-nav-count">0</span>
       </div>
-      <div class="setup-nav-item" data-action="setupNav" data-panel="teams" data-panel="teams">
-        <span class="nav-icon">🏳️</span>
-        <span class="nav-label">Teams</span>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="teams">
+        <span class="nav-icon">🏳️</span><span class="nav-label">Teams</span>
       </div>
-      <div class="setup-nav-item" data-action="setupNav" data-panel="twists" data-panel="twists">
-        <span class="nav-icon">🌀</span>
-        <span class="nav-label">Twists</span>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="twists">
+        <span class="nav-icon">🌀</span><span class="nav-label">Twists</span>
       </div>
-      <div class="setup-nav-item" data-action="setupNav" data-panel="rules" data-panel="rules">
-        <span class="nav-icon">📋</span>
-        <span class="nav-label">Rules</span>
+      <div class="setup-nav-item" data-action="setupNav" data-panel="rules">
+        <span class="nav-icon">📋</span><span class="nav-label">Rules</span>
       </div>
-      <div style="padding: 20px 16px; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.06);">
+      <div style="padding:16px;margin-top:auto;border-top:1px solid var(--border)">
         <button class="btn btn-fire" style="width:100%;justify-content:center" data-action="startSeason">🔥 Start Season</button>
         <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:8px" data-action="goHome">← Back</button>
       </div>
     </div>
     <div class="setup-content">
-      <!-- GENERAL PANEL -->
+      <!-- GENERAL -->
       <div id="panel-general" class="setup-panel active">
         <div class="setup-panel-title">General Settings</div>
         <div class="setup-panel-sub">Configure your season name, theme, and core rules.</div>
@@ -107,12 +150,12 @@
               <option value="camp">Classic Camp</option>
               <option value="drama">High Drama</option>
               <option value="strategic">Strategic Battle</option>
-              <option value="fun">Fun & Chaotic</option>
+              <option value="fun">Fun &amp; Chaotic</option>
             </select>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Season Seed <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">optional, makes seasons replayable</span></label>
+          <label class="form-label">Season Seed <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">optional · makes seasons replayable</span></label>
           <input type="text" class="form-input" id="s-seed" placeholder="e.g. camp-chaos-001">
         </div>
         <div class="divider"></div>
@@ -120,13 +163,13 @@
           <label class="form-label" style="display:flex;align-items:center;gap:8px">
             ✨ AI Dialogue — Gemini API Key
             <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">optional · free</span>
-            <button data-action="showGeminiHelp" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;display:flex;align-items:center;justify-content:center" title="How to get a free API key">?</button>
+            <button data-action="showGeminiHelp" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);background:var(--panel2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;display:flex;align-items:center;justify-content:center">?</button>
           </label>
           <div style="display:flex;gap:8px;align-items:center">
-            <input type="password" class="form-input" id="s-gemini-key" placeholder="Paste your Gemini API key here (AIza…)" autocomplete="off" oninput="saveGeminiKey(this.value)" style="flex:1">
-            <button class="btn btn-outline btn-sm" data-action="testGeminiKey" title="Test your API key" style="flex-shrink:0;white-space:nowrap">Test Key</button>
+            <input type="password" class="form-input" id="s-gemini-key" placeholder="Paste your Gemini API key (AIza…)" autocomplete="off" oninput="saveGeminiKey(this.value)" style="flex:1">
+            <button class="btn btn-outline btn-sm" data-action="testGeminiKey" style="flex-shrink:0;white-space:nowrap">Test Key</button>
           </div>
-          <div style="font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5">When set, episode scripts use Gemini Flash to write unique dialogue — confessionals, exit speeches, interactions — based on what actually happened that episode. Key is stored on your device only, never shared.</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5">AI writes unique confessionals, exit speeches, and interactions before you see them. Key stored on your device only.</div>
         </div>
         <div class="divider"></div>
         <div class="form-row">
@@ -161,64 +204,35 @@
           </div>
         </div>
         <div class="divider"></div>
-        <div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;margin-bottom:12px">Season Features</div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Alliance System</div><div class="toggle-desc">Contestants form alliances based on compatible personalities</div></div>
-            <div class="toggle-switch on" id="t-alliances" data-action="toggleSetting"></div>
-          </div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Confessionals</div><div class="toggle-desc">Random diary-room moments each episode</div></div>
-            <div class="toggle-switch on" id="t-confessionals" data-action="toggleSetting"></div>
-          </div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Drama Meter</div><div class="toggle-desc">Rising camp tension affects tribal unpredictability</div></div>
-            <div class="toggle-switch on" id="t-drama" data-action="toggleSetting"></div>
-          </div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Hidden Immunity Idols</div><div class="toggle-desc">Searchable advantages that can nullify votes</div></div>
-            <div class="toggle-switch on" id="t-idols" data-action="toggleSetting"></div>
-          </div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Jury System</div><div class="toggle-desc">Post-merge eliminated players vote for the winner</div></div>
-            <div class="toggle-switch on" id="t-jury" data-action="toggleSetting"></div>
-          </div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Contestant Interactions</div><div class="toggle-desc">Relationships, alliances, and conflicts between cast members</div></div>
-            <div class="toggle-switch on" id="t-interactions" data-action="toggleSetting"></div>
-          </div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Challenge Win Streak Tracker</div><div class="toggle-desc">Dominant players become bigger targets</div></div>
-            <div class="toggle-switch on" id="t-streaks" data-action="toggleSetting"></div>
-          </div>
-          <div class="toggle-row">
-            <div class="toggle-info"><div class="toggle-title">Episode Recap Log</div><div class="toggle-desc">Full narrative summary of every episode</div></div>
-            <div class="toggle-switch on" id="t-log" data-action="toggleSetting"></div>
-          </div>
-        </div>
+        <div style="font-family:'Space Mono',monospace;font-size:8px;letter-spacing:0.14em;color:var(--text3);text-transform:uppercase;margin-bottom:12px">Season Features</div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Alliance System</div><div class="toggle-desc">Contestants form alliances based on compatible personalities</div></div><div class="toggle-switch on" id="t-alliances" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Confessionals</div><div class="toggle-desc">Random diary-room moments each episode</div></div><div class="toggle-switch on" id="t-confessionals" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Drama Meter</div><div class="toggle-desc">Rising camp tension affects tribal unpredictability</div></div><div class="toggle-switch on" id="t-drama" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Hidden Immunity Idols</div><div class="toggle-desc">Searchable advantages that can nullify votes</div></div><div class="toggle-switch on" id="t-idols" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Jury System</div><div class="toggle-desc">Post-merge eliminated players vote for the winner</div></div><div class="toggle-switch on" id="t-jury" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Contestant Interactions</div><div class="toggle-desc">Relationships, alliances, and conflicts between cast members</div></div><div class="toggle-switch on" id="t-interactions" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Challenge Win Streak Tracker</div><div class="toggle-desc">Dominant players become bigger targets</div></div><div class="toggle-switch on" id="t-streaks" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Episode Recap Log</div><div class="toggle-desc">Full narrative summary of every episode</div></div><div class="toggle-switch on" id="t-log" data-action="toggleSetting"></div></div>
       </div>
-
-      <!-- CAST PANEL -->
+      <!-- CAST -->
       <div id="panel-cast" class="setup-panel">
         <div class="setup-panel-title">Cast Builder</div>
-        <div class="setup-panel-sub">Add, customize, and fine-tune every contestant's personality, strengths, and weaknesses.</div>
+        <div class="setup-panel-sub">Add, customize, and fine-tune every contestant.</div>
         <div class="section-hd">
-          <div>
-            <h3>Contestants <span style="color:var(--text2);font-weight:400;font-size:15px" id="cast-count-display">(0)</span></h3>
-          </div>
+          <div><h3>Contestants <span style="color:var(--text2);font-weight:400;font-size:15px" id="cast-count-display">(0)</span></h3></div>
           <div class="flex gap-8">
-            <button class="btn btn-outline btn-sm" data-action="generateCast12">⚡ Generate 12</button>
-            <button class="btn btn-outline btn-sm" data-action="generateCast16">⚡ Generate 16</button>
-            <button class="btn btn-outline btn-sm" data-action="showBulkUpload">📷 Photos</button>
+            <button class="btn btn-outline btn-sm" data-action="generateCast12">⚡ 12</button>
+            <button class="btn btn-outline btn-sm" data-action="generateCast16">⚡ 16</button>
+            <button class="btn btn-outline btn-sm" data-action="showBulkUpload">📷</button>
             <button class="btn btn-fire btn-sm" data-action="addContestant">+ Add</button>
           </div>
         </div>
         <div id="cast-list-container" class="cast-grid"></div>
       </div>
-
-      <!-- TEAMS PANEL -->
+      <!-- TEAMS -->
       <div id="panel-teams" class="setup-panel">
         <div class="setup-panel-title">Team Configuration</div>
-        <div class="setup-panel-sub">Set up your tribes, customize their names and colors, and assign contestants.</div>
+        <div class="setup-panel-sub">Set up tribes, customize names and colors, assign contestants.</div>
         <div class="form-row" style="margin-bottom:20px">
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Number of Teams</label>
@@ -229,22 +243,19 @@
             </select>
           </div>
           <div class="form-group" style="margin-bottom:0;display:flex;align-items:flex-end">
-            <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" data-action="autoAssignTeams">🔀 Auto-assign All</button>
+            <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" data-action="autoAssignTeams">🔀 Auto-assign</button>
           </div>
         </div>
         <div style="margin-bottom:14px">
           <div class="form-label" style="margin-bottom:8px">Unassigned Players</div>
-          <div id="unassigned-pool" class="unassigned-pool">
-            <div class="empty-state" style="padding:10px;font-size:12px">All players assigned</div>
-          </div>
+          <div id="unassigned-pool" class="unassigned-pool"><div class="empty-state" style="padding:10px;font-size:12px;color:var(--text3)">All players assigned</div></div>
         </div>
         <div id="team-config-container"></div>
       </div>
-
-      <!-- TWISTS PANEL -->
+      <!-- TWISTS -->
       <div id="panel-twists" class="setup-panel">
-        <div class="setup-panel-title">Twists & Advantages</div>
-        <div class="setup-panel-sub">Choose which twists can appear during the season. They trigger randomly and infrequently.</div>
+        <div class="setup-panel-title">Twists &amp; Advantages</div>
+        <div class="setup-panel-sub">Choose which twists can appear. They trigger randomly and infrequently.</div>
         <div class="form-group">
           <label class="form-label">Twist Frequency — <span id="twist-freq-val">15</span>% per episode</label>
           <div class="range-wrap">
@@ -257,11 +268,10 @@
         <div class="section-hd"><h3>Available Twists</h3></div>
         <div class="twist-grid" id="twist-grid-container"></div>
       </div>
-
-      <!-- RULES PANEL -->
+      <!-- RULES -->
       <div id="panel-rules" class="setup-panel">
         <div class="setup-panel-title">Advanced Rules</div>
-        <div class="setup-panel-sub">Fine-tune the simulation parameters and narrative style.</div>
+        <div class="setup-panel-sub">Fine-tune simulation parameters and narrative style.</div>
         <div class="form-group">
           <label class="form-label">Challenge Randomness</label>
           <div class="range-wrap">
@@ -302,23 +312,14 @@
           <label class="form-label">Narrative Tone</label>
           <select class="form-select" id="s-tone">
             <option value="dramatic">Dramatic (Survivor-style)</option>
-            <option value="fun">Fun & Campy (Total Drama-style)</option>
+            <option value="fun">Fun &amp; Campy</option>
             <option value="competitive">Competitive Focus</option>
           </select>
         </div>
-        <div class="toggle-row">
-          <div class="toggle-info"><div class="toggle-title">Show Challenge Scores</div><div class="toggle-desc">Display numerical scores during challenge results</div></div>
-          <div class="toggle-switch on" id="t-scores" data-action="toggleSetting"></div>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-info"><div class="toggle-title">Show Individual Votes</div><div class="toggle-desc">Reveal who voted for whom at tribal council</div></div>
-          <div class="toggle-switch" id="t-show-votes" data-action="toggleSetting"></div>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-info"><div class="toggle-title">Returnee Eligibility</div><div class="toggle-desc">Eliminated players return on a dedicated episode with no elimination</div></div>
-          <div class="toggle-switch on" id="t-returnees" data-action="toggleReturneeSettings"></div>
-        </div>
-        <div id="returnee-config" style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:8px">
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Show Challenge Scores</div><div class="toggle-desc">Display numerical scores during challenge results</div></div><div class="toggle-switch on" id="t-scores" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Show Individual Votes</div><div class="toggle-desc">Reveal who voted for whom at tribal council</div></div><div class="toggle-switch" id="t-show-votes" data-action="toggleSetting"></div></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="toggle-title">Returnee Eligibility</div><div class="toggle-desc">Eliminated players return on a dedicated episode</div></div><div class="toggle-switch on" id="t-returnees" data-action="toggleReturneeSettings"></div></div>
+        <div id="returnee-config" style="background:var(--panel2);border-radius:var(--radius);padding:14px;margin-bottom:8px">
           <div class="form-row">
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Rejoin Episode</label>
@@ -339,102 +340,91 @@
     </div>
   </div>
 
-  <!-- ===================== GAME ===================== -->
+  <!-- ══ GAME ══ -->
   <div id="screen-game" class="screen">
-    <div class="game-sidebar">
-      <div class="gs-section">
-        <div class="gs-section-title">Episode</div>
-        <div class="gs-ep-display" id="gs-ep-num">1</div>
-        <div class="gs-ep-label" id="gs-ep-label">Pre-Merge</div>
-        <div id="gs-phase-badge" class="gs-status-badge gs-status-pre">Pre-Merge</div>
-      </div>
-      <div class="season-progress">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.08em">Progress</div>
-          <div style="font-size:10px;font-family:'DM Mono',monospace;color:rgba(255,255,255,0.4)" id="gs-progress-txt">0/0</div>
-        </div>
-        <div class="sp-track"><div class="sp-fill" id="gs-progress-bar" style="width:0%"></div></div>
-      </div>
-      <div class="drama-meter" id="drama-meter-wrap" style="display:none">
-        <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Drama Level</div>
-        <div class="drama-bars" id="drama-bars"></div>
-      </div>
-      <div class="gs-section" style="flex:1;overflow-y:auto">
-        <div class="gs-section-title">Active Players</div>
-        <div id="gs-player-list" class="gs-player-list"></div>
-      </div>
+    <div class="status-bar" id="game-status-bar">
+      <div class="status-dot"></div>
+      <div class="status-ticker" id="status-ticker">LIVE BROADCAST</div>
     </div>
-    <div class="game-main">
-      <div class="ep-view" id="ep-view-container">
-        <!-- filled by JS -->
+    <div style="display:flex;flex:1;min-height:0;overflow:hidden">
+      <div class="game-sidebar">
+        <div class="gs-section">
+          <div class="gs-section-title">Episode</div>
+          <div class="gs-ep-display" id="gs-ep-num">1</div>
+          <div class="gs-ep-label" id="gs-ep-label">Pre-Merge</div>
+          <div id="gs-phase-badge" class="gs-status-badge gs-status-pre">Pre-Merge</div>
+        </div>
+        <div class="season-progress">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em">Progress</div>
+            <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--text2)" id="gs-progress-txt">0/0</div>
+          </div>
+          <div class="sp-track"><div class="sp-fill" id="gs-progress-bar" style="width:0%"></div></div>
+        </div>
+        <div class="drama-meter" id="drama-meter-wrap" style="display:none">
+          <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">Drama Level</div>
+          <div class="drama-bars" id="drama-bars"></div>
+        </div>
+        <div class="gs-section" style="flex:1;overflow-y:auto">
+          <div class="gs-section-title">Active Players</div>
+          <div id="gs-player-list" class="gs-player-list"></div>
+        </div>
       </div>
-      <div class="ep-nav-bar" id="ep-nav-bar">
-        <div style="font-size:13px;color:var(--text2)" id="ep-nav-status"></div>
-        <div class="flex gap-8">
-          <button class="btn btn-outline btn-sm" data-action="showCastStatus" id="btn-cast-status" aria-label="View cast status">👥 Cast</button>
-          <button class="btn btn-outline btn-sm" data-action="showSeasonStats" aria-label="View season stats">📊 Stats</button>
-          <button class="btn btn-outline btn-sm" data-action="showTribeHistory" aria-label="View tribe history">🗓️ History</button>
-          <button class="btn btn-outline btn-sm" data-action="showPlayerProfiles" aria-label="View player profiles">👤 Profiles</button>
-          <button class="btn btn-outline btn-sm" data-action="showV19Insights" aria-label="View game insights">🧠 Insights</button>
-          <button class="btn btn-outline btn-sm" data-action="showRelationshipWeb" aria-label="View relationship web">🕸️ Web</button>
-          <button class="btn btn-outline btn-sm" data-action="showEpisodeScripts" aria-label="View episode scripts">📜 Scripts</button>
-          <button class="btn btn-outline btn-sm" data-action="showSeasonRecap" aria-label="Season recap">📺 Recap</button>
-          <button class="btn btn-outline btn-sm" data-action="showSeasonStory" aria-label="Season story">📖 Story</button>
-          <button class="btn btn-outline btn-sm" data-action="saveGame" aria-label="Save game" title="Save (S)">💾</button>
-          <button class="btn btn-outline btn-sm" data-action="exportSaveFile" aria-label="Export save" title="Export save">⬇</button>
+      <div class="game-main">
+        <div class="ep-view" id="ep-view-container"></div>
+        <div class="ep-nav-bar" id="ep-nav-bar">
+          <div style="font-size:12px;color:var(--text2)" id="ep-nav-status"></div>
+          <div class="flex gap-8" style="flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" data-action="showCastStatus">👥 Cast</button>
+            <button class="btn btn-outline btn-sm" data-action="showSeasonStats">📊 Stats</button>
+            <button class="btn btn-outline btn-sm" data-action="showTribeHistory">🗓️ History</button>
+            <button class="btn btn-outline btn-sm" data-action="showPlayerProfiles">👤 Profiles</button>
+            <button class="btn btn-outline btn-sm" data-action="showV19Insights">🧠 Insights</button>
+            <button class="btn btn-outline btn-sm" data-action="showRelationshipWeb">🕸️ Web</button>
+            <button class="btn btn-outline btn-sm" data-action="showEpisodeScripts">📜 Scripts</button>
+            <button class="btn btn-outline btn-sm" data-action="showSeasonRecap">📺 Recap</button>
+            <button class="btn btn-outline btn-sm" data-action="showSeasonStory">📖 Story</button>
+            <button class="btn btn-outline btn-sm" data-action="saveGame" title="Save (S)">💾</button>
+            <button class="btn btn-outline btn-sm" data-action="exportSaveFile" title="Export">⬇</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ===================== FINALE ===================== -->
+  <!-- ══ FINALE ══ -->
   <div id="screen-finale" class="screen">
     <div class="game-main" style="overflow-y:auto">
       <div id="finale-container" class="finale-screen"></div>
     </div>
   </div>
-</div>
+
+</div><!-- /app -->
 
 <!-- MODALS -->
 <div class="modal-backdrop" id="modal-cast-status">
   <div class="modal" style="max-width:700px;width:100%">
     <div class="modal-title">Cast Status</div>
     <div id="modal-cast-content"></div>
-    <div class="modal-btns">
-      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-cast-status">Close</button>
-    </div>
+    <div class="modal-btns"><button class="btn btn-outline" data-action="closeModal" data-modal="modal-cast-status">Close</button></div>
   </div>
 </div>
 <div class="modal-backdrop" id="modal-player-detail">
   <div class="modal">
     <div id="modal-player-content"></div>
-    <div class="modal-btns">
-      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-player-detail">Close</button>
-    </div>
+    <div class="modal-btns"><button class="btn btn-outline" data-action="closeModal" data-modal="modal-player-detail">Close</button></div>
   </div>
 </div>
 <div class="modal-backdrop" id="modal-gemini-help">
   <div class="modal" style="max-width:500px;width:100%">
-    <div class="modal-title">✨ How to get a free Gemini API key</div>
+    <div class="modal-title">✨ Free Gemini API Key</div>
     <div style="font-size:14px;line-height:1.8;color:var(--text)">
       <div class="gemini-step"><span class="gemini-step-num">1</span><div><strong>Go to Google AI Studio</strong><br><a href="https://aistudio.google.com" target="_blank" style="color:var(--fire2);font-weight:600">aistudio.google.com</a> — sign in with any Google account</div></div>
-      <div class="gemini-step"><span class="gemini-step-num">2</span><div><strong>Create an API key</strong><br>Click <em>"Get API key"</em> in the left sidebar → <em>"Create API key"</em> → select any project</div></div>
-      <div class="gemini-step"><span class="gemini-step-num">3</span><div><strong>Copy your key</strong><br>It starts with <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px">AIza…</code> — tap the copy icon next to it</div></div>
-      <div class="gemini-step"><span class="gemini-step-num">4</span><div><strong>Paste it above</strong><br>In the API Key field in General Settings — it saves automatically</div></div>
+      <div class="gemini-step"><span class="gemini-step-num">2</span><div><strong>Create an API key</strong><br>Click "Get API key" → "Create API key" → select any project</div></div>
+      <div class="gemini-step"><span class="gemini-step-num">3</span><div><strong>Copy and paste</strong><br>It starts with <code style="background:var(--panel2);padding:1px 5px;border-radius:3px;font-size:12px">AIza…</code> — paste in General Settings</div></div>
     </div>
-
-    <div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-top:14px;font-size:13px;color:var(--text2);line-height:1.6">
-      <strong style="color:var(--text)">Free tier — no card needed</strong><br>
-      A basic key works straight away with no billing details. You get enough quota for casual use — around 5–10 episode script generations per day. Perfect for trying it out.
-    </div>
-
-    <div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:13px;color:var(--text2);line-height:1.6">
-      <strong style="color:var(--text)">For heavier use — add billing with a low cap</strong><br>
-      If you want more generations or hit rate limits, add a payment method to your Google Cloud project and set a <strong style="color:var(--text)">spending cap of £2–£5</strong>. This unlocks much higher limits. In practice AI generation costs fractions of a penny per episode — you are extremely unlikely to ever be charged anything. The cap is just a safety net.
-    </div>
-
-    <div style="background:rgba(232,69,10,0.08);border:1px solid rgba(232,69,10,0.2);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6">
-      🔒 <strong style="color:var(--text)">Your key stays on your device.</strong> It is stored in your browser only and sent directly to Google's API — never to any other server.
+    <div style="background:rgba(232,69,10,0.07);border:1px solid rgba(232,69,10,0.15);border-radius:var(--radius);padding:10px 14px;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6">
+      🔒 Your key stays on your device only — never sent anywhere except Google's API directly.
     </div>
     <div class="modal-btns" style="margin-top:16px">
       <a href="https://aistudio.google.com" target="_blank" class="btn btn-fire" style="text-decoration:none">Open Google AI Studio →</a>
@@ -447,7 +437,7 @@
     <div class="modal-title" id="script-modal-title">Episode Script</div>
     <div id="script-modal-content" style="overflow-y:auto;flex:1;margin:8px 0"></div>
     <div class="modal-btns">
-      <button class="btn btn-outline" data-action="copyScript">📋 Copy Script</button>
+      <button class="btn btn-outline" data-action="copyScript">📋 Copy</button>
       <button class="btn btn-outline" data-action="closeModal" data-modal="modal-script">Close</button>
     </div>
   </div>
@@ -456,41 +446,34 @@
   <div class="modal" style="max-width:320px">
     <div class="modal-title">Choose Color</div>
     <div class="color-grid" id="color-grid-container"></div>
-    <div class="modal-btns">
-      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-color-pick">Cancel</button>
-    </div>
+    <div class="modal-btns"><button class="btn btn-outline" data-action="closeModal" data-modal="modal-color-pick">Cancel</button></div>
   </div>
 </div>
-
-<!-- NOTIFICATION -->
-
 <div class="modal-backdrop" id="modal-v19">
   <div class="modal v19-modal-wide">
-    <div class="modal-title" id="modal-v19-title">v19</div>
+    <div class="modal-title" id="modal-v19-title">Insights</div>
     <div id="modal-v19-content"></div>
-    <div class="modal-btns">
-      <button class="btn btn-outline" data-action="closeModal" data-modal="modal-v19">Close</button>
-    </div>
+    <div class="modal-btns"><button class="btn btn-outline" data-action="closeModal" data-modal="modal-v19">Close</button></div>
   </div>
 </div>
 
 <div id="notification" class="notification"></div>
 
-  <!-- Single module entry point — all imports handled in main.js -->
-  <!-- Classic scripts loaded in dependency order. data.js first (state.js reads it at top-level); main.js last (event delegation). -->
-  <script src="js/data.js"></script>
-  <script src="js/state.js"></script>
-  <script src="js/portraits.js"></script>
-  <script src="js/memory.js"></script>
-  <script src="js/evolution.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/features.js"></script>
-  <script src="js/save.js"></script>
-  <script src="js/producer.js"></script>
-  <script src="js/script_gen.js"></script>
-  <script src="js/story.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/main.js"></script>
+<!-- Scripts in dependency order -->
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/portraits.js"></script>
+<script src="js/memory.js"></script>
+<script src="js/evolution.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/features.js"></script>
+<script src="js/save.js"></script>
+<script src="js/producer.js"></script>
+<script src="js/script_gen.js"></script>
+<script src="js/story.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

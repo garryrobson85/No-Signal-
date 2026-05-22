@@ -9,7 +9,12 @@ const PROJECT_VERSION = 'no-signal-v4';
 // Display version shown to users in the UI. Completely separate from SAVE_VERSION
 // (which tracks save schema compatibility and must not be changed lightly).
 // Bump this whenever you ship a meaningful update.
-const APP_VERSION = 'v1.1';
+const APP_VERSION = 'v1.1.2';
+
+function updateStatusTicker(msg) {
+  const el = document.getElementById('status-ticker');
+  if (el) el.textContent = msg || `LIVE BROADCAST — EP ${G.episode||1} — ${G.cast.filter(c=>!c.eliminated).length} REMAIN`;
+}
 
 let G = {
   cast:[], teams:[], settings:{},
@@ -434,9 +439,11 @@ function updateGameSidebar(){
   const eliminated=G.cast.filter(c=>c.eliminated).length;
   document.getElementById('gs-progress-txt').textContent=`${eliminated}/${total} out`;
   document.getElementById('gs-progress-bar').style.width=total>0?(eliminated/total*100)+'%':'0%';
+  // Status ticker
+  if(typeof updateStatusTicker==='function') updateStatusTicker();
   if(G.settings.drama){
     document.getElementById('drama-meter-wrap').style.display='block';
-    document.getElementById('drama-bars').innerHTML=Array.from({length:5},(_,i)=>`<div class="drama-pip${i<G.dramaLevel?' active':''}"><\/div>`).join('');
+    document.getElementById('drama-bars').innerHTML=Array.from({length:5},(_,i)=>`<div class="drama-bar${i<G.dramaLevel?' lit':''}"><\/div>`).join('');
   }
   const playerList=document.getElementById('gs-player-list');
   if(G.merged){
