@@ -246,6 +246,8 @@ function buildStageCampLife(ep){
       <div class="event-card-body" style="margin-top:10px;clear:both">${text}<\/div>
     <\/div>`;});}
   if(ep.confessionals.length){ep.confessionals.forEach(c=>{
+    // Skip if vote hasn't resolved yet — confessional text is filled post-vote in engine.js
+    if(!c.text||c.text==='__PENDING__') return;
     const cp=getPortrait(c.who).replace('width="120" height="145"','width="44" height="53"');
     html+=`<div class="confessional-card"><div class="conf-header">
       <div class="conf-portrait" style="flex-shrink:0;border-radius:8px;overflow:hidden;line-height:0;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${cp}<\/div>
