@@ -32,19 +32,10 @@ function _initAudio() {
   if (_actx) return;
   try {
     _actx = new (window.AudioContext || window.webkitAudioContext)();
+    // Auto-resume whenever the context is suspended (Chrome re-suspends after inactivity)
     _actx.onstatechange = () => {
       if (_actx && _actx.state === 'suspended') _actx.resume().catch(()=>{});
     };
-    // Silent keep-alive ping every 20s — prevents browser from suspending the context
-    setInterval(() => {
-      if (!_actx || _actx.state === 'closed') return;
-      if (_actx.state === 'suspended') { _actx.resume(); return; }
-      try {
-        const b = _actx.createBuffer(1,1,_actx.sampleRate);
-        const s = _actx.createBufferSource();
-        s.buffer = b; s.connect(_actx.destination); s.start(0);
-      } catch(e) {}
-    }, 20000);
   } catch(e) { _actx = null; }
 }
 
@@ -57,21 +48,21 @@ function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
   if (!NS.sound || !_actx) return;
   const doPlay = () => {
     try {
-      const c = _actx;
-      const o = c.createOscillator(), g = c.createGain();
-      o.connect(g); g.connect(c.destination);
+      if (_actx.state === 'closed') return;
+      const o = _actx.createOscillator(), g = _actx.createGain();
+      o.connect(g); g.connect(_actx.destination);
       o.type = t; o.frequency.value = f;
-      const T = c.currentTime + delay;
-      g.gain.setValueAtTime(v, T);
-      g.gain.exponentialRampToValueAtTime(0.001, T + d);
-      o.start(T); o.stop(T + d);
-    } catch(e) {}
+      const T = _actx.currentTime + Math.max(0, delay);
+      g.gain.setValueAtTime(Math.max(0.001, v), T);
+      g.gain.exponentialRampToValueAtTime(0.0001, T + d);
+      o.start(T); o.stop(T + d + 0.05);
+    } catch(e) { console.warn('playTone failed:', e.message); }
   };
-  if (_actx.state === 'running') {
-    doPlay();
+  // Always resume — it's a no-op if already running
+  if (_actx.state !== 'running') {
+    _actx.resume().then(doPlay).catch(e => console.warn('resume failed:', e.message));
   } else {
-    // Context is suspended — resume first, then play
-    _actx.resume().then(doPlay).catch(()=>{});
+    doPlay();
   }
 }
 

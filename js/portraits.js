@@ -104,24 +104,16 @@ function generatePortrait(contestant) {
       <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
     <\/filter>
   <\/defs>
-  /* Background */
   <rect width="120" height="145" rx="12" fill="url(#bg-${c.id})"/>
-  /* Clothing */
   ${clothingEl}
-  /* Hair (back) */
   ${hairPath}
-  /* Neck */
   <rect x="${60-10}" y="${faceY+faceH-4}" width="20" height="20" fill="${skinColor}"/>
-  /* Face */
   <ellipse cx="${60}" cy="${faceY+faceH*0.5}" rx="${faceW/2}" ry="${faceH/2}" fill="url(#face-${c.id})" filter="url(#shadow-${c.id})"/>
-  /* Ears */
   <ellipse cx="${faceX-4}" cy="${faceY+faceH*0.48}" rx="5" ry="7" fill="${skinColor}"/>
   <ellipse cx="${faceX+faceW+4}" cy="${faceY+faceH*0.48}" rx="5" ry="7" fill="${skinColor}"/>
   ${earringEl}
-  /* Eyebrows */
   <path d="M${leftEyeX-eyeSize},${eyeY-eyeSize-4+eyeSlant} Q${leftEyeX},${eyeY-eyeSize-7} ${leftEyeX+eyeSize},${eyeY-eyeSize-4-eyeSlant}" stroke="${hairColor}" stroke-width="${browThick}" fill="none" stroke-linecap="round"/>
   <path d="M${rightEyeX-eyeSize},${eyeY-eyeSize-4-eyeSlant} Q${rightEyeX},${eyeY-eyeSize-7} ${rightEyeX+eyeSize},${eyeY-eyeSize-4+eyeSlant}" stroke="${hairColor}" stroke-width="${browThick}" fill="none" stroke-linecap="round"/>
-  /* Eyes */
   <ellipse cx="${leftEyeX}" cy="${eyeY}" rx="${eyeSize}" ry="${eyeSize*0.8}" fill="white"/>
   <circle cx="${leftEyeX+1}" cy="${eyeY}" r="${eyeSize*0.55}" fill="${eyeColor}"/>
   <circle cx="${leftEyeX+2}" cy="${eyeY-1}" r="${eyeSize*0.2}" fill="white"/>
@@ -129,14 +121,10 @@ function generatePortrait(contestant) {
   <circle cx="${rightEyeX+1}" cy="${eyeY}" r="${eyeSize*0.55}" fill="${eyeColor}"/>
   <circle cx="${rightEyeX+2}" cy="${eyeY-1}" r="${eyeSize*0.2}" fill="white"/>
   ${hasGlasses?glassesEl:''}
-  /* Nose */
   <path d="M${60},${eyeY+eyeSize+2} Q${60+5},${eyeY+eyeSize+10} ${60+2},${eyeY+eyeSize+13} Q${60},${eyeY+eyeSize+15} ${60-2},${eyeY+eyeSize+13} Q${60-5},${eyeY+eyeSize+10} ${60},${eyeY+eyeSize+2}" fill="${shadeColor(skinColor,-15)}" opacity="0.6"/>
-  /* Mouth */
   <path d="M${60-9},${eyeY+eyeSize+20} Q${60},${eyeY+eyeSize+20+smileAmount} ${60+9},${eyeY+eyeSize+20}" stroke="${shadeColor(skinColor,-30)}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
   ${smileAmount>4?`<path d="M${60-7},${eyeY+eyeSize+20} Q${60},${eyeY+eyeSize+24+smileAmount*0.5} ${60+7},${eyeY+eyeSize+20}" fill="${shadeColor(skinColor,-10)}" opacity="0.5"/>`:''}
-  /* Bandana overlay */
   ${bandanaEl}
-  /* Villain scar */
   ${isVillain?`<path d="M${faceX+faceW*0.6},${eyeY-8} L${faceX+faceW*0.7},${eyeY+10}" stroke="${shadeColor(skinColor,-40)}" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>`:''}
   <rect x="6" y="120" width="108" height="19" rx="5" fill="rgba(0,0,0,0.35)"/>
   <text x="60" y="133" text-anchor="middle" font-family="'Bebas Neue', sans-serif" font-size="11" fill="white" letter-spacing="0.5">${c.name.toUpperCase()}<\/text>
