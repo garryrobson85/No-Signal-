@@ -509,13 +509,7 @@ function runChallengeWithChoice(chosenChallenge){
   // Update interactions now that we have the full ep — deduplicate across pairs
   const _usedInteractionTexts = new Set();
   ep.interactions=(ep.interactions||[]).map(i=>{
-    // Try up to 4 times to get a unique line for this pair
-    let text, attempts=0;
-    do {
-      text=buildInteractionText(i.a,i.b,ep);
-      attempts++;
-    } while(_usedInteractionTexts.has(text) && attempts<4);
-    _usedInteractionTexts.add(text);
+    const text = buildInteractionText(i.a, i.b, ep, _usedInteractionTexts);
     return {...i, text, _source: i._source||'engine'};
   });
   // Store evolution events on ep for recap export

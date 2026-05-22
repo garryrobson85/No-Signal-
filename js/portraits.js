@@ -138,7 +138,6 @@ function generatePortrait(contestant) {
   ${bandanaEl}
   /* Villain scar */
   ${isVillain?`<path d="M${faceX+faceW*0.6},${eyeY-8} L${faceX+faceW*0.7},${eyeY+10}" stroke="${shadeColor(skinColor,-40)}" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>`:''}
-  /* Name tag */
   <rect x="6" y="120" width="108" height="19" rx="5" fill="rgba(0,0,0,0.35)"/>
   <text x="60" y="133" text-anchor="middle" font-family="'Bebas Neue', sans-serif" font-size="11" fill="white" letter-spacing="0.5">${c.name.toUpperCase()}<\/text>
 <\/svg>`;

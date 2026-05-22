@@ -103,7 +103,7 @@ function buildConfessionalText(player, ep){
 }
 
 // Generates a grounded interaction narrative between two specific players
-function buildInteractionText(a, b, ep){
+function buildInteractionText(a, b, ep, usedTexts){
   const an=a.name.split(' ')[0], bn=b.name.split(' ')[0];
   const allied=(a.allianceIds||[]).some(id=>(b.allianceIds||[]).includes(id));
   const relScore=v19RelScore(a.id,b.id);
@@ -111,28 +111,43 @@ function buildInteractionText(a, b, ep){
   const sameTeam=!merged&&a.team!=null&&a.team===b.team;
   const crossTeam=!merged&&!sameTeam&&a.team!=null&&b.team!=null;
 
+  // pickFresh: pick a line not already used this episode
+  const pickFresh=(opts,used)=>{
+    if(!used) return pick(opts);
+    const fresh=opts.filter(o=>!used.has(o));
+    const chosen=fresh.length?pick(fresh):pick(opts);
+    used.add(chosen);
+    return chosen;
+  };
+
   if(allied&&relScore>=60){
     const opts=[
       `${an} and ${bn} found a quiet moment away from camp. Their alliance is holding — but both know the deeper they go, the harder the choices get.`,
       `${an} pulled ${bn} aside to compare notes on where everyone's heads are at. The trust between them runs deeper than most people realise.`,
       `${bn} reassured ${an} after a tense day — their bond is one of the few genuinely stable things left at this camp.`,
+      `${an} and ${bn} kept their strategy meeting short — eyes everywhere. What was agreed stays between them.`,
+      `${bn} checked in on ${an} before anyone else was awake. Small act, big signal.`,
+      `The body language between ${an} and ${bn} said what neither would say out loud — they're each other's person in this game.`,
     ];
-    return pick(opts);
+    return pickFresh(opts,usedTexts);
   }
   if(!allied&&relScore<=35){
     const opts=[
       `${an} and ${bn} kept their distance at camp, but the tension between them was impossible to miss. Something is building.`,
       `A brief exchange between ${an} and ${bn} turned sharp fast. Old frustrations surfaced. Nobody apologised.`,
       `${bn} vented about ${an} to anyone who would listen. Whether it was strategy or genuine grievance — probably both.`,
+      `${an} caught ${bn} watching them from across camp. They held eye contact a beat too long.`,
+      `The problem between ${an} and ${bn} hasn't been named out loud yet. But it's there.`,
     ];
-    return pick(opts);
+    return pickFresh(opts,usedTexts);
   }
   if(crossTeam){
     const opts=[
       `Despite being on opposite tribes, ${an} and ${bn} found a moment to connect at the challenge site. A quiet conversation that neither side saw coming.`,
       `${an} reached across tribal lines to feel out ${bn}'s position. A risky move — but information is worth the exposure.`,
+      `${bn} kept the exchange with ${an} brief — just long enough to plant a seed. Both filed it away.`,
     ];
-    return pick(opts);
+    return pickFresh(opts,usedTexts);
   }
   if(G.idolHolders.includes(a.id)||G.idolHolders.includes(b.id)){
     const holder=G.idolHolders.includes(a.id)?an:bn;
@@ -141,15 +156,15 @@ function buildInteractionText(a, b, ep){
       `${other} caught ${holder} slipping away from camp for the third time this week. ${holder} had an explanation ready. Whether ${other} bought it is another question.`,
       `${holder} made a calculated decision and hinted to ${other} that they might have something hidden. A gamble on trust.`,
     ];
-    return pick(opts);
+    return pickFresh(opts,usedTexts);
   }
-  // Memory layer — if there's a documented history between these two, use it
+  // Memory layer
   if(typeof getMemorySummary==='function'){
     const historySummary=getMemorySummary(a,b);
-    if(historySummary) return historySummary;
+    if(historySummary && (!usedTexts||!usedTexts.has(historySummary))){ if(usedTexts) usedTexts.add(historySummary); return historySummary; }
   }
 
-  // Generic fallback — 10 options ensures two pairs rarely get the same line
+  // Generic fallback — 10 distinct options, always pick fresh
   const opts=[
     `${an} and ${bn} talked by the fire well into the night — about the game, about trust, about who they think is actually running things. Neither fully showed their hand.`,
     `${bn} approached ${an} with what looked like a straightforward conversation. ${an} filed every word away for later.`,
@@ -162,7 +177,7 @@ function buildInteractionText(a, b, ep){
     `${an} asked ${bn} a question that sounded casual. ${bn} answered carefully. Neither was fooled by the other's act.`,
     `A quiet moment between ${an} and ${bn} — reading each other, testing the temperature. The game is always being played, even in the silences.`,
   ];
-  return pick(opts);
+  return pickFresh(opts,usedTexts);
 }
 
 // Drama events grounded in specific players and game state
