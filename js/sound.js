@@ -27,24 +27,34 @@ function applyScanlinesState() {
 
 // ═══ AUDIO ═══
 let _actx = null;
+
+// Create AudioContext eagerly on FIRST user interaction — mobile browsers require this.
+// Once created during a gesture, subsequent calls work even without a gesture.
+function _initAudio() {
+  if (_actx) return;
+  try {
+    _actx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch(e) { _actx = null; }
+}
+
 function getAC() {
   if (!NS.sound) return null;
-  try {
-    if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_actx.state === 'suspended') _actx.resume();
-    return _actx;
-  } catch(e) { return null; }
+  if (!_actx) return null; // not yet initialised — need a user gesture first
+  if (_actx.state === 'suspended') _actx.resume().catch(()=>{});
+  return _actx;
 }
 
 function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
   const c = getAC(); if (!c) return;
-  const o = c.createOscillator(), g = c.createGain();
-  o.connect(g); g.connect(c.destination);
-  o.type = t; o.frequency.value = f;
-  const T = c.currentTime + delay;
-  g.gain.setValueAtTime(v, T);
-  g.gain.exponentialRampToValueAtTime(0.001, T + d);
-  o.start(T); o.stop(T + d);
+  try {
+    const o = c.createOscillator(), g = c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.type = t; o.frequency.value = f;
+    const T = c.currentTime + delay;
+    g.gain.setValueAtTime(v, T);
+    g.gain.exponentialRampToValueAtTime(0.001, T + d);
+    o.start(T); o.stop(T + d);
+  } catch(e) {}
 }
 
 function sfxVote()   { playTone(220,'sine',0.07,0.09); playTone(440,'sine',0.1,0.07,0.05); playTone(330,'triangle',0.16,0.05,0.09); }
@@ -84,6 +94,8 @@ function _resizePC() {
   if (!_pc) return;
   _pc.width = window.innerWidth;
   _pc.height = window.innerHeight;
+  _pc.style.width = window.innerWidth + 'px';
+  _pc.style.height = window.innerHeight + 'px';
 }
 _resizePC();
 window.addEventListener('resize', _resizePC);
@@ -132,10 +144,12 @@ function nsElimBurst() {
 function toggleNsSound() {
   NS.sound = !NS.sound;
   nsSave();
+  // Create AudioContext on this gesture — guaranteed to work on mobile
+  if (NS.sound) _initAudio();
   _updateSoundBtn();
   const ts = document.getElementById('ns-t-sound');
   if (ts) ts.classList.toggle('on', NS.sound);
-  if (NS.sound) { sfxTick(); hapticTap(); }
+  if (NS.sound) { setTimeout(()=>sfxTick(), 50); hapticTap(); }
 }
 
 function _updateSoundBtn() {
@@ -156,8 +170,8 @@ function nsToggle(key) {
   nsSave();
   hapticTap();
   if (NS.sound) sfxTick();
+  if (key==='sound') { if (NS.sound) _initAudio(); _updateSoundBtn(); }
   if (key==='scanlines') applyScanlinesState();
-  if (key==='sound') _updateSoundBtn();
 }
 
 function openDrawer() {

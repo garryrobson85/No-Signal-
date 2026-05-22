@@ -9,15 +9,18 @@
 
   /* Game: sidebar collapses, game content always visible */
   #screen-game{min-height:auto}
-  #game-layout{flex-direction:column!important}
+  #game-layout{flex-direction:column!important;overflow:visible!important}
 
   .game-sidebar{
     width:100%!important;max-height:0;overflow:hidden;
     transition:max-height 0.3s ease;
-    border-right:none;border-bottom:1px solid var(--border);
-    flex-direction:column;
+    border-right:none;border-bottom:0;
+    flex-direction:column;flex-shrink:0;
   }
-  .game-sidebar.open{max-height:50vh;overflow-y:auto}
+  .game-sidebar.open{
+    max-height:45vh;overflow-y:auto;
+    border-bottom:1px solid var(--border);
+  }
 
   .sidebar-toggle-btn{
     display:flex!important;width:100%;padding:8px 14px;
@@ -92,7 +95,8 @@
 
 @media (min-width:769px){
   .sidebar-toggle-btn{display:none!important}
-  .game-sidebar{max-height:none!important;overflow:visible!important}
+  #game-layout{flex-direction:row!important}
+  .game-sidebar{max-height:none!important;overflow-y:auto!important;width:200px!important}
 }
 
 @media (hover:none){

@@ -271,7 +271,9 @@ function buildOpeningNarration(ep){
     const tribeLine = teams.length
       ? teams.map((t,i)=>{
           const count = G.cast.filter(c=>c.team===i).length;
-          return `Tribe ${t.name} (${count})`;
+          // Avoid "Tribe Tribe Fang" if the team name already starts with "Tribe"
+          const tname = t.name.replace(/^tribe\s+/i,'');
+          return `Tribe ${tname} (${count})`;
         }).join(' against ')
       : `${castSize} contestants`;
     const intros = [
