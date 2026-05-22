@@ -13,6 +13,22 @@ document.addEventListener('click', function(e){
   const panel  = el.dataset.panel;
   const modal  = el.dataset.modal;
 
+  // ── Sound on every action ──────────────────────────────────────────────
+  // toggleNsSound handles its own sound (it enables audio first)
+  // flipVote has its own dramatic sfx — skip here
+  if(typeof sfxTick==='function' && action !== 'toggleNsSound' && action !== 'nsToggle'){
+    const bigActions = new Set(['startSeason','loadGame','loadQuickDemo','runFinale','nextEpisode']);
+    const navActions  = new Set(['goHome','goSetup','setupNav','closeModal','showCastStatus',
+      'showSeasonStats','showTribeHistory','showPlayerProfiles','showV19Insights',
+      'showRelationshipWeb','showEpisodeScripts','showSeasonRecap','showSeasonStory',
+      'showProducerPanel','openDrawer','openImportSave']);
+    const toggleActions = new Set(['toggleSetting','toggleReturneeSettings']);
+    if(bigActions.has(action))    { sfxWin&&sfxWin();    hapticWin&&hapticWin(); }
+    else if(navActions.has(action)){ sfxNav&&sfxNav();    hapticAdv&&hapticAdv(); }
+    else if(toggleActions.has(action)){sfxToggle&&sfxToggle(); hapticTap&&hapticTap(); }
+    else                           { sfxTick&&sfxTick();  hapticTap&&hapticTap(); }
+  }
+
   switch(action){
     // Navigation
     case 'goHome':            goHome(); break;
@@ -99,7 +115,11 @@ document.addEventListener('click', function(e){
     case 'closeV19Modal':            closeModal('modal-v19'); break;
 
     // Toggle switches (settings checkboxes)
-    case 'toggleSetting':     el.classList.toggle('on'); break;
+    case 'toggleSetting':
+      el.classList.toggle('on');
+      if(typeof sfxToggle==='function') sfxToggle();
+      if(typeof hapticTap==='function') hapticTap();
+      break;
     case 'toggleReturneeSettings':
       el.classList.toggle('on');
       toggleReturneeSettings(el);

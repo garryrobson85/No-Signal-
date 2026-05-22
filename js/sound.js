@@ -57,12 +57,14 @@ function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
   } catch(e) {}
 }
 
-function sfxVote()   { playTone(220,'sine',0.07,0.09); playTone(440,'sine',0.1,0.07,0.05); playTone(330,'triangle',0.16,0.05,0.09); }
-function sfxElim()   { [80,70,60,50,40].forEach((f,i)=>playTone(f,'sawtooth',0.38,0.06,i*0.11)); playTone(220,'sine',0.5,0.04,0.62); }
-function sfxWin()    { [523,659,784,1047].forEach((f,i)=>playTone(f,'sine',0.14,0.09,i*0.09)); }
-function sfxAdv()    { playTone(440,'sine',0.09,0.06); playTone(550,'sine',0.09,0.05,0.07); }
-function sfxSelect() { playTone(660,'sine',0.1,0.07); }
-function sfxTick()   { playTone(880,'sine',0.06,0.05); }
+function sfxVote()   { playTone(220,'sine',0.07,0.12); playTone(440,'sine',0.1,0.09,0.05); playTone(330,'triangle',0.18,0.07,0.09); }
+function sfxElim()   { [80,70,60,50,40].forEach((f,i)=>playTone(f,'sawtooth',0.38,0.09,i*0.11)); playTone(220,'sine',0.5,0.06,0.62); }
+function sfxWin()    { [523,659,784,1047].forEach((f,i)=>playTone(f,'sine',0.18,0.12,i*0.09)); }
+function sfxAdv()    { playTone(440,'sine',0.12,0.09); playTone(550,'sine',0.12,0.08,0.07); }
+function sfxSelect() { playTone(660,'sine',0.14,0.1); }
+function sfxTick()   { playTone(800,'sine',0.12,0.08); }  // was 880/0.06/0.05 — barely audible
+function sfxNav()    { playTone(520,'sine',0.1,0.07); }   // lighter nav sound
+function sfxToggle() { playTone(700,'triangle',0.12,0.07); playTone(900,'triangle',0.08,0.05,0.05); }
 function sfxOpen()   { playTone(440,'sine',0.08,0.06); playTone(550,'sine',0.08,0.05,0.06); }
 
 // ═══ HAPTICS ═══

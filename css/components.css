@@ -184,36 +184,42 @@ input[type=range]{flex:1;accent-color:var(--fire);cursor:pointer;height:18px}
 .tribal-atmosphere-text{font-family:'Space Mono',monospace;font-size:9px;color:var(--text3);font-style:italic;letter-spacing:0.05em}
 
 /* ── VOTE PARCHMENTS ── */
-.vote-parchments{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 14px 14px}
+.vote-parchments{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 14px 14px}
 .vote-parchment{
   background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
-  aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  cursor:pointer;position:relative;overflow:hidden;transition:border-color 0.18s;user-select:none;
+  height:120px;position:relative;overflow:hidden;
+  cursor:pointer;transition:border-color 0.18s;user-select:none;
 }
 .vote-parchment:not(.flipped):hover{border-color:rgba(232,69,10,0.3)}
 .vote-parchment.next-up{border-color:rgba(232,69,10,0.3);animation:pulse-p 1.5s ease-in-out infinite}
 @keyframes pulse-p{0%,100%{box-shadow:0 0 6px rgba(232,69,10,0.1)}50%{box-shadow:0 0 16px rgba(232,69,10,0.3)}}
 .vote-parchment.flipping{animation:pflip 0.45s ease forwards}
 @keyframes pflip{0%{transform:rotateY(0)scale(1)}40%{transform:rotateY(90deg)scale(1.04)}60%{transform:rotateY(90deg)scale(1.04)}100%{transform:rotateY(0)scale(1)}}
-.vp-front,.vp-back{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.1s}
+.vp-inner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.vp-front,.vp-back{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.15s;padding:8px}
 .vp-back{background:linear-gradient(135deg,var(--panel2),var(--panel));opacity:0;pointer-events:none}
 .vote-parchment.flipped .vp-front{opacity:0;pointer-events:none}
 .vote-parchment.flipped .vp-back{opacity:1;pointer-events:all}
-.vp-scroll-icon{font-size:26px;margin-bottom:5px}
-.vp-label{font-family:'Space Mono',monospace;font-size:8px;color:var(--text3);letter-spacing:0.08em}
-.vp-target-name{font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:0.04em;margin-top:4px}
-.vp-voter-name{font-family:'Space Mono',monospace;font-size:8px;color:var(--text3);margin-top:2px}
-.vote-tally-dot{width:7px;height:7px;border-radius:50%;background:var(--fire);box-shadow:0 0 5px var(--fire);display:inline-block;margin:2px}
-.tally-display{padding:0 14px 8px}
-.tally-chip{
-  display:flex;align-items:center;gap:7px;padding:6px 10px;
-  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
-  margin-bottom:5px;transition:all 0.3s;animation:cin 0.3s ease both;
-}
-.tally-chip.leader{border-color:rgba(232,69,10,0.35);background:rgba(232,69,10,0.06)}
-.tally-chip-name{font-size:13px;font-weight:700;flex:1}
+.vp-scroll-icon{font-size:22px;margin-bottom:4px}
+.vp-hint{font-family:'Space Mono',monospace;font-size:8px;color:var(--text3);letter-spacing:0.08em}
+.vp-voter-row{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.vp-voter-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.vp-voter-name{font-family:'Space Mono',monospace;font-size:8px;color:var(--text3);letter-spacing:0.06em}
+.vp-arrow-icon{font-size:12px;color:var(--text3);margin:2px 0}
+.vp-target-name{font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:0.04em;text-align:center;line-height:1}
+.vp-extra{font-family:'Space Mono',monospace;font-size:7px;color:var(--ember);letter-spacing:0.1em;text-transform:uppercase;margin-top:3px}
+.vote-tally-dot{width:6px;height:6px;border-radius:50%;background:var(--fire);box-shadow:0 0 4px var(--fire);display:inline-block;margin:2px}
+.running-tally{padding:0 14px 10px}
+.tally-label{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:0.14em;color:var(--text3);text-transform:uppercase;margin-bottom:8px}
+.tally-display{display:flex;flex-direction:column;gap:5px}
+.tally-chip{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);transition:all 0.3s;animation:cin 0.3s ease both;}
+.tally-chip.tally-elim,.tally-chip.leader{border-color:rgba(232,69,10,0.4);background:rgba(232,69,10,0.07)}
+.tally-portrait{width:24px;height:29px;border-radius:3px;overflow:hidden;flex-shrink:0;line-height:0}
+.tally-name,.tally-chip-name{font-size:13px;font-weight:700;flex:1;letter-spacing:0.01em}
+.tally-count{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--fire)}
 .tally-chip-dots{display:flex;gap:3px;flex-wrap:wrap}
 .tally-chip-count{font-family:'Space Mono',monospace;font-size:11px;color:var(--text3)}
+
 
 /* ── ELIMINATION BANNER ── */
 .elim-banner-big{
