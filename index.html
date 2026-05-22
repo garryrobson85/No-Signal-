@@ -74,7 +74,10 @@
       <div id="header-ep-badge" style="display:none" class="header-ep-badge">
         <span id="hdr-ep-txt"></span>
       </div>
-      <button class="dark-toggle-btn" id="sound-hdr-btn" data-action="toggleNsSound" title="Sound">🔇</button>
+      <button id="sound-hdr-btn" data-action="toggleNsSound" title="Toggle sound" style="display:flex;align-items:center;gap:5px;padding:5px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-family:'Space Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:0.08em;transition:all 0.18s;white-space:nowrap">
+        <span id="sound-hdr-icon">🔇</span>
+        <span id="sound-hdr-label">SOUND OFF</span>
+      </button>
       <button class="dark-toggle-btn" data-action="openDrawer" title="Settings">⚙</button>
     </div>
   </div>
@@ -346,8 +349,9 @@
       <div class="status-dot"></div>
       <div class="status-ticker" id="status-ticker">LIVE BROADCAST</div>
     </div>
-    <div style="display:flex;flex:1;min-height:0;overflow:hidden">
-      <div class="game-sidebar">
+    <div id="game-layout" style="display:flex;flex:1;min-height:0">
+      <div class="game-sidebar" id="game-sidebar">
+        <div class="sidebar-toggle-btn" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</div>
         <div class="gs-section">
           <div class="gs-section-title">Episode</div>
           <div class="gs-ep-display" id="gs-ep-num">1</div>

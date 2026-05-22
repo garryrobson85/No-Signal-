@@ -1,4 +1,4 @@
-/* No Signal v1.1.2 — dark.css — responsive + dark mode overrides */
+/* No Signal v1.1.2 — dark.css — responsive + dark mode */
 
 /* ── RESPONSIVE ── */
 @media (max-width:768px){
@@ -7,20 +7,40 @@
   .logo-text{font-size:17px!important}
   .logo-sub{display:none}
 
-  #screen-game{flex-direction:column;min-height:auto}
+  /* Game: sidebar collapses, game content always visible */
+  #screen-game{min-height:auto}
+  #game-layout{flex-direction:column!important}
+
   .game-sidebar{
-    width:100%!important;flex-direction:row;border-right:none;
-    border-bottom:1px solid var(--border);max-height:44vh;overflow-y:auto;
+    width:100%!important;max-height:0;overflow:hidden;
+    transition:max-height 0.3s ease;
+    border-right:none;border-bottom:1px solid var(--border);
+    flex-direction:column;
   }
-  .gs-section{padding:10px 12px}
+  .game-sidebar.open{max-height:50vh;overflow-y:auto}
+
+  .sidebar-toggle-btn{
+    display:flex!important;width:100%;padding:8px 14px;
+    font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;
+    color:var(--text3);cursor:pointer;background:var(--deep);
+    border-bottom:1px solid var(--border);align-items:center;gap:8px;user-select:none;
+    border:none;text-align:left;
+  }
+  .sidebar-toggle-btn::after{content:'▼  CAST & EPISODE STATS'}
+  .game-sidebar.open+* .sidebar-toggle-btn::after,
+  .game-sidebar.open .sidebar-toggle-btn::after{content:'▲  HIDE'}
+
+  .gs-section{padding:10px 12px;border-bottom:1px solid var(--border)}
   .gs-ep-display{font-size:28px}
-  .gs-player-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:5px}
-  .game-main{width:100%}
-  .ep-view{padding:0 0 80px}
+  .gs-player-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px}
+
+  .game-main{width:100%;flex:1;display:flex;flex-direction:column}
+  .ep-view{padding:0 0 120px;flex:1;overflow-y:auto}
 
   .ep-nav-bar{
-    position:fixed;bottom:0;left:0;right:0;flex-direction:column;gap:6px;
-    align-items:stretch;padding:8px 10px;z-index:90;
+    position:fixed;bottom:0;left:0;right:0;flex-direction:column;gap:5px;
+    align-items:stretch;padding:7px 10px;z-index:90;
+    background:rgba(5,6,8,0.98);border-top:1px solid var(--border);backdrop-filter:blur(12px);
   }
   .ep-nav-bar>div{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
   .ep-nav-bar .btn{font-size:11px;padding:7px 10px}
@@ -29,7 +49,6 @@
   .ep-stage-nav .btn{width:100%;justify-content:center}
 
   .vote-parchments{gap:7px}
-  .vote-parchment{width:calc(50% - 4px)}
 
   #screen-setup{flex-direction:column;min-height:auto}
   .setup-sidebar{
@@ -63,14 +82,17 @@
 
   .finale-screen{padding:20px 14px 80px}
   .winner-name{font-size:36px}
-  .finale-podium{gap:7px}
 }
 
 @media (max-width:420px){
   .gs-player-list{grid-template-columns:1fr 1fr}
-  .vote-parchment{width:calc(50% - 3px)}
   .cast-status-grid{grid-template-columns:1fr!important}
   .home-title{font-size:48px!important}
+}
+
+@media (min-width:769px){
+  .sidebar-toggle-btn{display:none!important}
+  .game-sidebar{max-height:none!important;overflow:visible!important}
 }
 
 @media (hover:none){
@@ -78,15 +100,11 @@
   .vote-parchment:hover{border-color:var(--border)}
 }
 
-/* ── DARK MODE (explicit class — kept for toggle compat) ── */
-/* Base is already dark — .dark just ensures consistency if JS adds the class */
+/* ── DARK MODE ── */
 html.dark{
   --text:rgba(255,255,255,0.92);
   --text2:rgba(255,255,255,0.52);
   --text3:rgba(255,255,255,0.24);
-  --surface:var(--panel);
-  --surface2:var(--panel2);
-  --surface3:var(--panel3);
-  --border:rgba(255,255,255,0.07);
-  --border2:rgba(255,255,255,0.13);
+  --surface:var(--panel);--surface2:var(--panel2);--surface3:var(--panel3);
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
 }

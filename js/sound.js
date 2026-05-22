@@ -132,12 +132,20 @@ function nsElimBurst() {
 function toggleNsSound() {
   NS.sound = !NS.sound;
   nsSave();
-  const btn = document.getElementById('sound-hdr-btn');
-  const icon = NS.sound ? '🔊' : '🔇';
-  if (btn) { btn.textContent = icon; btn.classList.toggle('on', NS.sound); }
+  _updateSoundBtn();
   const ts = document.getElementById('ns-t-sound');
   if (ts) ts.classList.toggle('on', NS.sound);
   if (NS.sound) { sfxTick(); hapticTap(); }
+}
+
+function _updateSoundBtn() {
+  const icon  = document.getElementById('sound-hdr-icon');
+  const label = document.getElementById('sound-hdr-label');
+  const btn   = document.getElementById('sound-hdr-btn');
+  if (icon)  icon.textContent  = NS.sound ? '🔊' : '🔇';
+  if (label) label.textContent = NS.sound ? 'SOUND ON' : 'SOUND OFF';
+  if (btn)   btn.style.borderColor = NS.sound ? 'var(--fire)' : '';
+  if (btn)   btn.style.color       = NS.sound ? 'var(--fire)' : '';
 }
 
 // ═══ SETTINGS DRAWER TOGGLE ═══
@@ -149,13 +157,7 @@ function nsToggle(key) {
   hapticTap();
   if (NS.sound) sfxTick();
   if (key==='scanlines') applyScanlinesState();
-  if (key==='sound' && NS.sound) {
-    const btn=document.getElementById('sound-hdr-btn');
-    if(btn){btn.textContent='🔊';btn.classList.add('on')}
-  } else if (key==='sound') {
-    const btn=document.getElementById('sound-hdr-btn');
-    if(btn){btn.textContent='🔇';btn.classList.remove('on')}
-  }
+  if (key==='sound') _updateSoundBtn();
 }
 
 function openDrawer() {
@@ -214,13 +216,12 @@ function setTheme(key) {
 
 // ═══ INIT ═══
 document.addEventListener('DOMContentLoaded', () => {
-  // Sync toggle states from NS
+  // Sync toggle states
   Object.keys(NS).forEach(key => {
     const el = document.getElementById('ns-t-'+key);
     if (el) el.classList.toggle('on', NS[key]);
   });
-  const btn = document.getElementById('sound-hdr-btn');
-  if (btn) { btn.textContent = NS.sound ? '🔊' : '🔇'; btn.classList.toggle('on', NS.sound); }
+  _updateSoundBtn();
   applyScanlinesState();
   // Restore theme
   try {
@@ -230,3 +231,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Dark mode class for compat (game is always dark now)
   document.documentElement.classList.add('dark');
 });
+
+// ═══ SIDEBAR TOGGLE (mobile) ═══
+function toggleSidebar() {
+  const sidebar = document.getElementById('game-sidebar');
+  if (sidebar) {
+    sidebar.classList.toggle('open');
+    hapticTap();
+  }
+}
+
+// ═══ RESUME AUDIO on first interaction (browser policy) ═══
+document.addEventListener('click', function resumeAudio() {
+  if (_actx && _actx.state === 'suspended') _actx.resume();
+}, { once: false });
