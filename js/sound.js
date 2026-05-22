@@ -28,20 +28,31 @@ function applyScanlinesState() {
 // ═══ AUDIO ═══
 let _actx = null;
 
-// Create AudioContext eagerly on FIRST user interaction — mobile browsers require this.
-// Once created during a gesture, subsequent calls work even without a gesture.
 function _initAudio() {
   if (_actx) return;
   try {
     _actx = new (window.AudioContext || window.webkitAudioContext)();
+    _actx.onstatechange = () => {
+      if (_actx && _actx.state === 'suspended') _actx.resume().catch(()=>{});
+    };
+    // Silent keep-alive ping every 20s — prevents browser from suspending the context
+    setInterval(() => {
+      if (!_actx || _actx.state === 'closed') return;
+      if (_actx.state === 'suspended') { _actx.resume(); return; }
+      try {
+        const b = _actx.createBuffer(1,1,_actx.sampleRate);
+        const s = _actx.createBufferSource();
+        s.buffer = b; s.connect(_actx.destination); s.start(0);
+      } catch(e) {}
+    }, 20000);
   } catch(e) { _actx = null; }
 }
 
 function getAC() {
   if (!NS.sound) return null;
-  if (!_actx) return null; // not yet initialised — need a user gesture first
-  if (_actx.state === 'suspended') _actx.resume().catch(()=>{});
-  return _actx;
+  if (!_actx) return null;
+  if (_actx.state !== 'running') _actx.resume().catch(()=>{});
+  return _actx.state === 'running' ? _actx : null;
 }
 
 function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
@@ -257,7 +268,12 @@ function toggleSidebar() {
   }
 }
 
-// ═══ RESUME AUDIO on first interaction (browser policy) ═══
-document.addEventListener('click', function resumeAudio() {
-  if (_actx && _actx.state === 'suspended') _actx.resume();
-}, { once: false });
+// Resume AudioContext on every user interaction — browsers can suspend it silently
+function _resumeAC() {
+  if (_actx && _actx.state !== 'running') _actx.resume().catch(()=>{});
+}
+document.addEventListener('pointerdown', _resumeAC, { passive: true });
+document.addEventListener('click', _resumeAC, { passive: true });
+document.addEventListener('touchstart', _resumeAC, { passive: true });
+// Also periodically check — some browsers suspend without any event
+setInterval(()=>{ if(_actx && _actx.state==='suspended') _actx.resume().catch(()=>{}); }, 3000);

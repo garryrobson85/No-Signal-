@@ -58,3 +58,80 @@
 /* evolution ceremony */
 .evolution-card{margin:0 14px 10px;background:linear-gradient(135deg,rgba(234,179,8,0.1),rgba(234,179,8,0.03));border:1px solid rgba(234,179,8,0.22);border-radius:var(--radius);padding:14px;animation:cin 0.5s ease both}
 .evolution-title{font-family:'Bebas Neue',cursive;font-size:20px;color:var(--win);letter-spacing:0.04em;margin-bottom:6px}
+
+/* ── CHALLENGE SCORE BARS ── */
+.score-bars{display:flex;flex-direction:column;gap:10px;margin:12px 14px 4px}
+.score-bar-row{
+  display:flex;align-items:center;gap:10px;
+  animation:fadeSlideIn 0.4s ease both;
+}
+.score-bar-label{
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;
+  width:100px;flex-shrink:0;letter-spacing:0.02em;
+}
+.score-bar-track{
+  flex:1;height:6px;background:rgba(255,255,255,0.06);
+  border-radius:3px;overflow:hidden;
+}
+.score-bar-fill{
+  height:6px;border-radius:3px;width:0%;
+}
+/* Suspenseful race — bars crawl up over 4-5s with an easing that
+   feels competitive: quick start, slows as it approaches the target */
+.score-bar-fill.score-bar-anim{
+  animation:raceBar 4.5s cubic-bezier(0.15,0.5,0.4,1.0) forwards;
+}
+/* Stagger each bar slightly so it feels like a real race */
+.score-bar-row:nth-child(1) .score-bar-fill.score-bar-anim{animation-delay:0.3s}
+.score-bar-row:nth-child(2) .score-bar-fill.score-bar-anim{animation-delay:0.5s}
+.score-bar-row:nth-child(3) .score-bar-fill.score-bar-anim{animation-delay:0.4s}
+.score-bar-row:nth-child(4) .score-bar-fill.score-bar-anim{animation-delay:0.6s}
+@keyframes raceBar{
+  0%   { width:0% }
+  15%  { width:calc(var(--target-width,100%) * 0.25) }
+  40%  { width:calc(var(--target-width,100%) * 0.6)  }
+  70%  { width:calc(var(--target-width,100%) * 0.85) }
+  88%  { width:calc(var(--target-width,100%) * 0.97) }
+  100% { width:var(--target-width,100%) }
+}
+.score-bar-val{
+  font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);
+  width:26px;text-align:right;flex-shrink:0;
+}
+/* Win/loss badges on tribe challenge result */
+.tribe-win-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(57,255,20,0.1);border:1px solid rgba(57,255,20,0.2);
+  border-radius:3px;padding:3px 8px;font-family:'Space Mono',monospace;
+  font-size:8px;color:var(--signal);letter-spacing:0.08em;text-transform:uppercase;
+  margin-left:8px;
+}
+.tribe-loss-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(232,69,10,0.1);border:1px solid rgba(232,69,10,0.2);
+  border-radius:3px;padding:3px 8px;font-family:'Space Mono',monospace;
+  font-size:8px;color:var(--fire);letter-spacing:0.08em;text-transform:uppercase;
+  margin-left:8px;
+}
+
+/* ── BADGES (used in challenge result and elsewhere) ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:3px;font-family:'Space Mono',monospace;font-size:8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase}
+.badge-win,.badge-leaf{background:rgba(57,255,20,0.1);color:var(--signal);border:1px solid rgba(57,255,20,0.2)}
+.badge-red{background:rgba(232,69,10,0.1);color:var(--fire);border:1px solid rgba(232,69,10,0.2)}
+.badge-gold{background:rgba(234,179,8,0.1);color:var(--win);border:1px solid rgba(234,179,8,0.2)}
+.badge-ice{background:rgba(0,212,255,0.1);color:var(--ice);border:1px solid rgba(0,212,255,0.2)}
+
+/* ── TIE BANNER ── */
+.tie-banner{margin:0 14px 10px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--win)}
+
+/* ── CHALLENGE HEADER CARD ── */
+.challenge-header-card{margin:0 14px 10px}
+
+/* ── RACE BARS — suspenseful animated challenge results ── */
+.race-bars{display:flex;flex-direction:column;gap:16px;margin:4px 0 8px}
+.race-row{display:flex;align-items:center;gap:10px;opacity:0}
+/* kickRaceBars() in ui.js animates width, opacity, and score counter */
+.race-label{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;width:90px;flex-shrink:0;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.race-track{flex:1;height:14px;background:rgba(255,255,255,0.05);border-radius:7px;overflow:hidden;position:relative;box-shadow:inset 0 1px 4px rgba(0,0,0,0.4)}
+.race-fill{height:100%;border-radius:7px;width:0%}
+.race-score{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;width:32px;text-align:right;flex-shrink:0;opacity:0}

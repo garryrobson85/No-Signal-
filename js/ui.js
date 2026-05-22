@@ -93,6 +93,16 @@ function renderStage(idx){
   container.innerHTML=`<div class="ep-view">${html}<\/div>`;
   // Init vote state when tribal loads
   if(idx===2&&ep.voteResult) initVoteReveal();
+  // Kick score bar animations — force reflow so animation starts from 0 reliably
+  setTimeout(()=>{
+    document.querySelectorAll('.score-bar-fill.score-bar-anim').forEach(b=>{
+      b.style.animationPlayState='paused';
+      b.getBoundingClientRect();
+      b.style.animationPlayState='running';
+    });
+    // Race bars — new cinematic system
+    if(typeof kickRaceBars==='function') kickRaceBars();
+  }, 80);
   setTimeout(()=>{
     const gm=document.querySelector('.game-main');
     if(gm) gm.scrollTo({top:gm.scrollHeight,behavior:'smooth'});
@@ -112,6 +122,56 @@ function renderStage(idx){
       <\/div>`;
     }
   }
+}
+
+// ─── RACE BAR ANIMATION ─────────────────────────────────────────────────────
+// Called by renderStage after HTML is injected. Reads data-pct and data-delay,
+// fills bars with a 4-5s ease-out cubic animation for suspense.
+// Tribe bars stagger 1400ms apart so it feels like a real race.
+function kickRaceBars(){
+  const rows=document.querySelectorAll('.race-row');
+  if(!rows.length) return;
+  const isTribe=!!document.getElementById('race-bars-tribe');
+  const raceDuration=isTribe?4000:2600;
+
+  rows.forEach((row,idx)=>{
+    const fill=row.querySelector('.race-fill');
+    const scoreEl=row.querySelector('.race-score');
+    const pct=parseFloat(fill?.dataset.pct||0);
+    const delayBase=isTribe?idx*1400:parseFloat(row.dataset.delay||300);
+
+    setTimeout(()=>{row.style.transition='opacity 0.3s ease';row.style.opacity='1';},delayBase);
+
+    setTimeout(()=>{
+      if(!fill) return;
+      fill.style.transition=`width ${raceDuration}ms cubic-bezier(0.25,0.1,0.05,1.0)`;
+      fill.style.width=pct+'%';
+      if(typeof sfxSelect==='function'&&typeof NS!=='undefined'&&NS.sound) sfxSelect();
+    },delayBase+80);
+
+    setTimeout(()=>{
+      if(!scoreEl) return;
+      scoreEl.style.opacity='1';
+      const target=parseInt(scoreEl.textContent||0);
+      scoreEl.textContent='0';
+      let start=null;
+      function countUp(ts){
+        if(!start) start=ts;
+        const p=Math.min((ts-start)/raceDuration,1);
+        const e=1-Math.pow(1-p,3);
+        scoreEl.textContent=Math.round(e*target);
+        if(p<1) requestAnimationFrame(countUp);
+        else scoreEl.textContent=target;
+      }
+      requestAnimationFrame(countUp);
+    },delayBase+100);
+  });
+
+  const lastDelay=isTribe?(rows.length-1)*1400+raceDuration+200:raceDuration+400;
+  setTimeout(()=>{
+    if(typeof sfxWin==='function'&&typeof NS!=='undefined'&&NS.sound) sfxWin();
+    if(typeof hapticWin==='function') hapticWin();
+  },lastDelay);
 }
 
 function buildEpisodeHeader(ep){
@@ -310,50 +370,63 @@ function confirmChallenge(){
 function buildStageChallenge(ep){
   const r=ep.challengeResult; if(!r) return '';
   let html=`<div class="stage-block anim-in"><div class="stage-label">🏆 The Challenge: ${r.name}<\/div>`;
-  html+=`<div class="challenge-header-card" style="background:linear-gradient(135deg,#0EA5E910,#0EA5E905);border:1px solid #0EA5E930;border-radius:var(--radius-lg);padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:14px">
+
+  // Challenge header card
+  html+=`<div class="challenge-header-card" style="background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(14,165,233,0.03));border:1px solid rgba(14,165,233,0.2);border-radius:var(--radius);padding:16px;margin:0 14px 10px;display:flex;align-items:center;gap:14px">
     <div style="font-size:40px">${r.icon||'🏆'}<\/div>
-    <div><div style="font-size:18px;font-weight:700">${r.name}<\/div><div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">${r.flavor||''}<\/div><\/div>
+    <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700">${r.name}<\/div><div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">${r.flavor||''}<\/div><\/div>
   <\/div>`;
-  if(r.tieMsg) html+=`<div class="tie-banner">⚖️ ${r.tieMsg}<\/div>`;
+
+  if(r.tieMsg) html+=`<div style="margin:0 14px 10px;padding:10px 14px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:var(--radius);font-size:12px;color:var(--warn)">⚖️ ${r.tieMsg}<\/div>`;
+
   if(r.type==='individual'){
-    const top=r.scores.slice(0,Math.min(6,r.scores.length));
+    // Individual immunity — winner reveal then score bars
+    const top=r.scores?r.scores.slice(0,Math.min(8,r.scores.length)):[];
     const maxS=Math.max(...top.map(s=>s.score),1);
-    html+=`<div class="event-card type-challenge"><div class="event-card-type">Individual Immunity · ${r.stat.toUpperCase()}<\/div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <div style="width:48px;height:56px;flex-shrink:0">${r.winner?getPortrait(r.winner):''}<\/div>
-        <div><span class="badge badge-win" style="font-size:13px;padding:6px 12px">🛡️ ${r.winner?.name||'?'} wins immunity!<\/span><\/div>
+    html+=`<div class="event-card type-challenge"><div class="event-card-type">Individual Immunity · ${(r.stat||'').toUpperCase()}<\/div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <div style="width:48px;height:56px;flex-shrink:0;border-radius:5px;overflow:hidden">${r.winner?getPortrait(r.winner):''}<\/div>
+        <div style="font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:0.03em">🛡️ ${r.winner?.name||'?'}<br><span style="font-size:14px;font-family:'Space Mono',monospace;color:var(--signal);letter-spacing:0.08em">WINS IMMUNITY<\/span><\/div>
+      <\/div>
+      <div class="race-bars" id="race-bars-ind">`;
+    top.forEach((s,i)=>{
+      const pct=Math.round(s.score/maxS*100);
+      html+=`<div class="race-row" data-delay="${300+i*200}">
+        <div class="race-label" style="color:${s.color||'var(--text)'}">${(s.name||'').split(' ')[0]}<\/div>
+        <div class="race-track"><div class="race-fill" style="background:${s.color||'var(--fire)'}" data-pct="${pct}"><\/div><\/div>
+        <div class="race-score">${s.score}<\/div>
       <\/div>`;
-    if(G.settings.showScores){
-      html+=`<div class="score-bars animated-bars">`;
-      top.forEach((s,i)=>{html+=`<div class="score-bar-row" style="animation-delay:${i*0.12}s">
-        <span class="score-bar-label" style="display:flex;align-items:center;gap:5px">
-          <span style="width:14px;height:14px;border-radius:50%;background:${s.color};display:inline-block;flex-shrink:0"><\/span>
-          <span style="font-size:11px;${i===0?'font-weight:700':''}">${s.name.split(' ')[0]}<\/span>
-        <\/span>
-        <div class="score-bar-track"><div class="score-bar-fill score-bar-anim" style="--target-width:${Math.round(s.score/maxS*100)}%;background:${s.color}"><\/div><\/div>
-        <span class="score-bar-val">${s.score}<\/span>
-      <\/div>`;});
-      html+=`<\/div>`;
-    }
-    html+=`<\/div>`;
+    });
+    html+=`<\/div><\/div>`;
   } else {
-    const maxS=Math.max(...(r.scores||[]).map(s=>s.totalScore),1);
-    html+=`<div class="event-card type-challenge"><div class="event-card-type">Tribe Challenge · ${r.stat.toUpperCase()}<\/div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <span class="badge badge-leaf">👑 ${r.winner?.team?.name||'?'} wins!<\/span>
-        <span class="badge badge-red">⚠️ ${r.loser?.team?.name||'?'} goes to tribal<\/span>
+    // Tribe challenge — suspenseful bar race
+    const scores=r.scores||[];
+    const maxS=Math.max(...scores.map(s=>s.totalScore||0),1);
+    const winner=r.winner?.team;
+    const loser=r.loser?.team;
+
+    html+=`<div class="event-card type-challenge">
+      <div class="event-card-type">Tribe Challenge · ${(r.stat||'').toUpperCase()}<\/div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(57,255,20,0.1);border:1px solid rgba(57,255,20,0.2);border-radius:3px;padding:4px 10px;font-family:'Space Mono',monospace;font-size:9px;color:var(--signal);letter-spacing:0.08em">👑 ${winner?.name||'?'} wins!<\/span>
+        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(232,69,10,0.1);border:1px solid rgba(232,69,10,0.2);border-radius:3px;padding:4px 10px;font-family:'Space Mono',monospace;font-size:9px;color:var(--fire);letter-spacing:0.08em">⚠️ ${loser?.name||'?'} goes to tribal<\/span>
+      <\/div>
+      <div class="race-bars" id="race-bars-tribe">`;
+
+    scores.forEach((s,i)=>{
+      const pct=Math.round(Math.max(0,s.totalScore||0)/maxS*100);
+      const color=s.team?.color||'var(--fire)';
+      html+=`<div class="race-row" data-delay="${400+i*600}">
+        <div class="race-label" style="color:${color};font-weight:700">${s.team?.name||'?'}<\/div>
+        <div class="race-track">
+          <div class="race-fill" style="background:linear-gradient(90deg,${color},${color}88)" data-pct="${pct}"><\/div>
+        <\/div>
+        <div class="race-score" style="color:${color}">${Math.max(0,s.totalScore||0)}<\/div>
       <\/div>`;
-    if(G.settings.showScores&&r.scores){
-      html+=`<div class="score-bars animated-bars">`;
-      r.scores.forEach((s,i)=>{html+=`<div class="score-bar-row" style="animation-delay:${i*0.15}s">
-        <span class="score-bar-label" style="color:${s.team.color};font-weight:600;font-size:12px">${s.team.name}<\/span>
-        <div class="score-bar-track"><div class="score-bar-fill score-bar-anim" style="--target-width:${Math.round(Math.max(0,s.totalScore)/Math.max(maxS,1)*100)}%;background:${s.team.color}"><\/div><\/div>
-        <span class="score-bar-val">${Math.max(0,s.totalScore)}<\/span>
-      <\/div>`;});
-      html+=`<\/div>`;
-    }
-    html+=`<\/div>`;
+    });
+    html+=`<\/div><\/div>`;
   }
+
   html+=`<\/div>`;
   return html;
 }
