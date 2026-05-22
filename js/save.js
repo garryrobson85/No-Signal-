@@ -13,7 +13,7 @@ function loadQuickDemo(){
   ].forEach(([name,color,personality,archetype,phy,soc,men,end])=>G.cast.push(makeContestant({name,color,personality,archetype,physical:phy,social:soc,mental:men,endurance:end})));
   G.teams=[{id:uid(),name:'Tribe Fang',color:'#E8450A'},{id:uid(),name:'Tribe Kota',color:'#0EA5E9'}];
   G.cast.forEach((c,i)=>c.team=i%2);
-  G.settings={name:'No Signal: Demo Season',theme:'Tropical Volcanic Island',flavor:'drama',seed:'demo-v19',mergeEpisode:5,finaleSize:3,
+  G.settings={name:'No Signal: Demo Season',theme:'Tropical Volcanic Island',flavor:'drama',seed:'demo-season-1',mergeEpisode:5,finaleSize:3,
     voteSystem:'plurality',tiebreak:'fire',alliances:true,confessionals:true,drama:true,idols:true,jury:true,
     interactions:true,streaks:true,log:true,twistFreq:20,randomness:35,allianceStr:65,idolDiff:'medium',
     dramaRate:'medium',tone:'dramatic',showScores:true,showVotes:true,returnees:true};
@@ -30,7 +30,26 @@ function continueGame(){showGameScreen();if(G.currentEpData)renderStage(G.stageI
 // ===== SAVE / LOAD =====
 const SAVE_VERSION=19;
 const SAVE_KEY='nosignal_save_v19';
-const LEGACY_SAVE_KEYS=['nosignal_save_v18','nosignal_save_v1'];
+// All known past key names — scanned in order newest→oldest so we always prefer the freshest.
+const LEGACY_SAVE_KEYS=[
+  'nosignal_save_v18','nosignal_save_v17','nosignal_save_v16',
+  'nosignal_save_v15','nosignal_save_v12','nosignal_save_v10',
+  'nosignal_save_v5','nosignal_save_v4','nosignal_save_v3',
+  'nosignal_save_v2','nosignal_save_v1',
+  'noSignalSave','no_signal_save','nosignal_save',   // pre-versioned key variants
+];
+
+// Default settings — used to fill in any field an old save is missing.
+// Every key the engine reads from G.settings must have a fallback here.
+const SETTINGS_DEFAULTS = {
+  name:'No Signal: Season 1', theme:'Remote Island', flavor:'drama', seed:'',
+  mergeEpisode:6, finaleSize:3, voteSystem:'plurality', tiebreak:'revote',
+  alliances:true, confessionals:true, drama:true, idols:true, jury:true,
+  interactions:true, streaks:true, log:true,
+  twistFreq:15, randomness:30, allianceStr:60, idolDiff:'medium',
+  dramaRate:'medium', tone:'dramatic', showScores:true, showVotes:false,
+  returnees:true, rejoinEpisode:4, rejoinCount:1,
+};
 
 function stripRuntimeFields(contestant){
   const {_portrait,_portraitKey,...rest}=contestant||{};
@@ -60,37 +79,86 @@ function buildSavePayload(){
 function getSaveRaw(){
   try{
     const current=localStorage.getItem(SAVE_KEY);
-    if(current) return current;
+    if(current) return {raw:current, fromKey:SAVE_KEY};
     for(const key of LEGACY_SAVE_KEYS){
       const legacy=localStorage.getItem(key);
-      if(legacy) return legacy;
+      if(legacy) return {raw:legacy, fromKey:key};
     }
   }catch(e){}
   return null;
 }
-// Schema migrations — keyed by FROM version. Each migrator returns the upgraded save object.
-// Add a new entry whenever buildSavePayload's shape changes meaningfully.
+function hasSavedGame(){
+  return !!getSaveRaw();
+}
+
+// Schema migrations — keyed by FROM version.
 const SAVE_MIGRATIONS = {
-  // Example: 1: (save) => { save.newField = save.newField || []; save.version = 2; return save; }
-  // Currently a no-op chain — slot here when real shape changes ship.
+  // Slot new migrations here as the schema evolves.
+  // Example: 17: (save) => { save.newField = []; save.version = 18; return save; }
 };
+
 function migrateSaveIfNeeded(raw){
-  const save=JSON.parse(raw);
-  save.version=save.version||1;
-  save.schema=save.schema||'nosignal-season-save';
-  // Walk migrations in order until we're at the current schema version.
+  let save;
+  try { save=JSON.parse(raw); } catch(e){ throw new Error('Save file is not valid JSON'); }
+  save.version = save.version || 1;
+  save.schema  = save.schema  || 'nosignal-season-save';
+
+  // Walk explicit version migrations
   let safety=0;
   while(SAVE_MIGRATIONS[save.version] && safety++ < 32){
-    const fn=SAVE_MIGRATIONS[save.version];
-    try { Object.assign(save, fn(save)); }
-    catch(e){ console.error(`Migration from v${save.version} failed:`,e); break; }
+    try { Object.assign(save, SAVE_MIGRATIONS[save.version](save)); }
+    catch(e){ console.error(`Migration v${save.version} failed:`,e); break; }
   }
-  // Defensive defaults — if a legacy save predates a field that's now expected, fill it.
-  if(!Array.isArray(save.episodeLog)) save.episodeLog=[];
-  if(!Array.isArray(save.allianceLog)) save.allianceLog=[];
-  if(!Array.isArray(save.memories)) save.memories=[];
-  if(!Array.isArray(save.placementHistory)) save.placementHistory=[];
-  if(!save.perceivedRelationships) save.perceivedRelationships={};
+
+  // ── Settings: fill every missing field from SETTINGS_DEFAULTS ────────
+  save.settings = Object.assign({}, SETTINGS_DEFAULTS, save.settings||{});
+
+  // ── Arrays: guarantee required array fields exist ─────────────────────
+  const arrayFields=['episodeLog','allianceLog','memories','placementHistory',
+                     'idolHolders','extraVoteHolders','stealVoteHolders','alliances','cast','teams'];
+  arrayFields.forEach(k=>{ if(!Array.isArray(save[k])) save[k]=[]; });
+
+  // ── Objects: guarantee required object fields exist ───────────────────
+  if(!save.relationships || typeof save.relationships!=='object') save.relationships={};
+  if(!save.perceivedRelationships || typeof save.perceivedRelationships!=='object') save.perceivedRelationships={};
+  if(!save.producerPowers || typeof save.producerPowers!=='object') save.producerPowers={};
+  if(!save.challengeWinStreaks || typeof save.challengeWinStreaks!=='object') save.challengeWinStreaks={};
+
+  // ── Jury: old saves stored full contestant objects, new code stores ids only ──
+  if(Array.isArray(save.jury)){
+    save.jury = save.jury.map(j=>{
+      if(typeof j==='string') return j;         // already an id
+      if(j && typeof j==='object' && j.id) return j.id;  // full object → extract id
+      return null;
+    }).filter(Boolean);
+  } else {
+    save.jury=[];
+  }
+
+  // ── Cast: backfill any missing contestant fields ──────────────────────
+  const CAST_DEFAULTS={eliminated:false,juryMember:false,winner:false,allianceIds:[],
+                       challengeWins:0,immunity:false,elimEp:null,archetypeHistory:[]};
+  save.cast = save.cast.map(c=>{
+    if(!c || typeof c!=='object') return null;
+    const filled=Object.assign({},CAST_DEFAULTS,c);
+    if(!Array.isArray(filled.allianceIds)) filled.allianceIds=[];
+    if(!Array.isArray(filled.archetypeHistory)) filled.archetypeHistory=[];
+    // Sanitize name/id
+    if(typeof filled.name!=='string' || !filled.name) filled.name='Unknown';
+    if(typeof filled.id!=='string' || !filled.id) filled.id=Math.random().toString(36).slice(2,8);
+    return filled;
+  }).filter(Boolean);
+
+  // ── Scalars: guarantee primitive fields have sane values ─────────────
+  if(typeof save.episode!=='number' || save.episode<1) save.episode=1;
+  if(typeof save.merged!=='boolean') save.merged=!!save.merged;
+  if(typeof save.dramaLevel!=='number') save.dramaLevel=0;
+  if(typeof save.stageIndex!=='number') save.stageIndex=0;
+  if(typeof save.fanSaveUsed!=='boolean') save.fanSaveUsed=!!save.fanSaveUsed;
+  save.fanSavePlayer = save.fanSavePlayer||null;
+  save.rngState = save.rngState||null;
+
+  save._migrated = (save.version < SAVE_VERSION); // flag so loadGame can show a notice
   return save;
 }
 function downloadTextFile(filename, text, mime='application/json'){
@@ -165,28 +233,58 @@ function applyLoadedSave(save){
 }
 function loadGame(){
   try {
-    const raw=getSaveRaw();
-    if(!raw) return false;
+    const found=getSaveRaw();
+    if(!found) return false;
+    const {raw, fromKey} = found;
     const save=migrateSaveIfNeeded(raw);
     applyLoadedSave(save);
-    // Re-save legacy saves under the v19 key after a successful migration.
+    // After a successful load from any key, re-save under the current key.
+    // This means legacy saves are automatically promoted on first load.
     saveGame(true);
     document.getElementById('header-ep-badge').style.display='flex';
     showGameScreen();
     if(G.currentEpData) renderStage(G.stageIndex||0);
     else computeAndStartEpisode();
-    notify('✅ Save loaded','win');
+    // Show a clear notice if the save came from an older version
+    if(save._migrated || fromKey!==SAVE_KEY){
+      const oldVersion = save.version || '?';
+      const castCount = (G.cast||[]).length;
+      const ep = G.episode||1;
+      notify(`⬆️ Older save migrated (v${oldVersion} → v${SAVE_VERSION}). ${castCount} cast, Episode ${ep}. Saved under current version.`,'win');
+      // Export a backup automatically so the user has the migrated save as a file
+      setTimeout(()=>{
+        try { exportSaveFile(); notify('💾 Backup exported — keep this file safe','win'); } catch(e){}
+      }, 1200);
+    } else {
+      notify('✅ Save loaded','win');
+    }
     return true;
   } catch(e){
     console.error('Load failed:',e);
-    notify('Load failed — save may be corrupted');
+    // Try the backup slot before giving up
+    try {
+      const backupRaw = localStorage.getItem(SAVE_KEY+'_backup');
+      if(backupRaw){
+        const save=migrateSaveIfNeeded(backupRaw);
+        applyLoadedSave(save);
+        saveGame(true);
+        document.getElementById('header-ep-badge').style.display='flex';
+        showGameScreen();
+        if(G.currentEpData) renderStage(G.stageIndex||0);
+        else computeAndStartEpisode();
+        notify('⚠️ Main save failed — loaded from backup slot','win');
+        return true;
+      }
+    } catch(e2){ console.error('Backup load also failed:',e2); }
+    notify('❌ Load failed — save may be corrupted. Try importing a .json export.');
     return false;
   }
 }
 function exportSaveFile(){
   try{
     const payload=buildSavePayload();
-    downloadTextFile(`${seasonSlug()}-v19-save.json`, JSON.stringify(payload,null,2));
+    const ver = (typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'v1').replace(/\./g,'-');
+    downloadTextFile(`${seasonSlug()}-${ver}-save.json`, JSON.stringify(payload,null,2));
     notify('⬇ Save exported','win');
   }catch(e){ console.error(e); notify('Export failed'); }
 }
@@ -201,12 +299,21 @@ function importSaveFile(event){
   reader.onload=()=>{
     try{
       const save=migrateSaveIfNeeded(String(reader.result||''));
-      if(!Array.isArray(save.cast)) throw new Error('Missing cast array');
+      if(!Array.isArray(save.cast)||save.cast.length===0) throw new Error('No cast found in save file');
       localStorage.setItem(SAVE_KEY,JSON.stringify(save));
       applyLoadedSave(save);
       updateContinueButton();
-      notify('⬆ Save imported','win');
-    }catch(e){ console.error(e); notify('Import failed — not a valid No Signal save'); }
+      const wasLegacy = save._migrated || (save.version && save.version < SAVE_VERSION);
+      const castCount = (G.cast||[]).length;
+      if(wasLegacy){
+        notify(`⬆️ Older save imported & migrated (v${save.version||'?'}). ${castCount} cast loaded — click Resume to continue.`,'win');
+      } else {
+        notify(`⬆️ Save imported — ${castCount} cast, Episode ${save.episode||1}. Click Resume to continue.`,'win');
+      }
+    }catch(e){
+      console.error('Import failed:',e);
+      notify('❌ Import failed — '+((e.message||'').slice(0,60)||'not a valid No Signal save'));
+    }
     event.target.value='';
   };
   reader.readAsText(file);
