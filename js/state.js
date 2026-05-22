@@ -89,8 +89,8 @@ function _showNextNotify(){
     setTimeout(_showNextNotify,300);
   },2200);
 }
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('active');}
+function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('active');}
 function goHome(){
   // Auto-save if there's an active game
   if(G.currentEpData&&G.cast.length) saveGame(true);
