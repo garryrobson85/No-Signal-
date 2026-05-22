@@ -49,23 +49,30 @@ function _initAudio() {
 }
 
 function getAC() {
-  if (!NS.sound) return null;
-  if (!_actx) return null;
-  if (_actx.state !== 'running') _actx.resume().catch(()=>{});
-  return _actx.state === 'running' ? _actx : null;
+  if (!NS.sound || !_actx) return null;
+  return _actx; // always return — playTone handles suspended state
 }
 
 function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
-  const c = getAC(); if (!c) return;
-  try {
-    const o = c.createOscillator(), g = c.createGain();
-    o.connect(g); g.connect(c.destination);
-    o.type = t; o.frequency.value = f;
-    const T = c.currentTime + delay;
-    g.gain.setValueAtTime(v, T);
-    g.gain.exponentialRampToValueAtTime(0.001, T + d);
-    o.start(T); o.stop(T + d);
-  } catch(e) {}
+  if (!NS.sound || !_actx) return;
+  const doPlay = () => {
+    try {
+      const c = _actx;
+      const o = c.createOscillator(), g = c.createGain();
+      o.connect(g); g.connect(c.destination);
+      o.type = t; o.frequency.value = f;
+      const T = c.currentTime + delay;
+      g.gain.setValueAtTime(v, T);
+      g.gain.exponentialRampToValueAtTime(0.001, T + d);
+      o.start(T); o.stop(T + d);
+    } catch(e) {}
+  };
+  if (_actx.state === 'running') {
+    doPlay();
+  } else {
+    // Context is suspended — resume first, then play
+    _actx.resume().then(doPlay).catch(()=>{});
+  }
 }
 
 function sfxVote()   { playTone(220,'sine',0.07,0.12); playTone(440,'sine',0.1,0.09,0.05); playTone(330,'triangle',0.18,0.07,0.09); }
