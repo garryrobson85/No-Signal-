@@ -56,8 +56,9 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
 }
-// Shorthand for templates: `${esc(name)}` is easier on the eyes than the full name.
-const esc=escapeHtml;
+// Shorthand for templates — declared as function so it's hoisted and globally accessible
+// in all contexts including inline onclick handlers.
+function esc(s){ return escapeHtml(s); }
 
 let _notifyQueue=[],_notifyShowing=false,_lastNotifyMsg='';
 function notify(msg,type='fire'){
