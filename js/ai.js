@@ -321,9 +321,6 @@ function initDarkMode(){
 document.addEventListener('DOMContentLoaded',()=>{
   initDarkMode();
   initGeminiKeyField();
-  // Stamp the display version from the JS constant so HTML never needs a manual edit
-  const verLabel = document.getElementById('app-version-label');
-  if(verLabel && typeof APP_VERSION !== 'undefined') verLabel.textContent = APP_VERSION;
   // Note: initTeams, renderTwistsGrid, updateContinueButton are called
   // from their own modules (state.js / save.js) — not duplicated here
 });

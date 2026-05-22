@@ -39,10 +39,8 @@ function buildConfessionalText(player, ep){
   });
   const hasIdol=G.idolHolders.includes(player.id);
   const votesAgainstMe=(ep.voteResult?.tally?.[player.id]||0);
-  // NOTE: ep.eliminated is intentionally NOT referenced here.
-  // Confessionals are diary-room recordings filmed throughout the episode —
-  // not post-tribal debriefs. They must not reference who was voted out.
-  // Exit speeches and final words (in buildStageElimination) handle that.
+  const elimName=ep.eliminated?.name.split(' ')[0];
+  const elimArch=ep.eliminated?.archetype;
   const wonChallenge=ep.challengeResult?.winner?.id===player.id
     ||(ep.challengeResult?.winner?.ti!=null&&ep.challengeResult?.winner?.ti===player.team);
   const merged=G.merged;
@@ -51,21 +49,16 @@ function buildConfessionalText(player, ep){
   // Build a specific, contextual confessional from real state
   const lines=[];
 
-  // React to receiving votes (pre-vote awareness — they can feel pressure building)
+  // React to the vote if they were involved
   if(votesAgainstMe>0) lines.push(`${votesAgainstMe>1?`${votesAgainstMe} votes came my way`:'My name came up at tribal'}. I felt it. I knew. But I'm still here — and that tells me more about this game than any alliance meeting ever could.`);
-
-  // Alliance state — use varied language, no clichés
-  if(allies.length>0){
-    const allyList=allies.length===1?`${allies[0]} and I`:`${allies.slice(0,-1).join(', ')} and ${allies[allies.length-1]}`;
-    const allianceLines=merged
-      ? [`${allyList} are the ones I trust. Post-merge, that trust gets tested every single day.`,
-         `My core is ${allyList}. The further we go, the more each vote costs someone.`,
-         `${allyList} — that's who I'm going to the end with. If they feel the same way.`]
-      : [`${allyList} — we've built something real here. Whether it holds is the question.`,
-         `Right now I'm locked in with ${allyList}. The whole tribe is reading each other and I need to stay ahead of that.`,
-         `${allyList} and I are on the same page. For now. This game has a way of rewriting those pages.`];
-    lines.push(pick(allianceLines));
+  if(elimName&&ep.eliminated?.id!==player.id){
+    const betrayed=(ep.voteResult?.individualVotes||[]).some(v=>v.voter.id===player.id&&v.target.id===ep.eliminated?.id);
+    if(betrayed) lines.push(`I voted ${elimName} out. ${elimArch?`${elimName} was ${elimArch.toLowerCase()} and that made them dangerous`:'It wasn\'t personal — it was necessary'}. I won\'t lose sleep over it.`);
+    else lines.push(`${elimName} is gone. ${elimArch?`A ${elimArch.toLowerCase()}`:'Someone'} who had more game left in them than people realised. The tribe made their call. I made mine.`);
   }
+
+  // Alliance state
+  if(allies.length>0) lines.push(`${allies.length===1?`${allies[0]} and I`:`${allies.slice(0,-1).join(', ')} and ${allies[allies.length-1]} — that\'s my core`}. ${merged?'Post-merge, every vote matters more. We can\'t afford a crack.':'Pre-merge, we stay tight. One crack and we\'re done.'}`);
 
   // Idol awareness
   if(hasIdol) lines.push(`I\'m carrying something that nobody else knows about. The timing has to be perfect — play it too early and I waste it, too late and I go home with it in my pocket.`);

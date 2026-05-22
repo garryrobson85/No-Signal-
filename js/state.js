@@ -6,11 +6,6 @@
 // Bump on actual schema changes, not casual edits.
 const PROJECT_VERSION = 'no-signal-v4';
 
-// Display version shown to users in the UI. Completely separate from SAVE_VERSION
-// (which tracks save schema compatibility and must not be changed lightly).
-// Bump this whenever you ship a meaningful update.
-const APP_VERSION = 'v1.1';
-
 let G = {
   cast:[], teams:[], settings:{},
   twists:new Set(TWISTS_DATA.map(t=>t.id)),
@@ -61,9 +56,8 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
 }
-// Shorthand for templates — declared as function so it's hoisted and globally accessible
-// in all contexts including inline onclick handlers.
-function esc(s){ return escapeHtml(s); }
+// Shorthand for templates: `${esc(name)}` is easier on the eyes than the full name.
+const esc=escapeHtml;
 
 let _notifyQueue=[],_notifyShowing=false,_lastNotifyMsg='';
 function notify(msg,type='fire'){
