@@ -265,6 +265,3 @@ function getArchetypeHistory(contestant) {
     .map(h => `Ep ${h.episode}: ${h.from} → ${h.to}`)
     .join(' · ');
 }
-
-// ===== EXPORTS =====
-export { EVOLUTION_RULES, checkArchetypeEvolution, buildEvolutionDisplay, getArchetypeHistory, buildEvolutionCeremony };

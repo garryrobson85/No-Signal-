@@ -1,7 +1,7 @@
 // No Signal — ai.js
 // Gemini API integration, prompt builder, AI dialogue generation
 
-// ===== GEMINI AI DIALOGUE GENERATION =====
+// ===== GEMINI API KEY MANAGEMENT =====
 const GEMINI_KEY_STORE='nosignal_gemini_key';
 function showGeminiHelp(){openModal('modal-gemini-help');}
 async function testGeminiKey(){
@@ -38,96 +38,178 @@ function initGeminiKeyField(){
   if(el){const k=getGeminiKey();if(k) el.value=k;}
 }
 
-// Build the episode prompt for Gemini — tight, specific, structured
+// ===== TEXT POST-PROCESSOR =====
+// Strips common AI artifacts from generated text before display
+function cleanNarrativeText(text){
+  if(!text||typeof text!=='string') return text;
+  return text
+    // Strip markdown formatting that leaked through
+    .replace(/\*\*(.*?)\*\*/g,'$1')
+    .replace(/\*(.*?)\*/g,'$1')
+    // Remove trailing calls-to-action / production commentary
+    .replace(/\s*(Stay tuned[^.]*\.|Tune in[^.]*\.|Don't miss[^.]*\.|Next time on[^.]*\.)/gi,'')
+    // Remove self-referential meta lines
+    .replace(/\s*(This is [Ss]urvivor|This is reality TV|As a contestant[^.]*\.)/g,'')
+    // Collapse multiple spaces / fix punctuation spacing
+    .replace(/\s{2,}/g,' ')
+    .replace(/\s([.,!?])/g,'$1')
+    .trim();
+}
+
+// ===== PROMPT BUILDER =====
+// Build the Gemini episode prompt — tight, specific, no filler
 function buildEpisodePrompt(ep){
+  const isEp1 = ep.ep===1;
   const active=G.cast.filter(c=>!c.eliminated||(c.elimEp&&c.elimEp>=ep.ep));
   const eliminated=ep.eliminated;
   const tally=ep.voteResult?.tally||{};
-  const swapKnown=hasSwapOccurredByEpisode(ep);
-  const mergeKnown=hasMergeOccurredByEpisode(ep);
-  const forbiddenTopics=[];
-  if(!swapKnown) forbiddenTopics.push('tribe swap','swap','post-swap','new tribe','swapped tribes');
-  if(!mergeKnown) forbiddenTopics.push('merge','post-merge','jury','final tribal');
-  if(ep.ep===1) forbiddenTopics.push('blindside','betrayal','resume','voting bloc','for weeks','all season');
 
-  // Narrative compression — use summaries not raw objects (~65% fewer tokens)
+  // --- Season context (compressed) ---
   const recentSummaries=G.episodeLog
     .filter(e=>e.summary&&e.ep<ep.ep).slice(-4)
-    .map(e=>e.summary).join(' / ');
+    .map(e=>`Ep${e.ep}: ${e.summary}`).join(' | ');
+
+  // --- Key memories (betrayals, saves, idol plays) ---
   const keyMemories=(G.memories||[])
     .filter(m=>['betrayal','saved','idol_played_on'].includes(m.type)&&m.episode>=ep.ep-3)
-    .slice(0,6)
+    .slice(0,5)
     .map(m=>{
       const s=G.cast.find(c=>c.id===m.subject),o=G.cast.find(c=>c.id===m.object);
-      return `${s?.name?.split(' ')[0]||'?'} ${m.type.replace(/_/g,' ')} ${o?.name?.split(' ')[0]||'?'}(ep${m.episode})`;
+      return `${s?.name?.split(' ')[0]||'?'} ${m.type.replace(/_/g,' ')} ${o?.name?.split(' ')[0]||'?'} (ep${m.episode})`;
     }).join('; ');
-  const allianceDesc=G.alliances
-    .map(a=>{
-      const names=a.members.map(id=>G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean);
-      return names.length>=2?names.join('+'):null;
-    }).filter(Boolean).join(' | ');
+
+  // --- Alliance health context ---
+  const allianceDesc=G.alliances.map(a=>{
+    const names=a.members.map(id=>G.cast.find(c=>c.id===id)?.name.split(' ')[0]).filter(Boolean);
+    if(names.length<2) return null;
+    const str=a.strength||50;
+    const health=str>=70?'strong':str>=40?'shaky':'fragile';
+    return `${names.join('+')} [${health}, str:${str}]`;
+  }).filter(Boolean).join(' | ');
+
+  // --- Vote tally (for post-vote sections only) ---
   const voteLines=Object.entries(tally).map(([id,v])=>{
     const p=G.cast.find(c=>c.id===id);
-    return p?`${v}v→${p.name.split(' ')[0]}(${p.archetype})`:null;
+    return p?`${p.name.split(' ')[0]}: ${v} vote${v!==1?'s':''}`:null;
   }).filter(Boolean).join(', ');
-  const confPlayers=(ep.confessionals||[]).map(c=>`${c.who.name} (${c.who.archetype}, ${c.who.personality}, ${c.who.challengeWins||0} challenge wins${G.idolHolders.includes(c.who.id)?' — has idol':''}${tally[c.who.id]?` — received ${tally[c.who.id]} vote(s)`:''})`).join('\n- ');
-  const interPlayers=(ep.interactions||[]).map(i=>`${i.a.name} (${i.a.archetype}/${i.a.personality}) + ${i.b.name} (${i.b.archetype}/${i.b.personality}), relationship read: ${hiddenRelLabel(v19RelScore(i.a.id,i.b.id))}`).join('\n- ');
+
+  // --- Players needing confessionals ---
+  const confPlayers=(ep.confessionals||[]).map(c=>{
+    const votesAgainst=tally[c.who.id]||0;
+    const hasIdol=G.idolHolders.includes(c.who.id);
+    const wins=c.who.challengeWins||0;
+    return `${c.who.name} | archetype: ${c.who.archetype} | personality: ${c.who.personality} | challenge wins: ${wins}${hasIdol?' | HAS IDOL':''}${votesAgainst>0?` | received ${votesAgainst} vote${votesAgainst!==1?'s':''} tonight`:''}`;
+  }).join('\n- ');
+
+  // --- Interaction pairs with relationship context ---
+  const interPlayers=(ep.interactions||[]).map(i=>{
+    const score=v19RelScore(i.a.id,i.b.id);
+    const relLabel=score>=70?'close allies':score>=50?'cautious allies':score>=30?'neutral':score>=15?'uneasy':'rivals';
+    return `${i.a.name} (${i.a.archetype}) + ${i.b.name} (${i.b.archetype}) | relationship: ${relLabel} (${score}/100)`;
+  }).join('\n- ');
+
+  // --- Episode-1-specific vs ongoing rules ---
+  const ep1Rules=isEp1?`
+EP1 MODE — No tribal council has occurred yet. Confessionals must focus ONLY on:
+- First impressions of tribemates
+- Physical/social reads on specific people by name
+- Tribe dynamics and challenge pressure
+- What the player is thinking heading into the game
+DO NOT mention votes, betrayals, blindsides, alliances being broken, or anything that hasn't happened yet.`:'';
+
+  // --- Spoiler-prevention rule ---
+  const spoilerRule=eliminated?
+    `SPOILER PREVENTION: Confessionals and interactions were recorded BEFORE tribal council. They must NOT reference who was eliminated, how the vote went, or the outcome. Only the exit speech and host comment may reference the elimination.`
+    :`SPOILER PREVENTION: No elimination this episode. Confessionals should not anticipate or spoil any outcome.`;
 
   return `Reality TV writer for "${G.settings.name||'No Signal'}" (Survivor-style, ${G.settings.theme||'remote island'}).
-Ep${ep.ep}/${G.settings.mergeEpisode||6}. ${mergeKnown?'POST-MERGE':'PRE-MERGE'}. ${active.length} remain.
-RECENT SEASON: ${recentSummaries||'Season start'}
-KEY MEMORIES: ${keyMemories||'None yet'}
-THIS EPISODE: ${ep.summary||''}
-ALLIANCES: ${allianceDesc||'None'}
-${ep.mergeHappened?'*** THE MERGE HAPPENED THIS EPISODE ***':''}
-${ep.twist&&ep.twist.id==='swap'?'*** A TRIBE SWAP HAPPENED THIS EPISODE ***':''}
-CONFESSIONALS NEEDED (player/archetype/personality): ${confPlayers||'None'}
-INTERACTIONS (player pairs/rel score): ${interPlayers||'None'}
+Ep${ep.ep}/${G.settings.mergeEpisode||6} — ${G.merged?'POST-MERGE':'PRE-MERGE'} — ${active.length} remain.
+${ep.mergeHappened?'*** THE MERGE HAPPENED THIS EPISODE ***\n':''}
+== SEASON SO FAR ==
+${recentSummaries||'Season premiere — no prior episodes.'}
 
-Write the following in JSON format (no markdown, no backticks, pure JSON):
+== KEY EVENTS IN PLAYER MEMORIES ==
+${keyMemories||'None yet.'}
+
+== THIS EPISODE ==
+${ep.summary||''}
+
+== ACTIVE ALLIANCES ==
+${allianceDesc||'No alliances yet.'}
+
+== CONFESSIONALS NEEDED ==
+- ${confPlayers||'None'}
+
+== INTERACTION PAIRS ==
+- ${interPlayers||'None'}
+
+== TRIBAL VOTE RESULT ==
+${voteLines||'No vote this episode.'}
+${eliminated?`Eliminated: ${eliminated.name} (${eliminated.archetype}, ${eliminated.personality})`:''}
+
+${ep1Rules}
+${spoilerRule}
+
+== WRITING RULES ==
+1. VARY sentence openings and structure. No two confessionals can start the same way.
+2. BANNED PHRASES — never use: "one crack and we're done", "stay tight", "numbers game", "at the end of the day", "moving forward", "it is what it is", "stay the course", "keep our heads down". These are overused and kill authenticity.
+3. SPECIFICITY — every line must reference actual names, archetypes, or events from this episode's data. No generic Survivor filler.
+4. GRAMMAR — match subject/verb correctly: "votes were cast" not "votes was cast". Plural alliances take plural verbs.
+5. CHARACTER VOICE — a Strategist sounds calculating; a Sweetheart sounds earnest; a Villain sounds self-aware and unapologetic; a Goofball sounds self-deprecating. Don't swap these.
+6. CONTINUITY — if recentSummaries mentions a rivalry or idol play, characters can reference it. Don't contradict established events.
+7. LENGTH — confessionals: 2-3 sentences. Interactions: 1-2 sentences. Exit speech: 2-3 sentences. Final words: 3-4 sentences. Host comment: 1 sentence.
+
+Write ONLY a JSON object — no markdown, no backticks, no preamble:
 {
+  "openingNarration": "${isEp1?`A 2-3 sentence "welcome to a new season" intro for ${G.settings.name||'this season'}. Mention the ${active.length} contestants and tribes by name. Set the tone — first impressions, everything to prove.`:`A 2-3 sentence "Previously On" recap referencing what actually happened last episode (use recentSummaries above). End with one line setting up tonight.`}",
+  "beforeTribal": "${eliminated?'A 2-sentence host transition setting up tribal council. Reference the actual tension in the air — who feels safe, who is on the block, what the mood is. Do not name who goes home.':'A 2-sentence transition for an episode with no elimination — keep tension high without spoiling the outcome.'}",
   "confessionals": [
-    { "playerId": "...", "text": "2-3 sentence confessional in first person, specific to their situation this episode, in the voice of their archetype and personality" }
+    { "playerId": "...", "text": "..." }
   ],
   "interactions": [
-    { "playerIds": ["...", "..."], "text": "1-2 sentence third-person description of what happened between these two players, specific to their relationship score and episode events" }
+    { "playerIds": ["...", "..."], "text": "..." }
   ],
-  "exitSpeech": "2-3 sentence exit speech from ${eliminated?eliminated.name+' ('+eliminated.archetype+', '+eliminated.personality+')'  :'the eliminated player'}, in character",
-  "exitFinalWords": "3-4 sentence final words, reflective, in character for their archetype",
-  "hostComment": "1 sentence host quip reacting to tonight's vote specifically"
+  "exitSpeech": "Exit speech from ${eliminated?`${eliminated.name} (${eliminated.archetype}, ${eliminated.personality})`:'the eliminated player'}, in their voice, referencing what actually happened",
+  "exitFinalWords": "Reflective final words, in character — mix regret and pride in a way true to their archetype",
+  "hostComment": "Chip's one-liner reacting specifically to how tonight's vote played out"
 }
 
 Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', ')}
-Interaction player ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
-${eliminated?`Eliminated player ID: ${eliminated.id}`:''}
-
-Rules: Stay in character. Make dialogue specific, but ONLY use events listed in THIS EPISODE or RECENT SEASON. Never invent production events. Never mention hidden numbers, relationship scores, trust scores, percentages, AI/system data, or archetype mechanics in visible prose.
-Timeline lock: forbidden topics right now = ${forbiddenTopics.join(', ')||'none'}. If a topic is forbidden, do not hint at it or use synonyms.
-Episode 1 rule: before the first vote reveal, confessionals must be first-impression based only: arrivals, tribe dynamics, camp work, first challenge nerves, cautious social reads. No vote fallout, betrayal talk, cracks, resumes, swaps, merge, jury, or future-game language.
-Style: write like a real edited reality show, not analytics. Use uncertainty and human reads: "I can't tell if Presley is genuine" not "the 52/100 score shows...".`;
+Interaction ID pairs: ${(ep.interactions||[]).map(i=>`[${i.a.id},${i.b.id}]`).join(', ')}
+${eliminated?`Eliminated player ID: ${eliminated.id}`:'No elimination.'}`;
 }
 
-// Call Gemini Flash API
+// ===== GEMINI API CALL =====
+const GEMINI_MODEL_CACHE_KEY = 'nosignal_gemini_last_model';
 async function callGemini(prompt){
   const key=getGeminiKey();
   if(!key) return null;
-  // Try models in order of preference — free tier availability varies
-  const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
+  // Try the last-known-working model first to skip dead 404 retries.
+  const allModels=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
+  let models=allModels;
+  try {
+    const cached=localStorage.getItem(GEMINI_MODEL_CACHE_KEY);
+    if(cached && allModels.includes(cached)) models=[cached, ...allModels.filter(m=>m!==cached)];
+  } catch(e){}
   for(const model of models){
+    // Per-model timeout so a single bad endpoint doesn't stall the whole flow.
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),15000);
     try{
       const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
+        signal:ctrl.signal,
         body:JSON.stringify({
           contents:[{parts:[{text:prompt}]}],
           generationConfig:{temperature:0.85,maxOutputTokens:1400,thinkingConfig:{thinkingBudget:0}}
-          // Note: NOT using responseMimeType — causes failures on some models/keys
+          // NOT using responseMimeType — causes 400s on some models/keys
         })
       });
+      clearTimeout(timer);
       if(!res.ok){
         const err=await res.json().catch(()=>({}));
         const msg=err?.error?.message||res.statusText||'Unknown error';
-        // 404 = model not found, try next; other errors = real problem
         if(res.status===404||res.status===400) continue;
         console.error(`Gemini ${model} error:`,msg);
         notify(`AI error: ${msg.slice(0,80)}`);
@@ -135,16 +217,21 @@ async function callGemini(prompt){
       }
       const data=await res.json();
       const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-      if(!text){ console.error('Gemini returned empty text'); continue; }
-      // Strip markdown code fences if model wrapped the JSON
+      if(!text){console.error('Gemini returned empty text');continue;}
       const clean=text.replace(/^```(?:json)?\s*/,'').replace(/\s*```\s*$/,'').trim();
-      // Find the JSON object within the response (model sometimes adds preamble)
       const jsonMatch=clean.match(/\{[\s\S]*\}/);
-      if(!jsonMatch){ console.error('No JSON found in response:', clean.slice(0,200)); continue; }
+      if(!jsonMatch){console.error('No JSON found in response:',clean.slice(0,200));continue;}
+      // Remember which model worked so next call hits it first.
+      try { localStorage.setItem(GEMINI_MODEL_CACHE_KEY, model); } catch(e){}
       return JSON.parse(jsonMatch[0]);
     }catch(e){
+      clearTimeout(timer);
+      if(e.name==='AbortError'){
+        console.error(`Gemini ${model} timed out after 15s`);
+        continue;
+      }
       console.error(`Gemini ${model} call failed:`,e);
-      if(e instanceof SyntaxError) continue; // bad JSON, try next model
+      if(e instanceof SyntaxError) continue;
       notify(`AI connection error: ${e.message?.slice(0,60)||'Network error'}`);
       return null;
     }
@@ -153,7 +240,8 @@ async function callGemini(prompt){
   return null;
 }
 
-// Generate AI dialogue for one episode and apply it
+// ===== AI DIALOGUE APPLICATION =====
+// Generate AI dialogue for one episode and apply it to ep object
 async function generateAIDialogueForEp(ep,onProgress){
   const key=getGeminiKey();
   if(!key) return false;
@@ -161,23 +249,28 @@ async function generateAIDialogueForEp(ep,onProgress){
   const prompt=buildEpisodePrompt(ep);
   const result=await callGemini(prompt);
   if(!result) return false;
+
   // Apply confessionals
   if(result.confessionals&&ep.confessionals){
     result.confessionals.forEach(ai=>{
       const conf=ep.confessionals.find(c=>c.who.id===ai.playerId);
-      if(conf&&ai.text) conf.text=cleanNarrativeText(ai.text, ep, narrativeFallbackConfessional(conf.who, ep));
+      if(conf&&ai.text) conf.text=cleanNarrativeText(ai.text);
     });
   }
   // Apply interactions
   if(result.interactions&&ep.interactions){
     result.interactions.forEach((ai,i)=>{
-      if(ep.interactions[i]&&ai.text){ const it=ep.interactions[i]; it.text=cleanNarrativeText(ai.text, ep, narrativeFallbackInteraction(it.a,it.b,ep)); }
+      if(ep.interactions[i]&&ai.text) ep.interactions[i].text=cleanNarrativeText(ai.text);
     });
   }
-  // Apply exit speech
-  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=cleanNarrativeText(result.exitSpeech, ep, '');
-  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=cleanNarrativeText(result.exitFinalWords, ep, '');
-  if(result.hostComment) ep._aiHostComment=cleanNarrativeText(result.hostComment, ep, '');
+  // Apply exit content
+  if(result.exitSpeech&&ep.eliminated) ep._aiExitSpeech=cleanNarrativeText(result.exitSpeech);
+  if(result.exitFinalWords&&ep.eliminated) ep._aiExitFinalWords=cleanNarrativeText(result.exitFinalWords);
+  if(result.hostComment) ep._aiHostComment=cleanNarrativeText(result.hostComment);
+  // Apply opening narration (Ep 1 welcome OR Ep 2+ Previously On) and before-tribal host card
+  if(result.openingNarration) ep._aiOpeningNarration=cleanNarrativeText(result.openingNarration);
+  if(result.beforeTribal) ep._aiBeforeTribal=cleanNarrativeText(result.beforeTribal);
+
   ep._aiGenerated=true;
   onProgress&&onProgress('AI dialogue applied ✓');
   return true;
@@ -208,30 +301,26 @@ async function generateAIEpisodeScript(epNum){
   }
 }
 
+// ===== DARK MODE =====
 function toggleDarkMode(){
-  const isDark = document.documentElement.classList.toggle('dark');
-  document.getElementById('dark-toggle-btn').textContent = isDark ? '☀️' : '🌙';
-  try { localStorage.setItem('nosignal_darkmode', isDark ? '1' : '0'); } catch(e){}
+  const isDark=document.documentElement.classList.toggle('dark');
+  document.getElementById('dark-toggle-btn').textContent=isDark?'☀️':'🌙';
+  try{localStorage.setItem('nosignal_darkmode',isDark?'1':'0');}catch(e){}
 }
 function initDarkMode(){
-  let pref = '0';
-  try { pref = localStorage.getItem('nosignal_darkmode') || '0'; } catch(e){}
-  // Also respect system preference if no saved preference
-  if(pref === '0' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) pref = '1';
-  if(pref === '1'){
+  let pref='0';
+  try{pref=localStorage.getItem('nosignal_darkmode')||'0';}catch(e){}
+  if(pref==='0'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches) pref='1';
+  if(pref==='1'){
     document.documentElement.classList.add('dark');
-    const btn = document.getElementById('dark-toggle-btn');
-    if(btn) btn.textContent = '☀️';
+    const btn=document.getElementById('dark-toggle-btn');
+    if(btn) btn.textContent='☀️';
   }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   initDarkMode();
   initGeminiKeyField();
-  initTeams();renderTwistsGrid();
-  updateContinueButton();
+  // Note: initTeams, renderTwistsGrid, updateContinueButton are called
+  // from their own modules (state.js / save.js) — not duplicated here
 });
-
-
-// ===== EXPORTS =====
-export { callGemini, buildEpisodePrompt, generateAIDialogueForEp, generateAIEpisodeScript, testGeminiKey, showGeminiHelp, saveGeminiKey, getGeminiKey, initGeminiKeyField };

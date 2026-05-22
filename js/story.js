@@ -466,10 +466,3 @@ function exportSeasonStory(){
   URL.revokeObjectURL(a.href);
   notify('Season story exported ✓','win');
 }
-
-// ===== EXPORTS =====
-export {
-  analyseSeasonStory, buildSeasonStoryCard, buildPlayerArc,
-  buildArcSummary, buildSeasonTagline,
-  showSeasonStory, exportSeasonStory,
-};

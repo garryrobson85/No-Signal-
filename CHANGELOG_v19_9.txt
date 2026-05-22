@@ -1,6 +1,0 @@
-v19.9 final continuity fix
-- Timeline-aware Gemini prompt gating
-- Sanitiser for impossible future events like tribe swap/merge/jury before they happen
-- Removed visible hidden scores from AI prompt/output
-- Pre-vote camp life renders pre-vote-safe confessionals/interactions
-- Blocked tribe swap twists before Episode 3

@@ -292,6 +292,7 @@ function confirmFractureAlliance() {
   // Remove from alliance
   alliance.members = alliance.members.filter(id=>id!==betrayer.id);
   betrayer.allianceIds = (betrayer.allianceIds||[]).filter(id=>id!==allianceId);
+  logAlliance('broken', alliance);
   G.dramaLevel = Math.min(5, G.dramaLevel + 2);
   notify(`🔥 ${betrayer.name.split(' ')[0]} fractures the alliance — betrayal recorded`, 'twist');
   renderStage(G.stageIndex);
@@ -345,16 +346,3 @@ function producerIntelDrop() {
   useProducerPower('intel_drop');
   openV19Modal('👁️ Intel Drop — Confidential', html);
 }
-
-// ===== EXPORTS =====
-export {
-  PRODUCER_POWERS, initProducerPowers, producerPowerUsed,
-  useProducerPower, producerUsesLeft,
-  showProducerPanel, executeProducerAction,
-  producerForceRivalry, confirmRivalry,
-  producerBlindside, confirmBlindside,
-  producerGuidedIdol, confirmGuidedIdol,
-  producerFractureAlliance, confirmFractureAlliance,
-  producerChallengeBoost, confirmChallengeBoost,
-  producerIntelDrop,
-};

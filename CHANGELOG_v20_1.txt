@@ -1,4 +1,0 @@
-No Signal v20.1 bundle fix
-- Removed leftover ES module import/export syntax from js/bundle.js.
-- Verified bundle parses as a normal browser script.
-- Keeps v20 narrator implementation and continuity/story fixes.

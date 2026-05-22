@@ -275,7 +275,3 @@ function showCastStatus(){
   }).join('')}<\/div>`;
   openModal('modal-cast-status');
 }
-
-
-// ===== EXPORTS =====
-export { showCastStatus, generatePortrait, triggerImageUpload, handleImageUpload, applyCustomImage, clearImage, showBulkUpload };

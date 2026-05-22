@@ -325,11 +325,17 @@ const NoSignalCleanup = (() => {
   return { delegateActions, saveGameSafe };
 })();
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => NoSignalCleanup.delegateActions());
-} else {
-  NoSignalCleanup.delegateActions();
-}
+// NOTE: delegateActions auto-registration removed — it conflicts with main.js's switch-based
+// delegator. The old code called `window[action](payload)` for every data-action, which meant
+// setupNav was being called as setupNav(undefined) (no panel name passed), breaking every
+// setup nav click. main.js already handles every data-action with the correct arguments.
+// NoSignalCleanup is kept for saveGameSafe and as a manual-only call surface.
+//
+// if (document.readyState === 'loading') {
+//   document.addEventListener('DOMContentLoaded', () => NoSignalCleanup.delegateActions());
+// } else {
+//   NoSignalCleanup.delegateActions();
+// }
 
 
 // ===== RELATIONSHIP HISTORY PANEL =====
@@ -479,7 +485,3 @@ function showRelHistoryPicker(playerId){
   openV19Modal(`🔗 ${player.name.split(' ')[0]}'s Relationships`,
     `<div class="v19-help">Select a player to view your full history together — every vote, alliance, and memory event.<\/div><div style="margin-top:10px">${opts}<\/div>`);
 }
-
-
-// ===== EXPORTS =====
-export { showTribeHistory, showRelationshipWeb, showRelationshipHistory, showRelHistoryPicker, v19RelScore, showPlayerProfiles, showOneProfile, showV19Insights, showV19Relationships, v19EnsureRelationships, v19ActiveThreatScore, v19SocialPowerScore, exportV19SeasonReport };

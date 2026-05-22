@@ -49,6 +49,11 @@ function buildSavePayload(){
     memories:G.memories||[], placementHistory:G.placementHistory||[],
     producerPowers:G.producerPowers||{},
     perceivedRelationships:G.perceivedRelationships||{},
+    // Persistent history — without these, season recap, story, and Previously On break across save/load
+    episodeLog:G.episodeLog||[],
+    allianceLog:G.allianceLog||[],
+    fanSaveUsed:!!G.fanSaveUsed,
+    fanSavePlayer:G.fanSavePlayer||null,
     savedAt:Date.now()
   };
 }
@@ -63,10 +68,29 @@ function getSaveRaw(){
   }catch(e){}
   return null;
 }
+// Schema migrations — keyed by FROM version. Each migrator returns the upgraded save object.
+// Add a new entry whenever buildSavePayload's shape changes meaningfully.
+const SAVE_MIGRATIONS = {
+  // Example: 1: (save) => { save.newField = save.newField || []; save.version = 2; return save; }
+  // Currently a no-op chain — slot here when real shape changes ship.
+};
 function migrateSaveIfNeeded(raw){
   const save=JSON.parse(raw);
   save.version=save.version||1;
   save.schema=save.schema||'nosignal-season-save';
+  // Walk migrations in order until we're at the current schema version.
+  let safety=0;
+  while(SAVE_MIGRATIONS[save.version] && safety++ < 32){
+    const fn=SAVE_MIGRATIONS[save.version];
+    try { Object.assign(save, fn(save)); }
+    catch(e){ console.error(`Migration from v${save.version} failed:`,e); break; }
+  }
+  // Defensive defaults — if a legacy save predates a field that's now expected, fill it.
+  if(!Array.isArray(save.episodeLog)) save.episodeLog=[];
+  if(!Array.isArray(save.allianceLog)) save.allianceLog=[];
+  if(!Array.isArray(save.memories)) save.memories=[];
+  if(!Array.isArray(save.placementHistory)) save.placementHistory=[];
+  if(!save.perceivedRelationships) save.perceivedRelationships={};
   return save;
 }
 function downloadTextFile(filename, text, mime='application/json'){
@@ -100,8 +124,15 @@ function hasSavedGame(){
   return !!getSaveRaw();
 }
 function applyLoadedSave(save){
-  G.cast=save.cast||[];
-  G.teams=save.teams||[];
+  G.cast=(save.cast||[]).map(c=>{
+    // Imported saves can contain anything — sanitize free-text fields defensively.
+    if(c&&typeof c.name==='string') c.name=c.name.replace(/[<>"'`]/g,'').slice(0,40);
+    return c;
+  });
+  G.teams=(save.teams||[]).map(t=>{
+    if(t&&typeof t.name==='string') t.name=t.name.replace(/[<>"'`]/g,'').slice(0,30);
+    return t;
+  });
   G.settings=Object.assign({}, G.settings||{}, save.settings||{});
   G.twists=new Set(save.twists||TWISTS_DATA.map(t=>t.id));
   G.relationships=save.relationships||{};
@@ -120,6 +151,11 @@ function applyLoadedSave(save){
   G.stealVoteHolders=save.stealVoteHolders||[];
   G.stageIndex=save.stageIndex||0;
   G.currentEpData=save.currentEpData||null;
+  // Persistent history fields — restored here so season recap / story / Previously On survive reload
+  G.episodeLog=save.episodeLog||[];
+  G.allianceLog=save.allianceLog||[];
+  G.fanSaveUsed=!!save.fanSaveUsed;
+  G.fanSavePlayer=save.fanSavePlayer||null;
   if(G.currentEpData){
     const findById=id=>G.cast.find(c=>c.id===id);
     ['eliminated','eliminated2','idolFinder','winner','runnerUp'].forEach(k=>{
@@ -194,7 +230,3 @@ function queueAutosave(reason='change'){
 function markDirty(reason='change'){
   queueAutosave(reason);
 }
-
-
-// ===== EXPORTS =====
-export { saveGame, loadGame, hasSavedGame, deleteSave, updateContinueButton, queueAutosave, exportSaveFile, openImportSave, importSaveFile, loadQuickDemo, SAVE_KEY };
