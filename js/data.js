@@ -149,12 +149,18 @@ function buildInteractionText(a, b, ep){
     if(historySummary) return historySummary;
   }
 
-  // Generic but still specific
+  // Generic fallback — 10 options ensures two pairs rarely get the same line
   const opts=[
     `${an} and ${bn} talked by the fire well into the night — about the game, about trust, about who they think is actually running things. Neither fully showed their hand.`,
     `${bn} approached ${an} with what looked like a straightforward conversation. ${an} filed every word away for later.`,
     `${an} and ${bn} spent the morning working on shelter repairs together. Small moments build big loyalties — or expose their absence.`,
-    `${merged?`${an} found ${bn} alone after tribal and the conversation that followed was careful, measured, and full of subtext.`:`On the same tribe for ${ep.ep} episodes now, ${an} and ${bn} are still figuring out whether they actually trust each other.`}`,
+    `${merged?`${an} found ${bn} alone after tribal and the conversation that followed was careful, measured, and full of subtext.`:`On the same tribe for ${ep&&ep.ep||1} episodes now, ${an} and ${bn} are still figuring out whether they actually trust each other.`}`,
+    `${an} watched ${bn} carefully during the morning routines. Something about their energy today was different. Hard to say what.`,
+    `${bn} laughed at something ${an} said — genuinely, not politically. Small thing. But ${an} noticed.`,
+    `${an} and ${bn} ended up fetching water together and were gone longer than anyone expected. What was said at the well stayed there.`,
+    `${bn} made a point of sitting next to ${an} at the fire. Could be strategy. Could be genuine. In this game, it's usually both.`,
+    `${an} asked ${bn} a question that sounded casual. ${bn} answered carefully. Neither was fooled by the other's act.`,
+    `A quiet moment between ${an} and ${bn} — reading each other, testing the temperature. The game is always being played, even in the silences.`,
   ];
   return pick(opts);
 }

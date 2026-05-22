@@ -290,10 +290,11 @@ function computeAndStartEpisode(){
   G._pendingEvolutions=evolutionEvents;
 
   // ── REJOIN EPISODE ────────────────────────────────────────
-  // If this is the designated rejoin episode, run a dedicated rejoin episode (no elim)
-  if(G.settings.returnees && G.settings.rejoinEpisode && ep===G.settings.rejoinEpisode){
-    const eliminated=G.cast.filter(c=>c.eliminated&&!c.juryReturn);
-    const returning=shuffle(eliminated).slice(0,G.settings.rejoinCount||1);
+  // Guard: ep must be > 1 AND at least one player must have been eliminated
+  const _eliminatedSoFar = G.cast.filter(c=>c.eliminated&&!c.juryReturn);
+  if(G.settings.returnees && G.settings.rejoinEpisode && ep===G.settings.rejoinEpisode
+     && ep > 1 && _eliminatedSoFar.length > 0){
+    const returning=shuffle(_eliminatedSoFar).slice(0,G.settings.rejoinCount||1);
     returning.forEach(r=>{
       r.eliminated=false; r.juryMember=false; r.votes=0; r.immunity=false; r.juryReturn=true;
       if(G.merged){ r.team=-1; }
@@ -311,7 +312,7 @@ function computeAndStartEpisode(){
       doubleElim:false, noElim:true,
       isRejoinEpisode:true, rejoinPlayers:returning, rejoinNames,
     };
-    G.stageIndex=0; updateGameSidebar(); renderStage(0); // renderStage handles episodeLog push for rejoin
+    G.stageIndex=0; updateGameSidebar(); renderStage(0);
     return;
   }
 
@@ -320,7 +321,14 @@ function computeAndStartEpisode(){
   const rawTwist=getTwist();
   const twist=(rawTwist&&rawTwist.id==='swap'&&G.merged)?null:rawTwist;
   let twistMsg='';
-  if(twist){twistMsg=applyTwist(twist);if(twist.id==='double')doubleElim=true;if(twist.id==='noelim')noElim=true;}
+  if(twist){
+    twistMsg=applyTwist(twist)||'';
+    // If applyTwist returned null/empty the twist had no effect (e.g. returnee with no candidates)
+    // Clear it so no twist banner shows and subsequent logic ignores it
+    if(!twistMsg){ twist=null; }
+    if(twist&&twist.id==='double') doubleElim=true;
+    if(twist&&twist.id==='noelim') noElim=true;
+  }
 
   let dramaMsg='',idolFinder=null;
   if(G.settings.drama&&seededRandom()<(G.settings.dramaRate==='fast'?0.5:G.settings.dramaRate==='slow'?0.15:0.3)){dramaMsg=buildDramaText({ep:G.episode});G.dramaLevel=Math.min(G.dramaLevel+1,5);}
@@ -498,12 +506,18 @@ function runChallengeWithChoice(chosenChallenge){
     text:conf.text==='__PENDING__'?buildConfessionalText(conf.who,ep):conf.text,
     _source: conf._source || 'engine'   // ai.js overwrites this with 'ai' when Gemini runs
   }));
-  // Update interactions too now that we have the full ep
-  ep.interactions=(ep.interactions||[]).map(i=>({
-    ...i,
-    text:buildInteractionText(i.a,i.b,ep),
-    _source: i._source || 'engine'
-  }));
+  // Update interactions now that we have the full ep — deduplicate across pairs
+  const _usedInteractionTexts = new Set();
+  ep.interactions=(ep.interactions||[]).map(i=>{
+    // Try up to 4 times to get a unique line for this pair
+    let text, attempts=0;
+    do {
+      text=buildInteractionText(i.a,i.b,ep);
+      attempts++;
+    } while(_usedInteractionTexts.has(text) && attempts<4);
+    _usedInteractionTexts.add(text);
+    return {...i, text, _source: i._source||'engine'};
+  });
   // Store evolution events on ep for recap export
   ep.evolutionEvents = G._pendingEvolutions||[];
 
@@ -611,20 +625,17 @@ function applyTwist(twist){
     case 'noelim': return`No Elimination tonight! The losing tribe lives to fight another day.`;
     case 'idol_clue':{const l=pick(getActive());return l?`${l.name} received a public idol clue. Everyone is watching.`:`An idol clue was hidden at camp.`;}
     case 'returnee':{
-      if(!G.settings.returnees)return`A returnee twist was teased — nobody came back.`;
+      if(!G.settings.returnees) return null; // setting off — treat as no twist
       const e=G.cast.filter(c=>c.eliminated&&!c.juryReturn);
-      if(e.length){
-        const r=pick(e);
-        r.eliminated=false;r.juryMember=false;r.votes=0;r.immunity=false;r.juryReturn=true;
-        // Pick smallest non-empty team for balance; if merged, no team
-        if(G.merged){r.team=-1;}
-        else {
-          const sizes=G.teams.map((_,ti)=>({ti,count:getTeamMembers(ti).length})).sort((a,b)=>a.count-b.count);
-          r.team=sizes[0].ti;
-        }
-        return`${r.name} has returned to the game!`;
+      if(!e.length) return null; // nobody to return — skip silently, no message
+      const r=pick(e);
+      r.eliminated=false;r.juryMember=false;r.votes=0;r.immunity=false;r.juryReturn=true;
+      if(G.merged){r.team=-1;}
+      else {
+        const sizes=G.teams.map((_,ti)=>({ti,count:getTeamMembers(ti).length})).sort((a,b)=>a.count-b.count);
+        r.team=sizes[0].ti;
       }
-      return`No eligible returnees.`;
+      return`${r.name} has returned to the game!`;
     }
     case 'steal_vote':{const a=getActive();if(a.length>=2){const [x,y]=shuffle(a).slice(0,2);G.stealVoteHolders.push(x.id);return`${x.name} received a vote steal advantage.`;}return`A vote steal entered the game.`;}
     case 'tribe_dissolve':{if(!G.merged&&G.teams.length>2){const sz=G.teams.map((t,ti)=>({ti,count:getTeamMembers(ti).length})).sort((a,b)=>a.count-b.count);const dis=sz[0];getTeamMembers(dis.ti).forEach(c=>{const others=G.teams.map((_,ti)=>ti).filter(ti=>ti!==dis.ti);c.team=pick(others);});return`Tribe ${G.teams[dis.ti].name} dissolved — members absorbed into other tribes.`;}return`A tribe restructuring occurred.`;}
