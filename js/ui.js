@@ -538,14 +538,14 @@ function buildStageElimination(ep){
     if(G.settings.jury&&G.merged&&!G.jury.find(j=>j.id===ep.eliminated2.id)){ep.eliminated2.juryMember=true;G.jury.push(ep.eliminated2);}
   }
   let html=`<div class="stage-block anim-in"><div class="stage-label">🔦 The Tribe Has Spoken<\/div>`;
-  html+=buildElimBanner(ep.eliminated);
-  if(ep.eliminated2) html+=buildElimBanner(ep.eliminated2);
+  html+=buildElimBanner(ep.eliminated, ep);
+  if(ep.eliminated2) html+=buildElimBanner(ep.eliminated2, ep);
   html+=`<\/div>`;
   updateGameSidebar();
   return html;
 }
 
-function buildElimBanner(p){
+function buildElimBanner(p, ep){
   const bigPortrait=getPortrait(p).replace('width="120" height="145"','width="80" height="97"');
   const stats=[
     {label:'PHY',val:p.physical,color:'#0EA5E9'},
@@ -553,6 +553,32 @@ function buildElimBanner(p){
     {label:'MEN',val:p.mental,color:'#9333EA'},
     {label:'END',val:p.endurance,color:'#EAB308'},
   ];
+
+  // Exit speech — AI if generated, template fallback using real game history
+  const isDoubleElim = !!ep?.eliminated2;
+  const aiSpeech = !isDoubleElim ? ep?._aiExitSpeech : null; // double-elim shares one AI speech — only use for first
+  const aiFinalWords = !isDoubleElim ? ep?._aiExitFinalWords : null;
+  const templateSpeech = typeof buildExitSpeech==='function' ? buildExitSpeech(p, ep) : '';
+
+  const speechText = aiSpeech || templateSpeech;
+  const finalWordsText = aiFinalWords || ''; // final words only exist when AI generated
+
+  const speechSourceBadge = aiSpeech
+    ? `<span style="font-size:9px;opacity:0.4;margin-left:6px">✨<\/span>`
+    : `<span style="font-size:9px;opacity:0.25;margin-left:6px;font-family:'DM Mono',monospace">T<\/span>`;
+
+  const speechBlock = speechText ? `
+    <div style="margin:16px 0 4px;padding:14px 16px;background:rgba(255,255,255,0.04);border-left:3px solid rgba(255,255,255,0.15);border-radius:0 8px 8px 0">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--text3);margin-bottom:7px;display:flex;align-items:center">FINAL WORDS ${speechSourceBadge}<\/div>
+      <div style="font-size:13px;line-height:1.65;color:rgba(255,255,255,0.75);font-style:italic">"${speechText}"<\/div>
+    <\/div>` : '';
+
+  const finalWordsBlock = finalWordsText ? `
+    <div style="margin:10px 0 4px;padding:12px 16px;background:rgba(232,69,10,0.06);border-left:3px solid rgba(232,69,10,0.3);border-radius:0 8px 8px 0">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--fire);opacity:0.7;margin-bottom:7px">PRIVATE CAMERA ✨<\/div>
+      <div style="font-size:13px;line-height:1.65;color:rgba(255,255,255,0.65);font-style:italic">"${finalWordsText}"<\/div>
+    <\/div>` : '';
+
   return `<div class="elim-banner-big">
     <div class="elim-torch-anim">🔦<\/div>
     <div class="elim-portrait-wrap">${bigPortrait}<\/div>
@@ -563,6 +589,8 @@ function buildElimBanner(p){
         ${stats.map(s=>`<div style="display:flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:${s.color}">${s.label} <span style="font-family:'DM Mono',monospace">${s.val}<\/span><\/div>`).join('<span style="color:#ddd;margin:0 1px">·<\/span>')}
       <\/div>
       ${p.juryMember?'<div class="elim-jury-tag" style="margin-top:6px">Joins the Jury 🏛️<\/div>':'<div style="font-size:11px;color:#991B1B;margin-top:4px">Their torch has been snuffed.<\/div>'}
+      ${speechBlock}
+      ${finalWordsBlock}
     <\/div>
     <div class="torch-snuff-anim">💨<\/div>
   <\/div>`;

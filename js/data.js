@@ -292,3 +292,124 @@ function buildBeforeTribalNarration(ep){
   ];
   return pick(lines);
 }
+
+// ===== EXIT SPEECH =====
+// Builds an exit speech for the eliminated player based on their actual game history.
+// Used as the template when no AI key is set; AI overwrites with ep._aiExitSpeech.
+// The speech must only reference things the player would actually know:
+//   - Their own vote tonight and who voted for them
+//   - People they were allied with
+//   - Betrayals they experienced (from memory)
+//   - Their own idol plays, saves, wins
+//   - Their overall emotional state (archetype-driven)
+
+function buildExitSpeech(player, ep){
+  if(!player) return '';
+  const pn = player.name.split(' ')[0];
+  const votes = ep.voteResult?.individualVotes||[];
+  const tally = ep.voteResult?.tally||{};
+  const votesAgainst = tally[player.id]||0;
+
+  // Who voted for them (they can observe parchments)
+  const votedForMe = votes.filter(v=>v.target.id===player.id).map(v=>v.voter.name.split(' ')[0]);
+  // Who they voted for
+  const myVote = votes.find(v=>v.voter.id===player.id);
+  const iVotedFor = myVote?.target?.name.split(' ')[0];
+  // Allies they trusted
+  const allies = G.alliances
+    .filter(a=>a.members.includes(player.id))
+    .flatMap(a=>a.members.filter(id=>id!==player.id))
+    .map(id=>G.cast.find(c=>c.id===id)?.name.split(' ')[0])
+    .filter(Boolean);
+  // Betrayals from memory — people who were allies but voted them out
+  const allyBetrayers = votes
+    .filter(v=>v.target.id===player.id && player.allianceIds?.some(aid=>v.voter.allianceIds?.includes(aid)))
+    .map(v=>v.voter.name.split(' ')[0]);
+  // Were they blindsided? (didn't vote for the person who got most votes, and got the most votes themselves)
+  const wasBlindside = !myVote || (myVote.target.id !== ep.eliminated?.id && ep.eliminated?.id === player.id);
+  const challengeWins = player.challengeWins||0;
+  const epNum = ep.ep;
+
+  const lines = [];
+
+  // ── Opening: reaction to how they went out ──────────────────────────────
+  if(allyBetrayers.length){
+    const betrayer = allyBetrayers[0];
+    const bitterLines = [
+      `${betrayer}. That's who I trusted. That's who put my name down. I genuinely thought we were solid. I was wrong — and that stings more than going home does.`,
+      `I could see it coming eventually. But ${betrayer}? That one I didn't see. That's the part I'll be sitting with for a while.`,
+      `${betrayer} looked me in the eye at camp and I believed them. Lesson learned — the hard way.`,
+    ];
+    const gracefulLines = [
+      `${betrayer} made a smart move tonight. I would've done the same thing. That doesn't make it hurt less — but I respect the game.`,
+      `I understand why ${betrayer} did it. In their position, I probably would've too. Still stings to be on this side of it.`,
+    ];
+    lines.push(pick(player.archetype.toLowerCase().includes('villain')||player.personality==='Villain'?bitterLines:
+      player.personality==='Peacemaker'||player.archetype.includes('Sweetheart')?gracefulLines:
+      seededRandom()>0.5?bitterLines:gracefulLines));
+  } else if(wasBlindside && votedForMe.length>1){
+    lines.push(pick([
+      `I did not see that coming. I thought I had this figured out. Clearly I didn't have it as figured out as I thought.`,
+      `Blindsided. Plain and simple. Someone was smarter than me tonight and I have to respect that, even if it burns.`,
+      `That vote was not what I expected. Whoever pulled that together — well played. I mean it.`,
+    ]));
+  } else {
+    lines.push(pick([
+      `I gave everything I had out here. I'm proud of how I played, even if tonight didn't go my way.`,
+      `This game has a way of humbling you. I came here thinking I understood it. I understand it a little better now.`,
+      `${votesAgainst} votes. Okay. I had a good run.`,
+    ]));
+  }
+
+  // ── Middle: mention allies or people they're grateful for ───────────────
+  if(allies.length){
+    const allyName = allies.find(n=>!allyBetrayers.includes(n)) || allies[0];
+    if(allyName && !allyBetrayers.includes(allyName)){
+      lines.push(pick([
+        `${allyName} — I hope you go all the way. You know what we built together was real. Use it.`,
+        `I'm rooting for ${allyName}. If anyone in that camp deserves to win, it's them. I mean that.`,
+        `${allyName}, keep your head down and keep moving. You've got more game left than anyone knows.`,
+      ]));
+    }
+  }
+
+  // ── Reveal a secret or plan only they would know ────────────────────────
+  const hasIdolMemory = getMemories(player.id, null, ['idol_played_on','idol_played_against']).length > 0;
+  if(iVotedFor && iVotedFor !== pn){
+    lines.push(pick([
+      `For what it's worth — I voted for ${iVotedFor} tonight. I thought that was the right call. Maybe it would've changed things. Maybe not.`,
+      `My vote was for ${iVotedFor}. I had my reasons. They'll never know how close it came to going differently.`,
+    ]));
+  } else if(challengeWins >= 2){
+    lines.push(pick([
+      `${challengeWins} challenge wins. I earned my place out here every single time. Nobody can take that away.`,
+      `I won ${challengeWins} challenges. I carried my weight. Whatever else people say about my game — that's real.`,
+    ]));
+  } else if(hasIdolMemory){
+    lines.push(`The idol stuff was a wild ride. I'd play it the same way again.`);
+  }
+
+  // ── Archetype-specific closing ───────────────────────────────────────────
+  const archCloses = {
+    'The Strategist': pick([`The strategy was right. The execution had a crack somewhere. I'll find it.`,`I had the right read on almost everyone in that camp. Almost.`]),
+    'The Big Villain':`I made big moves. I made enemies. I'd do it all again — probably bigger.`,
+    'The Underdog': pick([`I was never supposed to make it this far. And I did. Remember that.`,`They underestimated me the whole time. Maybe they stopped underestimating me just a little too late.`]),
+    'The Fan Favorite': pick([`I came here because I love this game. And I still do, even now. Especially now.`,`Win or lose, this was everything I hoped it would be. And more.`]),
+    'The Sweetheart': pick([`I played with integrity. I can live with that. No regrets.`,`I hope I showed that you can be a good person in this game and still compete. That matters to me.`]),
+    'The Puppet Master':`Everything was in motion. Someone cut a string I didn't know was there. That's the game.`,
+    'The Quiet Threat': pick([`I was exactly where I wanted to be. Right up until I wasn't.`,`Nobody thought I was dangerous. Turns out somebody did.`]),
+    'The Loose Cannon':`It was always going to be chaotic. That's just who I am. No apologies.`,
+    'The Challenge Beast': pick([`I can out-run, out-climb, out-carry all of them. Couldn't out-talk them tonight.`,`Challenges don't vote. If they did, I'd still be here.`]),
+    'The Manipulator':`I played everyone around that fire. Just not quite everyone.`,
+  };
+  const archClose = archCloses[player.archetype];
+  if(archClose) lines.push(archClose);
+  else lines.push(pick([
+    `No regrets. I came, I competed, I made it count.`,
+    `This game breaks your heart a little. That's how you know you really played it.`,
+    `Whatever happens from here — I'm proud of the game I played.`,
+  ]));
+
+  // Return 2–3 lines max
+  return lines.slice(0,3).join(' ');
+}

@@ -169,8 +169,8 @@ Write ONLY a JSON object — no markdown, no backticks, no preamble:
   "interactions": [
     { "playerIds": ["...", "..."], "text": "..." }
   ],
-  "exitSpeech": "Exit speech from ${eliminated?`${eliminated.name} (${eliminated.archetype}, ${eliminated.personality})`:'the eliminated player'}, in their voice, referencing what actually happened",
-  "exitFinalWords": "Reflective final words, in character — mix regret and pride in a way true to their archetype",
+  "exitSpeech": "2-3 sentence spoken exit speech from ${eliminated?`${eliminated.name} (${eliminated.archetype}, ${eliminated.personality})`:'the eliminated player'} at tribal council, addressing the remaining players and host directly. Must reference SPECIFIC people by first name — who they trusted, who voted them out if they can tell, any ally they want to acknowledge. Voice must match their archetype. No generic lines.",
+  "exitFinalWords": "2-3 sentence private final words to camera after leaving tribal. More honest and raw than the speech — they can reveal a secret plan, name who they think will win, express real anger or real gratitude. Must reference actual events from this episode and their time in the game. In character — a Villain stays unapologetic, a Sweetheart stays warm even if hurt, an Underdog stays defiant.",
   "hostComment": "Chip's one-liner reacting specifically to how tonight's vote played out"
 }
 
