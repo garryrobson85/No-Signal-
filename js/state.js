@@ -91,17 +91,28 @@ function _showNextNotify(){
 }
 function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('active');}
 function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('active');}
+function _showOnlyScreen(id){
+  // Direct DOM manipulation — bypasses all CSS class issues
+  document.querySelectorAll('.screen').forEach(s=>{
+    if(s.id===id){
+      s.classList.add('active');
+      s.style.display='flex';
+    } else {
+      s.classList.remove('active');
+      s.style.display='none';
+    }
+  });
+  // Reset scroll to top
+  window.scrollTo(0,0);
+}
 function goHome(){
-  // Auto-save if there's an active game
   if(G.currentEpData&&G.cast.length) saveGame(true);
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-home').classList.add('active');
+  _showOnlyScreen('screen-home');
   document.getElementById('header-ep-badge').style.display='none';
   updateContinueButton();
 }
 function goSetup(){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-setup').classList.add('active');
+  _showOnlyScreen('screen-setup');
   if(!G.cast.length) generateRandomCast(12);
   renderTwistsGrid();
   setupNav('general',document.querySelector('[data-panel="general"]'));
@@ -422,8 +433,7 @@ function buildAlliances(){
 
 // ===== GAME SCREEN =====
 function showGameScreen(){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-game').classList.add('active');
+  _showOnlyScreen('screen-game');
   updateGameSidebar();
 }
 function updateGameSidebar(){

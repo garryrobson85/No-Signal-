@@ -154,12 +154,16 @@ function showRelationshipWeb(){
     for(let j=i+1;j<nodes.length;j++){
       const a=nodes[i], b=nodes[j];
       const score=v19RelScore(a.c.id,b.c.id); // 0-100
-      if(score<35 && score>20) continue; // skip neutral clutter
+      // Show bonds (>=58), mild bonds (>=70 stronger), rivalries (<=35), strong rivalries (<=20)
+      // Skip the wide neutral middle (36-57) to reduce clutter
+      if(score>35 && score<58) continue;
       let col, w;
-      if(score>=65){ col='rgba(22,163,74,'; w=1+(score-65)/14; }
-      else if(score<=20){ col='rgba(220,38,38,'; w=1+(20-score)/12; }
+      if(score>=70){ col='rgba(22,163,74,'; w=1+(score-70)/12; }       // strong green
+      else if(score>=58){ col='rgba(34,197,94,'; w=0.8; }               // light green
+      else if(score<=18){ col='rgba(220,38,38,'; w=1+(18-score)/10; }   // strong red
+      else if(score<=35){ col='rgba(239,68,68,'; w=0.8; }               // light red
       else continue;
-      const op=Math.min(0.85, 0.25+Math.abs(score-42)/70);
+      const op=Math.min(0.85, 0.3+Math.abs(score-50)/60);
       edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${col}${op.toFixed(2)})" stroke-width="${w.toFixed(2)}"/>`;
     }
   }
@@ -171,10 +175,11 @@ function showRelationshipWeb(){
     dots+=`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text)" style="cursor:pointer" onclick="showOneProfile('${n.c.id}')">${n.c.name.split(' ')[0]}<\/text>`;
   });
   const svg=`<svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:${size}px;display:block;margin:0 auto">${edges}${dots}<\/svg>`;
-  const legend=`<div class="th-legend" style="justify-content:center;margin-top:10px">
+  const legend=`<div class="th-legend" style="justify-content:center;margin-top:10px;flex-wrap:wrap;gap:8px">
     <span><i style="background:rgba(22,163,74,0.8)"><\/i> Strong bond<\/span>
+    <span><i style="background:rgba(34,197,94,0.5)"><\/i> Mild bond<\/span>
+    <span><i style="background:rgba(239,68,68,0.5)"><\/i> Tension<\/span>
     <span><i style="background:rgba(220,38,38,0.8)"><\/i> Rivalry<\/span>
-    <span style="color:var(--text2)">Line thickness = intensity<\/span>
   <\/div>`;
   let teamFilter='';
   if(!G.merged&&G.teams.length>1){
@@ -199,8 +204,11 @@ function showRelWebTeam(ti){
     for(let j=i+1;j<nodes.length;j++){
       const a=nodes[i],b=nodes[j];
       const score=v19RelScore(a.c.id,b.c.id);
-      if(score>=65){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(22,163,74,${Math.min(0.85,0.3+(score-65)/50).toFixed(2)})" stroke-width="${(1+(score-65)/14).toFixed(2)}"/>`;}
-      else if(score<=25){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(220,38,38,${Math.min(0.85,0.3+(25-score)/30).toFixed(2)})" stroke-width="${(1+(25-score)/12).toFixed(2)}"/>`;}
+      if(score>35 && score<58) {} // skip neutral
+      else if(score>=70){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(22,163,74,${Math.min(0.85,0.3+(score-70)/40).toFixed(2)})" stroke-width="${(1+(score-70)/12).toFixed(2)}"/>`;}
+      else if(score>=58){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(34,197,94,0.4)" stroke-width="0.8"/>`;}
+      else if(score<=18){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(220,38,38,${Math.min(0.85,0.3+(18-score)/20).toFixed(2)})" stroke-width="${(1+(18-score)/10).toFixed(2)}"/>`;}
+      else if(score<=35){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(239,68,68,0.4)" stroke-width="0.8"/>`;}
     }
   }
   nodes.forEach(n=>{

@@ -320,10 +320,9 @@ function initDarkMode(){
 
 document.addEventListener('DOMContentLoaded',()=>{
   initGeminiKeyField();
-  // Stamp display version
   const verLabel = document.getElementById('app-version-label');
   if(verLabel && typeof APP_VERSION !== 'undefined') verLabel.textContent = APP_VERSION;
-  // Show resume button if save exists
   updateContinueButton();
-  // Note: dark mode, sound, particles handled by sound.js
+  // Force home screen visible, all others hidden — using inline styles to beat any CSS issue
+  if(typeof _showOnlyScreen==='function') _showOnlyScreen('screen-home');
 });

@@ -1057,8 +1057,7 @@ function runFinale(){
     // The real Survivor rule: odd jury. We just protect against exact tie by random if needed.
     // (We handle ties in runFinale's vote logic below via tiebreak)
   }
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-finale').classList.add('active');
+  _showOnlyScreen('screen-finale');
   document.getElementById('header-ep-badge').style.display='flex';
   document.getElementById('hdr-ep-txt').textContent=`Finale · ${G.settings.name}`;
   if(!G.settings.jury||!G.jury.length){renderFinaleNoJury(pick(finalists),finalists);return;}
@@ -1371,9 +1370,10 @@ function showElimFullscreen(player,ep){
     ${speechText?`<div class="elim-fs-block"><div class="elim-fs-block-label">FINAL WORDS<\/div><div class="elim-fs-block-text">"${speechText}"<\/div><\/div>`:''}
     ${finalWords?`<div class="elim-fs-block elim-fs-camera"><div class="elim-fs-block-label">🎥 PRIVATE CAMERA<\/div><div class="elim-fs-block-text">"${finalWords}"<\/div><\/div>`:''}
     <div class="elim-fs-block elim-fs-interview">
-      <div class="elim-fs-block-label">🎙️ HOST INTERVIEW</div>
-      <div class="elim-fs-block-text" style="color:var(--fire)">"${player.name.split(' ')[0]}, what happened tonight?"<\/div>
-      <div class="elim-fs-block-text" style="margin-top:8px">"${speechText?speechText.split('.').slice(-1)[0].trim()||'This game is harder than it looks.':'This game is harder than it looks.'}"<\/div>
+      <div class="elim-fs-block-label">🎙️ HOST INTERVIEW — CHIP DELACROIX</div>
+      <div class="elim-fs-block-text" style="color:var(--fire)">"${_elimHostQ(player,ep)}"<\/div>
+      <div class="elim-fs-block-text" style="margin-top:8px">"${_elimPlayerA(player,ep,speechText)}"<\/div>
+      ${ep&&ep._aiHostComment?`<div class="elim-fs-block-text" style="margin-top:10px;font-style:normal;font-size:12px;color:rgba(255,255,255,0.4)">— Chip: "${ep._aiHostComment}"<\/div>`:''}
     <\/div>
     <button class="elim-fs-close" onclick="closeElimFullscreen()">Continue →<\/button>
   <\/div>`;
@@ -1392,4 +1392,55 @@ function closeElimFullscreen(){
   const el=document.getElementById('elim-fullscreen');
   if(el){el.classList.remove('elim-fs-visible');setTimeout(()=>el.remove(),400);}
   if(typeof sfxAdv==='function') sfxAdv();
+}
+
+// ─── ELIMINATION INTERVIEW HELPERS ──────────────────────────────────────────
+// Varied host questions and player answers so every elimination feels different
+
+function _elimHostQ(player, ep){
+  const first=player.name.split(' ')[0];
+  const votes=ep&&ep.voteResult&&ep.voteResult.tally?ep.voteResult.tally[player.id]||0:0;
+  const totalVoters=ep&&ep.voteResult?Object.values(ep.voteResult.votes||{}).length:0;
+  const allies=(player.allianceIds||[]).length;
+  const arch=player.archetype||'';
+  const q=[
+    `${first}, you received ${votes} vote${votes!==1?'s':''} tonight. Did you see this coming?`,
+    `${first}, ${votes} parchments had your name on them. Walk me through what you think happened.`,
+    `${first}, you played as ${arch.replace('The ','')}. In the end, did that work for you or against you?`,
+    `${first}, what's the one move you wish you'd made differently?`,
+    `${first}, you survived ${(ep&&ep.ep)||1} episode${(ep&&ep.ep)!==1?'s':''} out here. What did you learn about yourself?`,
+    `${first}, someone in that tribe had your name written down for a while. When did you realise you were in trouble?`,
+    `${first}, the tribe has spoken. Is there anything you want to say to the people who voted for you?`,
+    `${first}, ${allies>1?`you had ${allies} alliance${allies!==1?'s':''} out here`:`you went it mostly alone`}. Any regrets?`,
+  ];
+  // Pick based on a hash of player id for consistency within a session
+  const idx=player.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)%(q.length);
+  return q[idx];
+}
+
+function _elimPlayerA(player, ep, speechText){
+  // Use the last sentence of exit speech if available, else archetype-based fallback
+  if(speechText){
+    const sentences=speechText.split(/[.!?]+/).map(s=>s.trim()).filter(Boolean);
+    // Pick the most emotionally charged sentence (usually the last)
+    const last=sentences[sentences.length-1];
+    if(last&&last.length>20) return last;
+  }
+  const arch=player.archetype||'';
+  const first=player.name.split(' ')[0];
+  const fallbacks={
+    'The Big Villain': `I played the game I wanted to play. I'm proud of every move I made, even the ones that cost me.`,
+    'The Sweetheart': `I came here to show people you can play with integrity. I hope I did that, even if it got me voted out.`,
+    'The Strategist': `I over-thought it. I had the right read and then I second-guessed myself. That's on me.`,
+    'The Challenge Beast': `I let my strength make me a target. Next time I'd be smarter about when to hold back.`,
+    'The Underdog': `Nobody expected me to get this far. I surprised myself out here, and that means everything.`,
+    'The Fan Favorite': `I wanted this so badly. I'll carry every moment of it with me — the good and the bad.`,
+    'The Loose Cannon': `I burned every bridge I had and I'd do it again. That's just who I am.`,
+    'The Puppet Master': `Someone got to the strings before I did. Respect the game.`,
+    'The Quiet Threat': `I never got the chance to show what I could really do. But I was close.`,
+    'The Goofball': `I laughed my way to the end and I have no regrets. ${first} played, baby!`,
+    'The Number Nerd': `The math was right. The execution just wasn't there on the night.`,
+    'The Social Butterfly': `I loved every single person out here. That's not a strategy — that's just me.`,
+  };
+  return fallbacks[arch]||`This game changes you in ways you don't expect. I'll be back stronger.`;
 }
