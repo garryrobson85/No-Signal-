@@ -2,7 +2,7 @@
 
 /* ── APP HEADER ── */
 .app-header{
-  flex-shrink:0;z-index:100;
+  position:sticky;top:0;z-index:100;
   background:rgba(5,6,8,0.96);backdrop-filter:blur(16px);
   border-bottom:1px solid var(--border);
   padding:10px 14px;display:flex;align-items:center;gap:10px;
@@ -45,10 +45,10 @@
 
 /* ── SCREENS ── */
 .screen{display:none!important}
-.screen.active{display:flex!important;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.screen.active{display:flex!important;flex-direction:column;min-height:calc(100vh - 55px)}
 
 /* ── HOME ── */
-#screen-home{flex:1;min-height:0;overflow-y:auto;align-items:center;justify-content:center;background:var(--void);padding:20px}
+#screen-home{height:calc(100vh - 55px);overflow-y:auto;flex-direction:column;align-items:center;justify-content:center;background:var(--void);padding:20px;}
 .home-hero{text-align:center;max-width:520px;width:100%}
 .home-fire-wrap{font-size:72px;line-height:1;margin-bottom:16px;display:none}
 .home-title{
@@ -66,7 +66,7 @@
 .home-btns .btn{width:100%;justify-content:center;padding:13px;font-size:15px}
 
 /* ── SETUP ── */
-#screen-setup{flex:1;min-height:0;overflow:hidden;flex-direction:row}
+#screen-setup{flex-direction:row;min-height:calc(100vh - 55px)}
 .setup-sidebar{
   width:200px;flex-shrink:0;background:var(--deep);
   padding:16px 0;border-right:1px solid var(--border);
@@ -94,8 +94,8 @@
 .setup-panel-sub{font-size:12px;color:var(--text2);margin-bottom:20px;line-height:1.5}
 
 /* ── GAME SCREEN ── */
-#screen-game{flex:1;min-height:0;overflow:hidden;flex-direction:column}
-#game-layout{display:flex;flex-direction:row;flex:1;min-height:0;overflow:hidden}
+#screen-game{flex-direction:column;min-height:calc(100vh - 55px)}
+#game-layout{display:flex;flex-direction:row;min-height:calc(100vh - 55px);overflow:hidden}
 .game-sidebar{
   width:200px;flex-shrink:0;background:var(--deep);
   border-right:1px solid var(--border);
@@ -142,5 +142,5 @@
 .gs-tribe-label{font-family:'Space Mono',monospace;font-size:7px;letter-spacing:0.12em;text-transform:uppercase;padding:3px 8px;font-weight:700;margin-bottom:2px}
 
 /* ── FINALE ── */
-#screen-finale{flex:1;min-height:0;overflow:hidden;flex-direction:column}
+#screen-finale{flex-direction:column}
 .finale-screen{flex:1;overflow-y:auto;padding:24px 20px 80px;background:var(--void)}
