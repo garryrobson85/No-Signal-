@@ -132,22 +132,25 @@ function kickRaceBars(){
   const rows=document.querySelectorAll('.race-row');
   if(!rows.length) return;
   const isTribe=!!document.getElementById('race-bars-tribe');
-  const raceDuration=isTribe?4000:2600;
+  const raceDuration=isTribe?9000:2600;
 
   rows.forEach((row,idx)=>{
     const fill=row.querySelector('.race-fill');
     const scoreEl=row.querySelector('.race-score');
     const pct=parseFloat(fill?.dataset.pct||0);
-    const delayBase=isTribe?idx*1400:parseFloat(row.dataset.delay||300);
+    // Both bars start together — scores differ so they naturally separate
+    // Small offset so rows don't appear at identical frames
+    const delayBase=isTribe?idx*200:parseFloat(row.dataset.delay||300);
 
-    setTimeout(()=>{row.style.transition='opacity 0.3s ease';row.style.opacity='1';},delayBase);
+    setTimeout(()=>{row.style.transition='opacity 0.4s ease';row.style.opacity='1';},delayBase);
 
     setTimeout(()=>{
       if(!fill) return;
-      fill.style.transition=`width ${raceDuration}ms cubic-bezier(0.25,0.1,0.05,1.0)`;
+      // ease-out cubic: rushes to start, crawls at end — maximum suspense
+      fill.style.transition=`width ${raceDuration}ms cubic-bezier(0.22,0.8,0.08,1.0)`;
       fill.style.width=pct+'%';
       if(typeof sfxSelect==='function'&&typeof NS!=='undefined'&&NS.sound) sfxSelect();
-    },delayBase+80);
+    },delayBase+120);
 
     setTimeout(()=>{
       if(!scoreEl) return;
@@ -164,14 +167,19 @@ function kickRaceBars(){
         else scoreEl.textContent=target;
       }
       requestAnimationFrame(countUp);
-    },delayBase+100);
+    },delayBase+140);
   });
 
-  const lastDelay=isTribe?(rows.length-1)*1400+raceDuration+200:raceDuration+400;
+  // Reveal win/loss badges + SFX after last bar finishes
+  const lastRowDelay=isTribe?(rows.length-1)*200:0;
+  const revealAt=lastRowDelay+raceDuration+300;
   setTimeout(()=>{
+    const badges=document.getElementById('challenge-result-badges');
+    if(badges){badges.style.display='flex';badges.style.animation='cin 0.5s ease both';}
     if(typeof sfxWin==='function'&&typeof NS!=='undefined'&&NS.sound) sfxWin();
     if(typeof hapticWin==='function') hapticWin();
-  },lastDelay);
+    if(typeof nsFlash==='function') nsFlash();
+  },revealAt);
 }
 
 function buildEpisodeHeader(ep){
@@ -399,24 +407,24 @@ function buildStageChallenge(ep){
     });
     html+=`<\/div><\/div>`;
   } else {
-    // Tribe challenge — suspenseful bar race
-    const scores=r.scores||[];
+    // Tribe challenge — fixed order (team idx) so winner position never spoils result
+    const scores=[...(r.scores||[])].sort((a,b)=>{
+      const ai=a.team?.idx!==undefined?a.team.idx:(a.ti||0);
+      const bi=b.team?.idx!==undefined?b.team.idx:(b.ti||0);
+      return ai-bi;
+    });
     const maxS=Math.max(...scores.map(s=>s.totalScore||0),1);
     const winner=r.winner?.team;
     const loser=r.loser?.team;
 
     html+=`<div class="event-card type-challenge">
       <div class="event-card-type">Tribe Challenge · ${(r.stat||'').toUpperCase()}<\/div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(57,255,20,0.1);border:1px solid rgba(57,255,20,0.2);border-radius:3px;padding:4px 10px;font-family:'Space Mono',monospace;font-size:9px;color:var(--signal);letter-spacing:0.08em">👑 ${winner?.name||'?'} wins!<\/span>
-        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(232,69,10,0.1);border:1px solid rgba(232,69,10,0.2);border-radius:3px;padding:4px 10px;font-family:'Space Mono',monospace;font-size:9px;color:var(--fire);letter-spacing:0.08em">⚠️ ${loser?.name||'?'} goes to tribal<\/span>
-      <\/div>
       <div class="race-bars" id="race-bars-tribe">`;
 
     scores.forEach((s,i)=>{
       const pct=Math.round(Math.max(0,s.totalScore||0)/maxS*100);
       const color=s.team?.color||'var(--fire)';
-      html+=`<div class="race-row" data-delay="${400+i*600}">
+      html+=`<div class="race-row" data-delay="${400+i*500}">
         <div class="race-label" style="color:${color};font-weight:700">${s.team?.name||'?'}<\/div>
         <div class="race-track">
           <div class="race-fill" style="background:linear-gradient(90deg,${color},${color}88)" data-pct="${pct}"><\/div>
@@ -424,7 +432,13 @@ function buildStageChallenge(ep){
         <div class="race-score" style="color:${color}">${Math.max(0,s.totalScore||0)}<\/div>
       <\/div>`;
     });
-    html+=`<\/div><\/div>`;
+    // Badges hidden — kickRaceBars reveals them after the race finishes
+    html+=`<\/div>
+      <div id="challenge-result-badges" style="display:none;flex-direction:column;gap:8px;margin-top:14px">
+        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(57,255,20,0.1);border:1px solid rgba(57,255,20,0.2);border-radius:3px;padding:6px 12px;font-family:'Space Mono',monospace;font-size:10px;color:var(--signal);letter-spacing:0.08em">👑 ${winner?.name||'?'} wins immunity<\/span>
+        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(232,69,10,0.1);border:1px solid rgba(232,69,10,0.2);border-radius:3px;padding:6px 12px;font-family:'Space Mono',monospace;font-size:10px;color:var(--fire);letter-spacing:0.08em">⚠️ ${loser?.name||'?'} goes to tribal council<\/span>
+      <\/div>
+    <\/div>`;
   }
 
   html+=`<\/div>`;
@@ -1111,4 +1125,143 @@ function renderFinaleNoJury(winner,finalists){
     <div style="width:120px;margin:16px auto">${getPortrait(winner)}<\/div>
     <div style="margin-top:24px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn btn-fire" onclick="showEpisodeScripts()">📜 Read Full Season Script<\/button><button class="btn btn-outline" onclick="goHome()">🔥 New Season<\/button><\/div>
   <\/div>`;
+}
+// ─── CHALLENGE RACE OVERLAY ─────────────────────────────────────────────────
+// Full-screen modal that shows the tribe race bars cinematically.
+// Opens automatically after challenge resolves. Close button returns to episode.
+
+function showChallengeRaceOverlay(){
+  const ep=G.currentEpData;
+  if(!ep||!ep.challengeResult) return;
+  const r=ep.challengeResult;
+
+  // Build race rows — fixed order by team index
+  let raceHtml='';
+  if(r.type==='individual'){
+    const top=(r.scores||[]).slice(0,8);
+    const maxS=Math.max(...top.map(s=>s.score),1);
+    top.forEach((s,i)=>{
+      const pct=Math.round(s.score/maxS*100);
+      raceHtml+=`<div class="race-row" data-delay="${300+i*180}" style="opacity:0">
+        <div class="race-label" style="color:${s.color||'var(--fire)'};">${(s.name||'').split(' ')[0]}</div>
+        <div class="race-track"><div class="race-fill" style="background:${s.color||'var(--fire)'}" data-pct="${pct}"></div></div>
+        <div class="race-score">${s.score}</div>
+      </div>`;
+    });
+  } else {
+    const scores=[...(r.scores||[])].sort((a,b)=>(a.ti||0)-(b.ti||0));
+    const maxS=Math.max(...scores.map(s=>s.totalScore||0),1);
+    scores.forEach((s,i)=>{
+      const pct=Math.round(Math.max(0,s.totalScore||0)/maxS*100);
+      const color=s.team?.color||'var(--fire)';
+      raceHtml+=`<div class="race-row" data-delay="${300+i*200}" style="opacity:0">
+        <div class="race-label" style="color:${color};font-size:20px;font-weight:700">${s.team?.name||'?'}</div>
+        <div class="race-track"><div class="race-fill" style="background:linear-gradient(90deg,${color},${color}88)" data-pct="${pct}"></div></div>
+        <div class="race-score" style="color:${color};font-size:16px;font-weight:700">${Math.max(0,s.totalScore||0)}</div>
+      </div>`;
+    });
+  }
+
+  const winner=r.winner?.team||r.winner;
+  const loser=r.loser?.team||r.loser;
+  const isTribal=r.type!=='individual';
+
+  // Inject overlay into page
+  const existing=document.getElementById('challenge-race-overlay');
+  if(existing) existing.remove();
+
+  const overlay=document.createElement('div');
+  overlay.id='challenge-race-overlay';
+  overlay.innerHTML=`
+    <div class="cro-inner">
+      <div class="cro-header">
+        <div style="font-size:42px;margin-bottom:8px">${r.icon||'🏆'}</div>
+        <div class="cro-challenge-name">${r.name}</div>
+        <div class="cro-challenge-type">${(r.stat||'').toUpperCase()} CHALLENGE</div>
+      </div>
+      <div class="race-bars ${isTribal?'':'race-bars-ind'}" id="${isTribal?'race-bars-tribe':'race-bars-ind'}" style="width:100%;max-width:500px;margin:0 auto">
+        ${raceHtml}
+      </div>
+      <div id="cro-result-badges" style="display:none;flex-direction:column;gap:10px;align-items:center;margin-top:20px">
+        ${isTribal?`
+          <div class="cro-win-badge">👑 ${winner?.name||'?'} wins immunity</div>
+          <div class="cro-loss-badge">⚠️ ${loser?.name||'?'} goes to tribal council</div>
+        `:`<div class="cro-win-badge">🛡️ ${winner?.name||winner?.name||'?'} wins individual immunity</div>`}
+      </div>
+      <button class="cro-close-btn" id="cro-close" style="display:none" onclick="closeChallengeRaceOverlay()">
+        ${isTribal?'🔦 Go to Tribal Council':'Continue →'}
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // Animate in
+  requestAnimationFrame(()=>{
+    overlay.classList.add('cro-visible');
+    // Slight delay before bars start so overlay transition completes
+    setTimeout(()=>kickRaceBarsInOverlay(isTribal), 400);
+  });
+}
+
+function kickRaceBarsInOverlay(isTribal){
+  const rows=document.querySelectorAll('#challenge-race-overlay .race-row');
+  if(!rows.length) return;
+  const raceDuration=isTribal?9000:2600;
+
+  rows.forEach((row,idx)=>{
+    const fill=row.querySelector('.race-fill');
+    const scoreEl=row.querySelector('.race-score');
+    const pct=parseFloat(fill?.dataset.pct||0);
+    const delayBase=isTribal?idx*200:parseFloat(row.dataset.delay||300);
+
+    setTimeout(()=>{ row.style.transition='opacity 0.4s ease'; row.style.opacity='1'; }, delayBase);
+
+    setTimeout(()=>{
+      if(!fill) return;
+      fill.style.transition=`width ${raceDuration}ms cubic-bezier(0.22,0.8,0.08,1.0)`;
+      fill.style.width=pct+'%';
+      if(typeof sfxSelect==='function'&&typeof NS!=='undefined'&&NS.sound) sfxSelect();
+    }, delayBase+120);
+
+    setTimeout(()=>{
+      if(!scoreEl) return;
+      scoreEl.style.opacity='1';
+      const target=parseInt(scoreEl.textContent||0);
+      scoreEl.textContent='0';
+      let t0=null;
+      function count(ts){
+        if(!t0) t0=ts;
+        const p=Math.min((ts-t0)/raceDuration,1);
+        const e=1-Math.pow(1-p,3);
+        scoreEl.textContent=Math.round(e*target);
+        if(p<1) requestAnimationFrame(count);
+        else scoreEl.textContent=target;
+      }
+      requestAnimationFrame(count);
+    }, delayBase+140);
+  });
+
+  const revealAt=(isTribal?(rows.length-1)*200:0)+raceDuration+300;
+  setTimeout(()=>{
+    const badges=document.getElementById('cro-result-badges');
+    const closeBtn=document.getElementById('cro-close');
+    if(badges){ badges.style.display='flex'; badges.style.animation='cin 0.6s ease both'; }
+    if(closeBtn){ closeBtn.style.display='block'; closeBtn.style.animation='cin 0.6s ease 0.3s both'; }
+    if(typeof sfxWin==='function'&&typeof NS!=='undefined'&&NS.sound) sfxWin();
+    if(typeof hapticWin==='function') hapticWin();
+    if(typeof nsFlash==='function') nsFlash();
+  }, revealAt);
+}
+
+function closeChallengeRaceOverlay(){
+  const overlay=document.getElementById('challenge-race-overlay');
+  if(overlay){
+    overlay.classList.remove('cro-visible');
+    setTimeout(()=>overlay.remove(), 350);
+  }
+  const ep=G.currentEpData;
+  if(typeof sfxAdv==='function') sfxAdv();
+  if(ep&&ep.voteResult&&!ep.noElim){
+    renderStage(2); // tribal council
+  }
+  // For no-elim or individual challenges, stage 1 is already rendered — do nothing
 }

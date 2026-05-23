@@ -541,11 +541,14 @@ function runChallengeWithChoice(chosenChallenge){
       if(el) el.textContent = msg;
     }).then(() => {
       renderStage(1);
+      setTimeout(()=>{ if(typeof showChallengeRaceOverlay==='function') showChallengeRaceOverlay(); }, 300);
     }).catch(() => {
-      renderStage(1); // AI failed — engine text is already set, render it
+      renderStage(1);
+      setTimeout(()=>{ if(typeof showChallengeRaceOverlay==='function') showChallengeRaceOverlay(); }, 300);
     });
   } else {
     renderStage(1);
+    setTimeout(()=>{ if(typeof showChallengeRaceOverlay==='function') showChallengeRaceOverlay(); }, 300);
   }
   } catch(err) {
     console.error('runChallengeWithChoice failed:',err);
