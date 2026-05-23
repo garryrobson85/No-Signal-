@@ -14,9 +14,8 @@ document.addEventListener('click', function(e){
   const modal  = el.dataset.modal;
 
   // ── Sound on every action ──────────────────────────────────────────────
-  // toggleNsSound handles its own sound (it enables audio first)
   // flipVote has its own dramatic sfx — skip here
-  if(typeof sfxTick==='function' && action !== 'toggleNsSound' && action !== 'nsToggle'){
+  if(typeof sfxTick==='function' && action !== 'nsToggle'){
     const bigActions = new Set(['startSeason','loadGame','loadQuickDemo','runFinale','nextEpisode']);
     const navActions  = new Set(['goHome','goSetup','setupNav','closeModal','showCastStatus',
       'showSeasonStats','showTribeHistory','showPlayerProfiles','showV19Insights',
@@ -76,10 +75,6 @@ document.addEventListener('click', function(e){
 
     // Modals
     case 'closeModal':        if(modal) closeModal(modal); break;
-
-    // Dark mode / sound
-    case 'toggleDarkMode':    toggleDarkMode(); break;
-    case 'toggleNsSound':     toggleNsSound(); break;
 
     // Drawer + theme
     case 'openDrawer':        openDrawer(); break;

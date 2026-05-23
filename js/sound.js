@@ -1,51 +1,69 @@
 // No Signal v1.1.2 — sound.js
-// Web Audio SFX, haptics, particle system, settings drawer, theme switcher
-// Loaded after ai.js, before main.js
+// Sound is ALWAYS ON. No toggle. AudioContext is created on the first user
+// interaction (browser policy), then kept alive permanently.
+// Haptics, particles, flash, drawer, themes also live here.
 
-// ═══ SETTINGS STATE ═══
+// ═══ UI SETTINGS (no sound toggle — sound is always on) ═══
 const NS = {
-  sound: false,
-  haptic: true,
-  flash: true,
+  haptic:    true,
+  flash:     true,
   particles: true,
   scanlines: true,
 };
-
 try {
   const stored = localStorage.getItem('ns_ui_settings');
-  if (stored) Object.assign(NS, JSON.parse(stored));
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    // Merge but ignore any old 'sound' key — sound is always on now
+    const {sound, ...rest} = parsed;
+    Object.assign(NS, rest);
+  }
 } catch(e) {}
 
 function nsSave() {
   try { localStorage.setItem('ns_ui_settings', JSON.stringify(NS)); } catch(e) {}
 }
 
-// Apply scanlines setting on load
 function applyScanlinesState() {
   document.documentElement.classList.toggle('no-scan', !NS.scanlines);
 }
 
 // ═══ AUDIO ═══
+// Rule: AudioContext is created the moment the user first interacts with the page.
+// After that, playTone always works — we never check a "sound enabled" flag.
 let _actx = null;
+let _audioReady = false;
 
 function _initAudio() {
   if (_actx) return;
   try {
     _actx = new (window.AudioContext || window.webkitAudioContext)();
-    // Auto-resume whenever the context is suspended (Chrome re-suspends after inactivity)
     _actx.onstatechange = () => {
       if (_actx && _actx.state === 'suspended') _actx.resume().catch(()=>{});
     };
+    _audioReady = true;
   } catch(e) { _actx = null; }
 }
 
-function getAC() {
-  if (!NS.sound || !_actx) return null;
-  return _actx; // always return — playTone handles suspended state
+// Called on EVERY user interaction — creates context on first call, resumes on subsequent
+function _ensureAudio() {
+  if (!_actx) {
+    _initAudio();
+  } else if (_actx.state === 'suspended') {
+    _actx.resume().catch(()=>{});
+  }
 }
 
+// Register on all gesture types so we catch the very first interaction
+['pointerdown','click','touchstart','keydown'].forEach(ev => {
+  document.addEventListener(ev, _ensureAudio, { passive: true });
+});
+
+// Periodic keep-alive in case browser suspends silently
+setInterval(() => { if (_actx && _actx.state === 'suspended') _actx.resume().catch(()=>{}); }, 2000);
+
 function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
-  if (!NS.sound || !_actx) return;
+  if (!_actx) return; // not yet initialised — first gesture hasn't happened
   const doPlay = () => {
     try {
       if (_actx.state === 'closed') return;
@@ -56,36 +74,32 @@ function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
       g.gain.setValueAtTime(Math.max(0.001, v), T);
       g.gain.exponentialRampToValueAtTime(0.0001, T + d);
       o.start(T); o.stop(T + d + 0.05);
-    } catch(e) { console.warn('playTone failed:', e.message); }
+    } catch(e) { /* silent */ }
   };
-  // Always resume — it's a no-op if already running
-  if (_actx.state !== 'running') {
-    _actx.resume().then(doPlay).catch(e => console.warn('resume failed:', e.message));
-  } else {
-    doPlay();
-  }
+  if (_actx.state === 'running') doPlay();
+  else _actx.resume().then(doPlay).catch(()=>{});
 }
 
-function sfxVote()   { playTone(220,'sine',0.07,0.12); playTone(440,'sine',0.1,0.09,0.05); playTone(330,'triangle',0.18,0.07,0.09); }
-function sfxElim()   { [80,70,60,50,40].forEach((f,i)=>playTone(f,'sawtooth',0.38,0.09,i*0.11)); playTone(220,'sine',0.5,0.06,0.62); }
-function sfxWin()    { [523,659,784,1047].forEach((f,i)=>playTone(f,'sine',0.18,0.12,i*0.09)); }
-function sfxAdv()    { playTone(440,'sine',0.12,0.09); playTone(550,'sine',0.12,0.08,0.07); }
-function sfxSelect() { playTone(660,'sine',0.14,0.1); }
-function sfxTick()   { playTone(800,'sine',0.12,0.08); }  // was 880/0.06/0.05 — barely audible
-function sfxNav()    { playTone(520,'sine',0.1,0.07); }   // lighter nav sound
-function sfxToggle() { playTone(700,'triangle',0.12,0.07); playTone(900,'triangle',0.08,0.05,0.05); }
-function sfxOpen()   { playTone(440,'sine',0.08,0.06); playTone(550,'sine',0.08,0.05,0.06); }
+function sfxVote()   { playTone(220,'sine',0.07,0.13); playTone(440,'sine',0.1,0.10,0.05); playTone(330,'triangle',0.18,0.08,0.09); }
+function sfxElim()   { [80,70,60,50,40].forEach((f,i)=>playTone(f,'sawtooth',0.38,0.10,i*0.11)); playTone(220,'sine',0.5,0.07,0.62); }
+function sfxWin()    { [523,659,784,1047].forEach((f,i)=>playTone(f,'sine',0.2,0.13,i*0.09)); }
+function sfxAdv()    { playTone(440,'sine',0.12,0.10); playTone(550,'sine',0.12,0.09,0.07); }
+function sfxSelect() { playTone(660,'sine',0.14,0.11); }
+function sfxTick()   { playTone(800,'sine',0.13,0.09); }
+function sfxNav()    { playTone(520,'sine',0.11,0.08); }
+function sfxToggle() { playTone(700,'triangle',0.13,0.08); playTone(900,'triangle',0.09,0.06,0.05); }
+function sfxOpen()   { playTone(440,'sine',0.09,0.07); playTone(550,'sine',0.09,0.06,0.06); }
 
 // ═══ HAPTICS ═══
 function haptic(p=[8]) {
   if (!NS.haptic) return;
   try { if (navigator.vibrate) navigator.vibrate(p); } catch(e) {}
 }
-function hapticVote()   { haptic([15,8,15]); }
-function hapticElim()   { haptic([50,30,80,30,50]); }
-function hapticTap()    { haptic([7]); }
-function hapticWin()    { haptic([20,15,40]); }
-function hapticAdv()    { haptic([8]); }
+function hapticVote() { haptic([15,8,15]); }
+function hapticElim() { haptic([50,30,80,30,50]); }
+function hapticTap()  { haptic([7]); }
+function hapticWin()  { haptic([20,15,40]); }
+function hapticAdv()  { haptic([8]); }
 
 // ═══ SCREEN FLASH ═══
 function nsFlash() {
@@ -114,8 +128,7 @@ window.addEventListener('resize', _resizePC);
 class _Particle {
   constructor(x, y, c='#E8450A') {
     this.x=x; this.y=y;
-    this.vx=(Math.random()-.5)*4;
-    this.vy=-Math.random()*5-2;
+    this.vx=(Math.random()-.5)*4; this.vy=-Math.random()*5-2;
     this.life=1; this.d=Math.random()*0.02+0.014;
     this.sz=Math.random()*3.5+2; this.c=c;
   }
@@ -132,7 +145,6 @@ function nsBurst(x, y, n=18, c='#E8450A') {
   if (!NS.particles || !_pctx) return;
   for (let i=0; i<n; i++) _parts.push(new _Particle(x, y, c));
 }
-
 function nsElimBurst() {
   if (!NS.particles || !_pctx) return;
   const cx = window.innerWidth/2;
@@ -141,7 +153,6 @@ function nsElimBurst() {
     p.vy *= 1.6; _parts.push(p);
   }
 }
-
 (function _ploop() {
   if (_pctx) {
     _pctx.clearRect(0,0,_pc.width,_pc.height);
@@ -151,37 +162,13 @@ function nsElimBurst() {
   requestAnimationFrame(_ploop);
 })();
 
-// ═══ SOUND TOGGLE (header button) ═══
-function toggleNsSound() {
-  NS.sound = !NS.sound;
-  nsSave();
-  // Create AudioContext on this gesture — guaranteed to work on mobile
-  if (NS.sound) _initAudio();
-  _updateSoundBtn();
-  const ts = document.getElementById('ns-t-sound');
-  if (ts) ts.classList.toggle('on', NS.sound);
-  if (NS.sound) { setTimeout(()=>sfxTick(), 50); hapticTap(); }
-}
-
-function _updateSoundBtn() {
-  const icon  = document.getElementById('sound-hdr-icon');
-  const label = document.getElementById('sound-hdr-label');
-  const btn   = document.getElementById('sound-hdr-btn');
-  if (icon)  icon.textContent  = NS.sound ? '🔊' : '🔇';
-  if (label) label.textContent = NS.sound ? 'SOUND ON' : 'SOUND OFF';
-  if (btn)   btn.style.borderColor = NS.sound ? 'var(--fire)' : '';
-  if (btn)   btn.style.color       = NS.sound ? 'var(--fire)' : '';
-}
-
-// ═══ SETTINGS DRAWER TOGGLE ═══
+// ═══ SETTINGS DRAWER ═══
 function nsToggle(key) {
   NS[key] = !NS[key];
   const el = document.getElementById('ns-t-'+key);
   if (el) el.classList.toggle('on', NS[key]);
   nsSave();
-  hapticTap();
-  if (NS.sound) sfxTick();
-  if (key==='sound') { if (NS.sound) _initAudio(); _updateSoundBtn(); }
+  hapticTap(); sfxToggle();
   if (key==='scanlines') applyScanlinesState();
 }
 
@@ -190,7 +177,6 @@ function openDrawer() {
   document.getElementById('drawer-backdrop')?.classList.add('open');
   hapticTap(); sfxOpen();
 }
-
 function closeDrawer() {
   document.getElementById('settings-drawer')?.classList.remove('open');
   document.getElementById('drawer-backdrop')?.classList.remove('open');
@@ -203,19 +189,23 @@ const _themes = {
   jungle:  {'--fire':'#39ff14','--fire2':'#22c55e','--ember':'#86efac','--ice':'#ffcc00','--ice2':'#f59e0b'},
   void:    {'--fire':'#a78bfa','--fire2':'#c084fc','--ember':'#e9d5ff','--ice':'#f472b6','--ice2':'#db2777'},
 };
-
 function setTheme(key) {
   document.querySelectorAll('.theme-opt').forEach(t=>t.classList.remove('sel'));
   document.querySelector(`[data-theme="${key}"]`)?.classList.add('sel');
   const theme = _themes[key] || {};
-  // reset to defaults first
   Object.keys(_themes.arctic).forEach(k=>document.documentElement.style.removeProperty(k));
   Object.entries(theme).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
   try { localStorage.setItem('ns_theme', key); } catch(e) {}
-  hapticTap(); if(NS.sound) sfxSelect();
+  hapticTap(); sfxSelect();
 }
 
-// ═══ DRAWER CSS (injected here to keep it out of the CSS files) ═══
+// ═══ SIDEBAR TOGGLE (mobile) ═══
+function toggleSidebar() {
+  const sidebar = document.getElementById('game-sidebar');
+  if (sidebar) { sidebar.classList.toggle('open'); hapticTap(); sfxNav(); }
+}
+
+// ═══ DRAWER CSS ═══
 (function injectDrawerCSS() {
   const s = document.createElement('style');
   s.textContent = `
@@ -233,7 +223,6 @@ function setTheme(key) {
     .theme-opt{padding:9px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);font-family:'Space Mono',monospace;font-size:9px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.18s;letter-spacing:0.06em;color:var(--text2)}
     .theme-opt:hover{border-color:var(--border2);color:var(--text)}
     .theme-opt.sel{border-color:var(--fire);background:rgba(232,69,10,0.08);color:var(--fire)}
-    .dark-toggle-btn.on{border-color:var(--fire)!important;color:var(--fire)!important;background:rgba(232,69,10,0.1)!important}
     html.no-scan body::before{display:none}
   `;
   document.head.appendChild(s);
@@ -241,37 +230,17 @@ function setTheme(key) {
 
 // ═══ INIT ═══
 document.addEventListener('DOMContentLoaded', () => {
-  // Sync toggle states
   Object.keys(NS).forEach(key => {
     const el = document.getElementById('ns-t-'+key);
     if (el) el.classList.toggle('on', NS[key]);
   });
-  _updateSoundBtn();
   applyScanlinesState();
-  // Restore theme
   try {
     const t = localStorage.getItem('ns_theme');
     if (t && _themes[t]) setTheme(t);
   } catch(e) {}
-  // Dark mode class for compat (game is always dark now)
   document.documentElement.classList.add('dark');
+  // Stamp version
+  const vl = document.getElementById('app-version-label');
+  if (vl && typeof APP_VERSION !== 'undefined') vl.textContent = APP_VERSION;
 });
-
-// ═══ SIDEBAR TOGGLE (mobile) ═══
-function toggleSidebar() {
-  const sidebar = document.getElementById('game-sidebar');
-  if (sidebar) {
-    sidebar.classList.toggle('open');
-    hapticTap();
-  }
-}
-
-// Resume AudioContext on every user interaction — browsers can suspend it silently
-function _resumeAC() {
-  if (_actx && _actx.state !== 'running') _actx.resume().catch(()=>{});
-}
-document.addEventListener('pointerdown', _resumeAC, { passive: true });
-document.addEventListener('click', _resumeAC, { passive: true });
-document.addEventListener('touchstart', _resumeAC, { passive: true });
-// Also periodically check — some browsers suspend without any event
-setInterval(()=>{ if(_actx && _actx.state==='suspended') _actx.resume().catch(()=>{}); }, 3000);

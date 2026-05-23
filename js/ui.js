@@ -149,7 +149,7 @@ function kickRaceBars(){
       // ease-out cubic: rushes to start, crawls at end — maximum suspense
       fill.style.transition=`width ${raceDuration}ms cubic-bezier(0.22,0.8,0.08,1.0)`;
       fill.style.width=pct+'%';
-      if(typeof sfxSelect==='function'&&typeof NS!=='undefined'&&NS.sound) sfxSelect();
+      if(typeof sfxSelect==='function') sfxSelect();
     },delayBase+120);
 
     setTimeout(()=>{
@@ -176,7 +176,7 @@ function kickRaceBars(){
   setTimeout(()=>{
     const badges=document.getElementById('challenge-result-badges');
     if(badges){badges.style.display='flex';badges.style.animation='cin 0.5s ease both';}
-    if(typeof sfxWin==='function'&&typeof NS!=='undefined'&&NS.sound) sfxWin();
+    if(typeof sfxWin==='function') sfxWin();
     if(typeof hapticWin==='function') hapticWin();
     if(typeof nsFlash==='function') nsFlash();
   },revealAt);
@@ -1219,7 +1219,7 @@ function kickRaceBarsInOverlay(isTribal){
       if(!fill) return;
       fill.style.transition=`width ${raceDuration}ms cubic-bezier(0.22,0.8,0.08,1.0)`;
       fill.style.width=pct+'%';
-      if(typeof sfxSelect==='function'&&typeof NS!=='undefined'&&NS.sound) sfxSelect();
+      if(typeof sfxSelect==='function') sfxSelect();
     }, delayBase+120);
 
     setTimeout(()=>{
@@ -1246,7 +1246,7 @@ function kickRaceBarsInOverlay(isTribal){
     const closeBtn=document.getElementById('cro-close');
     if(badges){ badges.style.display='flex'; badges.style.animation='cin 0.6s ease both'; }
     if(closeBtn){ closeBtn.style.display='block'; closeBtn.style.animation='cin 0.6s ease 0.3s both'; }
-    if(typeof sfxWin==='function'&&typeof NS!=='undefined'&&NS.sound) sfxWin();
+    if(typeof sfxWin==='function') sfxWin();
     if(typeof hapticWin==='function') hapticWin();
     if(typeof nsFlash==='function') nsFlash();
   }, revealAt);
