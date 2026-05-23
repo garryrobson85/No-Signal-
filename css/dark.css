@@ -9,7 +9,7 @@
 
   /* Game: sidebar collapses, game content always visible */
   #screen-game{min-height:auto}
-  #game-layout{flex-direction:column!important;overflow:visible!important}
+  #game-layout{flex-direction:column!important}
 
   .game-sidebar{
     width:100%!important;max-height:0;overflow:hidden;
