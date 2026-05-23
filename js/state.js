@@ -92,18 +92,19 @@ function _showNextNotify(){
 function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('active');}
 function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('active');}
 function _showOnlyScreen(id){
-  // Direct DOM manipulation — bypasses all CSS class issues
   document.querySelectorAll('.screen').forEach(s=>{
     if(s.id===id){
       s.classList.add('active');
       s.style.display='flex';
+      s.scrollTop=0;
     } else {
       s.classList.remove('active');
       s.style.display='none';
     }
   });
-  // Reset scroll to top
   window.scrollTo(0,0);
+  document.documentElement.scrollTop=0;
+  document.body.scrollTop=0;
 }
 function goHome(){
   if(G.currentEpData&&G.cast.length) saveGame(true);
