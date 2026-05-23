@@ -43,7 +43,7 @@
 .screen.active{display:flex!important;flex-direction:column}
 
 /* ── HOME ── */
-#screen-home{background:var(--void);padding:40px 20px;}
+#screen-home{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:20px;background:var(--void)}
 .home-hero{text-align:center;max-width:520px;width:100%;margin:0 auto}
 .home-fire-wrap{font-size:72px;line-height:1;margin-bottom:16px;display:none}
 .home-title{
