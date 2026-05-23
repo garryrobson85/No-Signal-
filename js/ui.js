@@ -76,7 +76,7 @@ function renderStage(idx){
     container.innerHTML=`<div class="ep-view">${html}<\/div>`;
     capturePlacementSnapshot(ep);
     G.episodeLog.push(ep);
-    setTimeout(()=>{const gm=document.querySelector('.game-main');if(gm)gm.scrollTo({top:gm.scrollHeight,behavior:'smooth'});},120);
+    setTimeout(()=>{const gm=document.querySelector('.game-main');if(gm)gm.scrollTo({top:0,behavior:'instant'});},50);
     updateGameSidebar();
     return;
   }
@@ -105,8 +105,8 @@ function renderStage(idx){
   }, 80);
   setTimeout(()=>{
     const gm=document.querySelector('.game-main');
-    if(gm) gm.scrollTo({top:gm.scrollHeight,behavior:'smooth'});
-  },120);
+    if(gm) gm.scrollTo({top:0,behavior:'instant'});
+  },50);
   updateGameSidebar();
   } catch(err) {
     console.error('renderStage failed:',err);
