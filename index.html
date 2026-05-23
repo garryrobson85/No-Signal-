@@ -16,29 +16,23 @@
     .app-header{flex-shrink:0}
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css?v=1779573986">
-  <link rel="stylesheet" href="css/layout.css?v=1779573986">
-  <link rel="stylesheet" href="css/components.css?v=1779573986">
-  <link rel="stylesheet" href="css/game.css?v=1779573986">
-  <link rel="stylesheet" href="css/dark.css?v=1779573986">
+  <link rel="stylesheet" href="css/base.css?v=1779574198">
+  <link rel="stylesheet" href="css/layout.css?v=1779574198">
+  <link rel="stylesheet" href="css/components.css?v=1779574198">
+  <link rel="stylesheet" href="css/game.css?v=1779574198">
+  <link rel="stylesheet" href="css/dark.css?v=1779574198">
 </head>
 <body>
 
-<div id="app">
-
-  <!-- Particles + flash overlays (inside #app but position:fixed, no flow impact) -->
-  <canvas id="ns-particles" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:200"></canvas>
-  <div id="ns-flash" style="position:fixed;inset:0;pointer-events:none;z-index:199;opacity:0"></div>
-
-  <!-- Settings Drawer (position:fixed, no flow impact) -->
-  <div class="drawer-backdrop" id="drawer-backdrop" data-action="closeDrawer" style="position:fixed;inset:0;z-index:300;opacity:0;pointer-events:none"></div>
-<div class="drawer" id="settings-drawer" style="position:fixed;right:0;top:0;bottom:0;width:290px;max-width:88vw;z-index:301;transform:translateX(100%);overflow-y:auto">
+<!-- Settings Drawer — position:fixed, zero document flow impact -->
+<div class="drawer-backdrop" id="drawer-backdrop" data-action="closeDrawer"></div>
+<div class="drawer" id="settings-drawer">
   <div class="drawer-head">
     <div class="drawer-title">Settings</div>
     <button class="drawer-close" data-action="closeDrawer">✕</button>
   </div>
   <div class="drawer-section">
-    <div class="drawer-label">Audio & Feel</div>
+    <div class="drawer-label">Audio &amp; Feel</div>
     <div class="toggle-row">
       <div class="toggle-info"><div class="toggle-title">Haptic Feedback</div><div class="toggle-desc">Vibration on key moments (mobile)</div></div>
       <div class="toggle-switch on" id="ns-t-haptic" data-action="nsToggle" data-key="haptic"></div>
@@ -66,6 +60,10 @@
     </div>
   </div>
 </div>
+
+<!-- Particles + flash (position:fixed, zero document flow) -->
+<canvas id="ns-particles"></canvas>
+<div id="ns-flash"></div>
 
 <div id="app">
 
@@ -486,20 +484,20 @@
 </div>
 
 <div id="notification" class="notification"></div>
-<script src="js/data.js?v=1779573986"></script>
-<script src="js/state.js?v=1779573986"></script>
-<script src="js/portraits.js?v=1779573986"></script>
-<script src="js/memory.js?v=1779573986"></script>
-<script src="js/evolution.js?v=1779573986"></script>
-<script src="js/engine.js?v=1779573986"></script>
-<script src="js/ui.js?v=1779573986"></script>
-<script src="js/features.js?v=1779573986"></script>
-<script src="js/save.js?v=1779573986"></script>
-<script src="js/producer.js?v=1779573986"></script>
-<script src="js/script_gen.js?v=1779573986"></script>
-<script src="js/story.js?v=1779573986"></script>
-<script src="js/ai.js?v=1779573986"></script>
-<script src="js/sound.js?v=1779573986"></script>
-<script src="js/main.js?v=1779573986"></script>
+<script src="js/data.js?v=1779574198"></script>
+<script src="js/state.js?v=1779574198"></script>
+<script src="js/portraits.js?v=1779574198"></script>
+<script src="js/memory.js?v=1779574198"></script>
+<script src="js/evolution.js?v=1779574198"></script>
+<script src="js/engine.js?v=1779574198"></script>
+<script src="js/ui.js?v=1779574198"></script>
+<script src="js/features.js?v=1779574198"></script>
+<script src="js/save.js?v=1779574198"></script>
+<script src="js/producer.js?v=1779574198"></script>
+<script src="js/script_gen.js?v=1779574198"></script>
+<script src="js/story.js?v=1779574198"></script>
+<script src="js/ai.js?v=1779574198"></script>
+<script src="js/sound.js?v=1779574198"></script>
+<script src="js/main.js?v=1779574198"></script>
 </body>
 </html>
