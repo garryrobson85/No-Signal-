@@ -10,17 +10,18 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔥</text></svg>">
   <!-- Critical inline CSS: hides all screens immediately before any stylesheet loads -->
   <style>
-    body{margin:0;background:#050608}
+    html,body{height:100%;margin:0;padding:0;overflow:hidden;background:#050608}
+    #app{display:flex;flex-direction:column;height:100%;overflow:hidden}
     .screen{display:none!important}
-    .screen.active{display:flex!important}
-    #screen-home{height:calc(100vh - 55px);flex-direction:column;align-items:center;justify-content:center}
+    .screen.active{display:flex!important;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+    .app-header{flex-shrink:0}
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css?v=1779556848">
-  <link rel="stylesheet" href="css/layout.css?v=1779556848">
-  <link rel="stylesheet" href="css/components.css?v=1779556848">
-  <link rel="stylesheet" href="css/game.css?v=1779556848">
-  <link rel="stylesheet" href="css/dark.css?v=1779556848">
+  <link rel="stylesheet" href="css/base.css?v=1779557241">
+  <link rel="stylesheet" href="css/layout.css?v=1779557241">
+  <link rel="stylesheet" href="css/components.css?v=1779557241">
+  <link rel="stylesheet" href="css/game.css?v=1779557241">
+  <link rel="stylesheet" href="css/dark.css?v=1779557241">
 </head>
 <body>
 
@@ -486,20 +487,20 @@
 </div>
 
 <div id="notification" class="notification"></div>
-<script src="js/data.js?v=1779556848"></script>
-<script src="js/state.js?v=1779556848"></script>
-<script src="js/portraits.js?v=1779556848"></script>
-<script src="js/memory.js?v=1779556848"></script>
-<script src="js/evolution.js?v=1779556848"></script>
-<script src="js/engine.js?v=1779556848"></script>
-<script src="js/ui.js?v=1779556848"></script>
-<script src="js/features.js?v=1779556848"></script>
-<script src="js/save.js?v=1779556848"></script>
-<script src="js/producer.js?v=1779556848"></script>
-<script src="js/script_gen.js?v=1779556848"></script>
-<script src="js/story.js?v=1779556848"></script>
-<script src="js/ai.js?v=1779556848"></script>
-<script src="js/sound.js?v=1779556848"></script>
-<script src="js/main.js?v=1779556848"></script>
+<script src="js/data.js?v=1779557241"></script>
+<script src="js/state.js?v=1779557241"></script>
+<script src="js/portraits.js?v=1779557241"></script>
+<script src="js/memory.js?v=1779557241"></script>
+<script src="js/evolution.js?v=1779557241"></script>
+<script src="js/engine.js?v=1779557241"></script>
+<script src="js/ui.js?v=1779557241"></script>
+<script src="js/features.js?v=1779557241"></script>
+<script src="js/save.js?v=1779557241"></script>
+<script src="js/producer.js?v=1779557241"></script>
+<script src="js/script_gen.js?v=1779557241"></script>
+<script src="js/story.js?v=1779557241"></script>
+<script src="js/ai.js?v=1779557241"></script>
+<script src="js/sound.js?v=1779557241"></script>
+<script src="js/main.js?v=1779557241"></script>
 </body>
 </html>
