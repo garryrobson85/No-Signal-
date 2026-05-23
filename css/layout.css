@@ -45,13 +45,15 @@
 
 /* ── SCREENS ── */
 .screen{display:none!important}
-.screen.active{display:flex!important;flex-direction:column}
+.screen.active{display:flex!important;flex-direction:column;flex:1;min-height:0}
 
 /* ── HOME ── */
 #screen-home{
+  flex:1;
   align-items:center;justify-content:center;
-  background:var(--void);min-height:calc(100vh - 57px);
-  padding:40px 20px;position:relative;
+  background:var(--void);
+  padding:40px 20px;
+  min-height:0;
 }
 .home-hero{text-align:center;max-width:520px;width:100%}
 .home-fire-wrap{font-size:72px;line-height:1;margin-bottom:16px;display:none}
