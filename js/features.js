@@ -17,24 +17,40 @@ function v19SocialPowerScore(c){
   return Math.round(((+c.social||0)*6 + avg*0.4 + ((c.allianceIds||[]).length*8))*10)/10;
 }
 function v19RelationshipKey(a,b){return [a,b].sort().join('|');}
+const _archetypeClash={
+  'The Big Villain':['The Sweetheart','The Fan Favorite','The Underdog'],
+  'The Puppet Master':['The Loose Cannon','The Strategist'],
+  'The Loose Cannon':['The Puppet Master','The Number Nerd'],
+  'The Challenge Beast':['The Quiet Threat'],
+  'The Strategist':['The Puppet Master'],
+};
+const _archetypeBond={
+  'The Underdog':['The Sweetheart','The Fan Favorite'],
+  'The Sweetheart':['The Fan Favorite','The Underdog'],
+  'The Fan Favorite':['The Sweetheart','The Underdog'],
+  'The Strategist':['The Challenge Beast'],
+};
 function v19EnsureRelationships(){
   if(!G.relationships) G.relationships={};
-  const ids=G.cast.map(c=>c.id);
-  ids.forEach((a,i)=>ids.slice(i+1).forEach(b=>{
-    const key=v19RelationshipKey(a,b);
-    if(G.relationships[key]==null){
-      const pa=G.cast.find(c=>c.id===a), pb=G.cast.find(c=>c.id===b);
-      let base=50;
-      if(pa&&pb){
-        if((pa.allianceIds||[]).some(x=>(pb.allianceIds||[]).includes(x))) base+=18;
-        if(pa.personality===pb.personality) base+=8;
-        if(pa.archetype===pb.archetype) base+=5;
-        base+=Math.round((((+pa.social||5)+(+pb.social||5))/2-5)*2);
+  const cast=G.cast;
+  for(let i=0;i<cast.length;i++){
+    for(let j=i+1;j<cast.length;j++){
+      const key=v19RelationshipKey(cast[i].id,cast[j].id);
+      if(G.relationships[key]===undefined){
+        const a=cast[i], b=cast[j];
+        let base=40+Math.floor(seededRandom()*22); // 40-61 neutral range
+        if((_archetypeClash[a.archetype]||[]).includes(b.archetype)||
+           (_archetypeClash[b.archetype]||[]).includes(a.archetype)){
+          base=12+Math.floor(seededRandom()*16); // 12-27 clear rivalry
+        } else if((_archetypeBond[a.archetype]||[]).includes(b.archetype)||
+           (_archetypeBond[b.archetype]||[]).includes(a.archetype)){
+          base=65+Math.floor(seededRandom()*16); // 65-80 natural bond
+        }
+        if(!G.merged && a.team===b.team) base=Math.min(82,base+8);
+        G.relationships[key]=base;
       }
-      G.relationships[key]=Math.max(5,Math.min(95,base));
     }
-  }));
-  return G.relationships;
+  }
 }
 function v19RelationshipScoresFor(id){
   v19EnsureRelationships();
@@ -160,7 +176,42 @@ function showRelationshipWeb(){
     <span><i style="background:rgba(220,38,38,0.8)"><\/i> Rivalry<\/span>
     <span style="color:var(--text2)">Line thickness = intensity<\/span>
   <\/div>`;
-  openV19Modal('🕸️ Relationship Web', `<div class="v19-help">A live map of who's tight and who's clashing. Strong bonds in green, rivalries in red.<\/div>${svg}${legend}`);
+  let teamFilter='';
+  if(!G.merged&&G.teams.length>1){
+    const tabs=G.teams.map((t,ti)=>`<button onclick="showRelWebTeam(${ti})" style="padding:5px 12px;border-radius:3px;font-size:11px;font-family:'Space Mono',monospace;cursor:pointer;border:1px solid ${t.color};background:rgba(0,0,0,0.3);color:${t.color};letter-spacing:0.06em">${t.name}</button>`).join('');
+    const allBtn=`<button onclick="showRelWebTeam(-1)" style="padding:5px 12px;border-radius:3px;font-size:11px;font-family:'Space Mono',monospace;cursor:pointer;border:1px solid var(--border2);background:rgba(255,255,255,0.05);color:var(--text2);letter-spacing:0.06em">ALL</button>`;
+    teamFilter=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${tabs}${allBtn}</div>`;
+  }
+  openV19Modal('🕸️ Relationship Web', `<div class="v19-help">Strong bonds in green, rivalries in red. Line thickness = intensity.</div>${teamFilter}${svg}${legend}`);
+}
+function showRelWebTeam(ti){
+  // Re-filter nodes for the selected team
+  const cast=getActive();
+  const filtered=ti<0?cast:cast.filter(c=>c.team===ti);
+  if(filtered.length<2){openV19Modal('🕸️ Relationship Web','<div class="v19-help">Not enough players in this tribe.</div>');return;}
+  // Temporarily show web for filtered cast only
+  const savedActive=G.cast.filter(c=>!c.eliminated);
+  // Rebuild web with filtered cast
+  const size=320; const cx=size/2, cy=size/2, r2=cx-30;
+  const nodes=filtered.map((c,i)=>({c,x:cx+r2*Math.cos(2*Math.PI*i/filtered.length-Math.PI/2),y:cy+r2*Math.sin(2*Math.PI*i/filtered.length-Math.PI/2)}));
+  let edges='',dots='';
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const a=nodes[i],b=nodes[j];
+      const score=v19RelScore(a.c.id,b.c.id);
+      if(score>=65){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(22,163,74,${Math.min(0.85,0.3+(score-65)/50).toFixed(2)})" stroke-width="${(1+(score-65)/14).toFixed(2)}"/>`;}
+      else if(score<=25){edges+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="rgba(220,38,38,${Math.min(0.85,0.3+(25-score)/30).toFixed(2)})" stroke-width="${(1+(25-score)/12).toFixed(2)}"/>`;}
+    }
+  }
+  nodes.forEach(n=>{
+    dots+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="13" fill="${n.c.color}" stroke="#fff" stroke-width="2" style="cursor:pointer" onclick="showOneProfile('${n.c.id}')"/>`;
+    dots+=`<text x="${n.x.toFixed(1)}" y="${(n.y>cy?n.y+26:n.y-18).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text)">${n.c.name.split(' ')[0]}</text>`;
+  });
+  const tname=ti<0?'All Tribes':(G.teams[ti]?.name||'Tribe');
+  const svg2=`<svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:${size}px;display:block;margin:0 auto">${edges}${dots}</svg>`;
+  const teamFilter2=!G.merged&&G.teams.length>1?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${G.teams.map((t,i)=>`<button onclick="showRelWebTeam(${i})" style="padding:5px 12px;border-radius:3px;font-size:11px;font-family:'Space Mono',monospace;cursor:pointer;border:1px solid ${t.color};background:${i===ti?t.color:'rgba(0,0,0,0.3)'};color:${i===ti?'black':t.color};letter-spacing:0.06em">${t.name}</button>`).join('')}<button onclick="showRelWebTeam(-1)" style="padding:5px 12px;border-radius:3px;font-size:11px;font-family:'Space Mono',monospace;cursor:pointer;border:1px solid var(--border2);background:${ti<0?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.05)'};color:var(--text2);letter-spacing:0.06em">ALL</button></div>`:'';
+  document.getElementById('modal-v19-title').textContent=`🕸️ ${tname} Web`;
+  document.getElementById('modal-v19-content').innerHTML=`<div class="v19-help">Strong bonds in green, rivalries in red.</div>${teamFilter2}${svg2}`;
 }
 // score helper that reads the v19 relationship store consistently
 function v19RelScore(idA,idB){

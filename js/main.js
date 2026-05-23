@@ -53,7 +53,7 @@ document.addEventListener('click', function(e){
     case 'autoAssignTeams':   autoAssignTeams(); break;
 
     // Game screens
-    case 'showCastStatus':    showCastStatus(); break;
+    case 'showHowToPlay':     showHowToPlay(); break;
     case 'showSeasonStats':   showSeasonStats(); break;
     case 'showTribeHistory':  showTribeHistory(); break;
     case 'showPlayerProfiles':showPlayerProfiles(); break;

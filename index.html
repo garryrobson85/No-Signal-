@@ -6,11 +6,11 @@
   <title>No Signal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔥</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css?v=1779522216">
-  <link rel="stylesheet" href="css/layout.css?v=1779522216">
-  <link rel="stylesheet" href="css/components.css?v=1779522216">
-  <link rel="stylesheet" href="css/game.css?v=1779522216">
-  <link rel="stylesheet" href="css/dark.css?v=1779522216">
+  <link rel="stylesheet" href="css/base.css?v=1779537858">
+  <link rel="stylesheet" href="css/layout.css?v=1779537858">
+  <link rel="stylesheet" href="css/components.css?v=1779537858">
+  <link rel="stylesheet" href="css/game.css?v=1779537858">
+  <link rel="stylesheet" href="css/dark.css?v=1779537858">
 </head>
 <body>
 
@@ -70,7 +70,7 @@
       <div id="header-ep-badge" style="display:none" class="header-ep-badge">
         <span id="hdr-ep-txt"></span>
       </div>
-      <button class="dark-toggle-btn" data-action="openDrawer" title="Settings">⚙</button>
+      <button class="dark-toggle-btn" data-action="openDrawer" title="Settings" style="width:38px;height:38px;font-size:18px;border-color:rgba(255,255,255,0.15)">⚙</button>
     </div>
     </div>
   </div>
@@ -86,6 +86,7 @@
       <div class="home-btns">
         <button class="btn btn-fire" data-action="goSetup">🔥 New Season</button>
         <button class="btn btn-ghost" data-action="loadQuickDemo">⚡ Quick Demo</button>
+        <button class="btn btn-ghost" data-action="showHowToPlay" style="border-color:rgba(0,212,255,0.3);color:var(--ice)">📖 How to Play</button>
       </div>
       <div id="continue-btn-wrap" style="margin-top:14px;display:none;flex-direction:column;gap:10px;align-items:center">
         <button class="btn btn-outline" style="min-width:220px;font-size:15px;padding:13px 24px" data-action="loadGame">▶ Resume Saved Season</button>
@@ -454,23 +455,39 @@
   </div>
 </div>
 
-<div id="notification" class="notification"></div>
+<div class="modal-backdrop" id="modal-how-to-play">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title">📖 How to Play</div>
+    <div style="display:flex;flex-direction:column;gap:14px;font-size:14px;line-height:1.7;color:var(--text2)">
+      <div><span style="color:var(--fire);font-weight:700">1. Build Your Cast</span><br>Create or auto-generate contestants. Each has 4 stats (Physical, Social, Mental, Endurance) and an archetype that shapes how they play.</div>
+      <div><span style="color:var(--fire);font-weight:700">2. Set Up Teams &amp; Rules</span><br>Assign players to tribes, pick twists, and set the merge episode. Add a Gemini AI key in General Settings for unique dialogue every episode.</div>
+      <div><span style="color:var(--fire);font-weight:700">3. Run Episodes</span><br>Each episode: read camp confessionals → pick a challenge → watch the race → send the losing tribe to tribal council.</div>
+      <div><span style="color:var(--fire);font-weight:700">4. Tribal Council</span><br>Flip each parchment in order to reveal votes. The player with the most votes is eliminated. Ties trigger a revote or fire-making challenge.</div>
+      <div><span style="color:var(--fire);font-weight:700">5. Post-Merge</span><br>After the merge, individual immunity challenges protect one player. Alliances, idols, and rivalries shape every vote. The last player standing wins.</div>
+      <div><span style="color:var(--fire);font-weight:700">6. The Finale</span><br>The final 2 or 3 face the jury — eliminated players who vote for the winner based on how the game was played.</div>
+      <div style="background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.15);border-radius:4px;padding:10px 14px;font-size:12px;color:var(--text2)">
+        💡 <strong style="color:var(--ice)">Tips:</strong> Use the ⚙ Settings to toggle haptics, particles, and scanlines. Check the Relationship Web under the Web tab to spot rivalries. The Producer panel lets you intervene in the game.
+      </div>
+    </div>
+    <div class="modal-btns"><button class="btn btn-fire" data-action="closeModal" data-modal="modal-how-to-play">Let's Play →</button></div>
+  </div>
+</div>
 
-<!-- Scripts in dependency order -->
-<script src="js/data.js?v=1779522216"></script>
-<script src="js/state.js?v=1779522216"></script>
-<script src="js/portraits.js?v=1779522216"></script>
-<script src="js/memory.js?v=1779522216"></script>
-<script src="js/evolution.js?v=1779522216"></script>
-<script src="js/engine.js?v=1779522216"></script>
-<script src="js/ui.js?v=1779522216"></script>
-<script src="js/features.js?v=1779522216"></script>
-<script src="js/save.js?v=1779522216"></script>
-<script src="js/producer.js?v=1779522216"></script>
-<script src="js/script_gen.js?v=1779522216"></script>
-<script src="js/story.js?v=1779522216"></script>
-<script src="js/ai.js?v=1779522216"></script>
-<script src="js/sound.js?v=1779522216"></script>
-<script src="js/main.js?v=1779522216"></script>
+<div id="notification" class="notification"></div>
+<script src="js/data.js?v=1779537858"></script>
+<script src="js/state.js?v=1779537858"></script>
+<script src="js/portraits.js?v=1779537858"></script>
+<script src="js/memory.js?v=1779537858"></script>
+<script src="js/evolution.js?v=1779537858"></script>
+<script src="js/engine.js?v=1779537858"></script>
+<script src="js/ui.js?v=1779537858"></script>
+<script src="js/features.js?v=1779537858"></script>
+<script src="js/save.js?v=1779537858"></script>
+<script src="js/producer.js?v=1779537858"></script>
+<script src="js/script_gen.js?v=1779537858"></script>
+<script src="js/story.js?v=1779537858"></script>
+<script src="js/ai.js?v=1779537858"></script>
+<script src="js/sound.js?v=1779537858"></script>
+<script src="js/main.js?v=1779537858"></script>
 </body>
 </html>

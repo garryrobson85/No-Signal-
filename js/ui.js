@@ -385,11 +385,10 @@ function buildStageChallenge(ep){
     <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700">${r.name}<\/div><div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">${r.flavor||''}<\/div><\/div>
   <\/div>`;
 
-  if(r.tieMsg) html+=`<div style="margin:0 14px 10px;padding:10px 14px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:var(--radius);font-size:12px;color:var(--warn)">⚖️ ${r.tieMsg}<\/div>`;
-
   if(r.type==='individual'){
     // Individual immunity — winner reveal then score bars
-    const top=r.scores?r.scores.slice(0,Math.min(8,r.scores.length)):[];
+    // Sort by contestant id string — consistent order each render, never sorted by score
+    const top=r.scores?[...r.scores].sort((a,b)=>(a.id||a.name||'').localeCompare(b.id||b.name||'')).slice(0,Math.min(8,r.scores.length)):[];
     const maxS=Math.max(...top.map(s=>s.score),1);
     html+=`<div class="event-card type-challenge"><div class="event-card-type">Individual Immunity · ${(r.stat||'').toUpperCase()}<\/div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
@@ -479,9 +478,9 @@ function buildStageTribal(ep){
     <\/div>`;
   }
 
-  // Tie breaker message
+  // Tie banner - rendered hidden, shown only after all parchments flipped
   if(ep.voteResult.tied&&ep.voteResult.tiebreakerApplied){
-    html+=`<div class="tie-banner">⚖️ ${ep.voteResult.tiebreakerApplied}<\/div>`;
+    html+=`<div class="tie-banner" id="tie-reveal-banner" style="display:none">⚖️ ${ep.voteResult.tiebreakerApplied}<\/div>`;
   }
 
   // ===== TRIBAL COUNCIL QUIZ: HOST ASKS A QUESTION =====
@@ -587,6 +586,8 @@ function flipVote(i){
   _voteRevealIdx++;
   updateRunningTally(ep);
   if(_voteRevealIdx>=_totalVotes){
+    const tb=document.getElementById('tie-reveal-banner');
+    if(tb){tb.style.display='block';tb.style.animation='cin 0.4s ease both';}
     const nav=document.getElementById('tribal-nav-inner');
     if(nav) nav.innerHTML=`<button class="btn btn-fire" onclick="revealElimination()" style="animation:pulse-fire 1.5s infinite">🔦 The tribe has spoken…<\/button>`;
   }
@@ -732,7 +733,14 @@ function buildStageNav(ep,idx){
 }
 
 
-function revealElimination(){renderStage(4);}
+function revealElimination(){
+  const ep=G.currentEpData;
+  renderStage(4);
+  // Show fullscreen after a brief delay so stage renders first
+  if(ep&&ep.eliminated){
+    setTimeout(()=>showElimFullscreen(ep.eliminated,ep),600);
+  }
+}
 function nextEpisode(){G.episode++;G.cast.forEach(c=>c.immunity=false);saveGame(true);computeAndStartEpisode();}
 function nextAction(){nextEpisode();}
 
@@ -1264,4 +1272,124 @@ function closeChallengeRaceOverlay(){
     renderStage(2); // tribal council
   }
   // For no-elim or individual challenges, stage 1 is already rendered — do nothing
+}
+
+// ─── HOW TO PLAY ─────────────────────────────────────────────────────────────
+function showHowToPlay(){
+  sfxOpen&&sfxOpen();
+  openModal('modal-how-to-play');
+}
+
+// ─── FULL-SCREEN ELIMINATION EXPERIENCE ──────────────────────────────────────
+function showElimFullscreen(player, ep){
+  if(!player) return;
+  const portrait=getPortrait(player).replace('width="120" height="145"','width="160" height="194"');
+  const votesAgainst=ep?.voteResult?.tally?[player.id]||0:0;
+  const speechText=ep?._aiExitSpeech||buildExitSpeech(player,ep)||'';
+  const finalWords=ep?._aiExitFinalWords||'';
+  const isJury=player.juryMember;
+
+  const existing=document.getElementById('elim-fullscreen');
+  if(existing) existing.remove();
+
+  const el=document.createElement('div');
+  el.id='elim-fullscreen';
+  el.innerHTML=`
+    <div class="elim-fs-inner">
+      <div class="elim-fs-torch-row">
+        <span class="tribal-flame">🔥</span><span class="tribal-flame">🔥</span>
+        <span class="elim-fs-snuff" id="elim-torch-snuff">🔦</span>
+        <span class="tribal-flame">🔥</span><span class="tribal-flame">🔥</span>
+      </div>
+      <div class="elim-fs-portrait">${portrait}</div>
+      <div class="elim-fs-name">${player.name}</div>
+      <div class="elim-fs-role">${player.archetype}</div>
+      ${isJury?`<div class="elim-fs-jury">🏛️ Joins the Jury</div>`:`<div class="elim-fs-snuffed">Their torch has been snuffed.</div>`}
+      ${speechText?`
+        <div class="elim-fs-speech">
+          <div class="elim-fs-speech-label">FINAL WORDS</div>
+          <div class="elim-fs-speech-text">"${speechText}"</div>
+        </div>`:''}
+      ${finalWords?`
+        <div class="elim-fs-camera">
+          <div class="elim-fs-camera-label">🎥 PRIVATE CAMERA</div>
+          <div class="elim-fs-speech-text">"${finalWords}"</div>
+        </div>`:''}
+      <div class="elim-fs-interview" id="elim-interview">
+        <div class="elim-fs-speech-label">🎙️ CHIP'S INTERVIEW</div>
+        <div class="elim-fs-speech-text" style="color:var(--fire);font-style:normal">"${player.name.split(' ')[0]}, the tribe has spoken. Walk me through what happened tonight — what did you miss?"</div>
+        <div class="elim-fs-speech-text" style="margin-top:8px">"${speechText?(speechText.split('.').slice(-1)[0].trim()||'This game is harder than it looks.'):'This game is harder than it looks.'}"</div>
+      </div>
+      <button class="elim-fs-close" onclick="closeElimFullscreen()">Continue →</button>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>{ el.classList.add('elim-fs-visible'); });
+
+  // Dramatic torch snuff sequence
+  if(typeof sfxElim==='function') sfxElim();
+  if(typeof hapticElim==='function') hapticElim();
+  if(typeof nsElimBurst==='function') nsElimBurst();
+  setTimeout(()=>{
+    const torch=document.getElementById('elim-torch-snuff');
+    if(torch){ torch.style.animation='torchSnuffOut 1.2s ease forwards'; torch.textContent='💨'; }
+  },1200);
+}
+
+function closeElimFullscreen(){
+  const el=document.getElementById('elim-fullscreen');
+  if(el){ el.classList.remove('elim-fs-visible'); setTimeout(()=>el.remove(),400); }
+  if(typeof sfxAdv==='function') sfxAdv();
+}
+
+// ─── HOW TO PLAY ─────────────────────────────────────────────────────────────
+function showHowToPlay(){
+  if(typeof sfxOpen==='function') sfxOpen();
+  openModal('modal-how-to-play');
+}
+
+// ─── FULL-SCREEN ELIMINATION ─────────────────────────────────────────────────
+function showElimFullscreen(player,ep){
+  if(!player) return;
+  const portrait=getPortrait(player).replace('width="120" height="145"','width="160" height="194"');
+  const speechText=(ep&&ep._aiExitSpeech)||(typeof buildExitSpeech==='function'?buildExitSpeech(player,ep):'');
+  const finalWords=ep&&ep._aiExitFinalWords||'';
+  const isJury=!!player.juryMember;
+  const existing=document.getElementById('elim-fullscreen');
+  if(existing) existing.remove();
+  const el=document.createElement('div');
+  el.id='elim-fullscreen';
+  el.innerHTML=`<div class="elim-fs-inner">
+    <div class="elim-fs-torch-row">
+      <span class="tribal-flame">🔥<\/span><span class="tribal-flame">🔥<\/span>
+      <span id="elim-torch-snuff" style="font-size:32px">🔦<\/span>
+      <span class="tribal-flame">🔥<\/span><span class="tribal-flame">🔥<\/span>
+    <\/div>
+    <div class="elim-fs-portrait">${portrait}<\/div>
+    <div class="elim-fs-name">${player.name}<\/div>
+    <div class="elim-fs-role">${player.archetype} · ${player.personality}<\/div>
+    ${isJury?`<div class="elim-fs-jury-tag">🏛️ Joins the Jury<\/div>`:`<div class="elim-fs-snuffed">Their torch has been snuffed.<\/div>`}
+    ${speechText?`<div class="elim-fs-block"><div class="elim-fs-block-label">FINAL WORDS<\/div><div class="elim-fs-block-text">"${speechText}"<\/div><\/div>`:''}
+    ${finalWords?`<div class="elim-fs-block elim-fs-camera"><div class="elim-fs-block-label">🎥 PRIVATE CAMERA<\/div><div class="elim-fs-block-text">"${finalWords}"<\/div><\/div>`:''}
+    <div class="elim-fs-block elim-fs-interview">
+      <div class="elim-fs-block-label">🎙️ HOST INTERVIEW</div>
+      <div class="elim-fs-block-text" style="color:var(--fire)">"${player.name.split(' ')[0]}, what happened tonight?"<\/div>
+      <div class="elim-fs-block-text" style="margin-top:8px">"${speechText?speechText.split('.').slice(-1)[0].trim()||'This game is harder than it looks.':'This game is harder than it looks.'}"<\/div>
+    <\/div>
+    <button class="elim-fs-close" onclick="closeElimFullscreen()">Continue →<\/button>
+  <\/div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('elim-fs-visible'));
+  if(typeof sfxElim==='function') sfxElim();
+  if(typeof hapticElim==='function') hapticElim();
+  if(typeof nsElimBurst==='function') nsElimBurst();
+  setTimeout(()=>{
+    const t=document.getElementById('elim-torch-snuff');
+    if(t){t.textContent='💨';t.style.animation='torch-snuff 1.2s ease forwards';}
+  },1200);
+}
+
+function closeElimFullscreen(){
+  const el=document.getElementById('elim-fullscreen');
+  if(el){el.classList.remove('elim-fs-visible');setTimeout(()=>el.remove(),400);}
+  if(typeof sfxAdv==='function') sfxAdv();
 }
