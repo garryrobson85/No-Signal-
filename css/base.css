@@ -26,14 +26,12 @@ html.dark { /* same vars — already dark */ }
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{font-size:15px}
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
 body {
   font-family: 'Barlow Condensed', sans-serif;
   background: var(--void);
   color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 h1,h2,h3{font-family:'Barlow Condensed',sans-serif;font-weight:700}
 .display{font-family:'Bebas Neue',cursive;letter-spacing:0.03em}
@@ -71,7 +69,7 @@ body::after{
 * { scrollbar-width: thin; scrollbar-color: rgba(0,212,255,0.45) rgba(0,212,255,0.04); }
 
 /* app shell */
-#app{display:flex;height:100%;flex-direction:column;position:relative;overflow:hidden}
+#app{display:flex;min-height:100vh;flex-direction:column;position:relative}
 
 /* particle canvas + flash */
 #ns-particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9990}
