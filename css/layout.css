@@ -48,7 +48,7 @@
 .screen.active{display:flex!important;flex-direction:column;min-height:calc(100vh - 55px)}
 
 /* ── HOME ── */
-#screen-home{background:var(--void);min-height:calc(100vh - 55px);display:flex!important;flex-direction:column;align-items:center;justify-content:flex-start;padding:8vh 20px 40px;}
+#screen-home{background:var(--void);min-height:calc(100vh - 55px);flex-direction:column;align-items:center;justify-content:flex-start;padding:8vh 20px 40px;}
 .home-hero{text-align:center;max-width:520px;width:100%}
 .home-fire-wrap{font-size:72px;line-height:1;margin-bottom:16px;display:none}
 .home-title{
