@@ -87,7 +87,7 @@ function renderStage(idx){
   if(idx>=0) html+=buildStageCampLife(ep);
   if(idx>=1&&ep.challengeResult) html+=buildStageChallenge(ep);
   if(idx===1&&!ep.challengeResult) html+=buildChallengeChooser(ep);
-  if(idx>=2) html+=buildStageTribal(ep);
+  if(idx>=2) html+=buildStageTribal(ep, idx);
   if(idx>=4) html+=buildStageElimination(ep);
   html+=buildStageNav(ep,idx);
   html+=`<\/div><\/div>`;
@@ -449,7 +449,7 @@ function buildStageChallenge(ep){
   return html;
 }
 
-function buildStageTribal(ep){
+function buildStageTribal(ep, idx=2){
   if(ep.noElim) return`<div class="stage-block anim-in"><div class="stage-label">🔦 Tribal Council<\/div>
     <div class="event-card type-merge"><div class="event-card-type">No Vote<\/div><div class="event-card-title">🛡️ No Elimination Tonight<\/div><div class="event-card-body">Nobody was voted out. The game continues.<\/div><\/div><\/div>`;
   if(!ep.voteResult) return '';
@@ -508,8 +508,30 @@ function buildStageTribal(ep){
   // We must not sort elim votes last (reveals the answer by position/count)
   const {tally,individualVotes}=ep.voteResult;
   if(!individualVotes||!individualVotes.length) return html+'<div style="font-size:13px;color:var(--text2);padding:8px">Votes were cast in private.<\/div><\/div>';
-  
-  // Fully shuffle — the suspense comes from not knowing which is which
+
+  // Stage 4+ = elimination already revealed — show static tally, no interactive parchments
+  if(idx>=4){
+    const sorted=Object.entries(tally).map(([id,n])=>({
+      p:G.cast.find(c=>c.id===id),n
+    })).filter(x=>x.p).sort((a,b)=>b.n-a.n);
+    html+=`<div class="event-card type-vote">
+      <div class="event-card-type">🗳️ Final Vote</div>
+      <div class="event-card-title" style="margin-bottom:12px">The votes have been read.</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">`;
+    sorted.forEach(({p,n})=>{
+      const isElim=ep.eliminated&&ep.eliminated.id===p.id;
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:${isElim?'rgba(232,69,10,0.12)':'rgba(255,255,255,0.04)'}">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0"><\/span>
+        <span style="flex:1;font-size:13px;font-weight:${isElim?700:400}">${p.name}<\/span>
+        <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:${isElim?'var(--fire)':'var(--text2)'}">${n} vote${n!==1?'s':''}<\/span>
+        ${isElim?'<span style="font-size:11px;color:var(--fire)">eliminated<\/span>':''}
+      <\/div>`;
+    });
+    html+=`<\/div><\/div><\/div>`;
+    return html;
+  }
+
+  // Stage 2: interactive parchments — fully shuffle for suspense
   // Store the order on ep so initVoteReveal can use the exact same sequence
   const orderedVotes=shuffle([...individualVotes]);
   ep._renderedVoteOrder=orderedVotes;
