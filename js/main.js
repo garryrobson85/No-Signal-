@@ -14,18 +14,19 @@ document.addEventListener('click', function(e){
   const modal  = el.dataset.modal;
 
   // ── Sound on every action ──────────────────────────────────────────────
-  // flipVote has its own dramatic sfx — skip here
-  if(typeof sfxTick==='function' && action !== 'nsToggle'){
-    const bigActions = new Set(['startSeason','loadGame','loadQuickDemo','runFinale','nextEpisode']);
+  if(typeof playTone==='function' && action !== 'nsToggle'){
+    const bigActions  = new Set(['startSeason','loadGame','loadQuickDemo','runFinale','nextEpisode']);
     const navActions  = new Set(['goHome','goSetup','setupNav','closeModal','showCastStatus',
       'showSeasonStats','showTribeHistory','showPlayerProfiles','showV19Insights',
       'showRelationshipWeb','showEpisodeScripts','showSeasonRecap','showSeasonStory',
-      'showProducerPanel','openDrawer','openImportSave']);
+      'showProducerPanel','openDrawer','openImportSave','showHowToPlay']);
     const toggleActions = new Set(['toggleSetting','toggleReturneeSettings']);
-    if(bigActions.has(action))    { sfxWin&&sfxWin();    hapticWin&&hapticWin(); }
-    else if(navActions.has(action)){ sfxNav&&sfxNav();    hapticAdv&&hapticAdv(); }
-    else if(toggleActions.has(action)){sfxToggle&&sfxToggle(); hapticTap&&hapticTap(); }
-    else                           { sfxTick&&sfxTick();  hapticTap&&hapticTap(); }
+    const selectActions = new Set(['runChallengeWithChoice','selectChallenge','setTheme']);
+    if(bigActions.has(action))     { sfxWin&&sfxWin();    hapticWin&&hapticWin(); }
+    else if(navActions.has(action)) { sfxNav&&sfxNav();    hapticAdv&&hapticAdv(); }
+    else if(toggleActions.has(action)){ sfxToggle&&sfxToggle(); hapticTap&&hapticTap(); }
+    else if(selectActions.has(action)){ sfxSelect&&sfxSelect(); hapticAdv&&hapticAdv(); }
+    else                            { sfxBtn&&sfxBtn();    hapticTap&&hapticTap(); }
   }
 
   switch(action){

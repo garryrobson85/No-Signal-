@@ -366,6 +366,8 @@ function selectChallenge(idx){
   document.querySelectorAll('.challenge-pick-card').forEach((c,i)=>{
     c.classList.toggle('selected',i===idx);
   });
+  if(typeof sfxSelect==='function') sfxSelect();
+  if(typeof hapticAdv==='function') hapticAdv();
   const nav=document.getElementById('challenge-pick-nav');
   if(nav) nav.innerHTML=`<button class="btn btn-fire" onclick="confirmChallenge()">🏆 Run This Challenge →<\/button>`;
 }
@@ -373,6 +375,7 @@ function confirmChallenge(){
   if(_selectedChallengeIdx===null) return;
   const ch=G.currentEpData.challengeOptions[_selectedChallengeIdx];
   _selectedChallengeIdx=null;
+  if(typeof sfxWin==='function') sfxWin();
   runChallengeWithChoice(ch);
 }
 

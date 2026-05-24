@@ -63,7 +63,7 @@ function _ensureAudio() {
 setInterval(() => { if (_actx && _actx.state === 'suspended') _actx.resume().catch(()=>{}); }, 2000);
 
 function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
-  if (!_actx) return; // not yet initialised — first gesture hasn't happened
+  if (!_actx) { _initAudio(); if(!_actx) return; }
   const doPlay = () => {
     try {
       if (_actx.state === 'closed') return;
@@ -76,15 +76,28 @@ function playTone(f, t='sine', d=0.15, v=0.09, delay=0) {
       o.start(T); o.stop(T + d + 0.05);
     } catch(e) { /* silent */ }
   };
-  if (_actx.state === 'running') doPlay();
-  else _actx.resume().then(doPlay).catch(()=>{});
+  // Always go through resume() — it resolves synchronously if already running
+  // This fixes the race where click + sound happen in the same microtask
+  if (_actx.state === 'running') {
+    doPlay();
+  } else {
+    _actx.resume().then(doPlay).catch(()=>{});
+  }
+}
+
+// Reliable button sound — re-inits audio if needed, plays immediately
+function sfxBtn() {
+  if (!_actx) _initAudio();
+  if (!_actx) return;
+  // Short crisp tick — distinct from sfxTick
+  playTone(600, 'sine', 0.08, 0.09);
 }
 
 function sfxVote()   { playTone(220,'sine',0.07,0.13); playTone(440,'sine',0.1,0.10,0.05); playTone(330,'triangle',0.18,0.08,0.09); }
 function sfxElim()   { [80,70,60,50,40].forEach((f,i)=>playTone(f,'sawtooth',0.38,0.10,i*0.11)); playTone(220,'sine',0.5,0.07,0.62); }
 function sfxWin()    { [523,659,784,1047].forEach((f,i)=>playTone(f,'sine',0.2,0.13,i*0.09)); }
 function sfxAdv()    { playTone(440,'sine',0.12,0.10); playTone(550,'sine',0.12,0.09,0.07); }
-function sfxSelect() { playTone(660,'sine',0.14,0.11); }
+function sfxSelect() { playTone(520,'sine',0.10,0.11); playTone(780,'sine',0.13,0.10,0.07); }
 function sfxTick()   { playTone(800,'sine',0.13,0.09); }
 function sfxNav()    { playTone(520,'sine',0.11,0.08); }
 function sfxToggle() { playTone(700,'triangle',0.13,0.08); playTone(900,'triangle',0.09,0.06,0.05); }
