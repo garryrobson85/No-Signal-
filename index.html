@@ -23,11 +23,11 @@
     #ns-flash{inset:0;opacity:0;pointer-events:none}
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css?v=1779609400">
-  <link rel="stylesheet" href="css/layout.css?v=1779609400">
-  <link rel="stylesheet" href="css/components.css?v=1779609400">
-  <link rel="stylesheet" href="css/game.css?v=1779609400">
-  <link rel="stylesheet" href="css/dark.css?v=1779609400">
+  <link rel="stylesheet" href="css/base.css?v=1779626796">
+  <link rel="stylesheet" href="css/layout.css?v=1779626796">
+  <link rel="stylesheet" href="css/components.css?v=1779626796">
+  <link rel="stylesheet" href="css/game.css?v=1779626796">
+  <link rel="stylesheet" href="css/dark.css?v=1779626796">
 </head>
 <body>
 
@@ -179,7 +179,7 @@
             <button data-action="showGeminiHelp" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);background:var(--panel2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;display:flex;align-items:center;justify-content:center">?</button>
           </label>
           <div style="display:flex;gap:8px;align-items:center">
-            <input type="password" class="form-input" id="s-gemini-key" placeholder="Paste your Gemini API key (AIza…)" autocomplete="off" data-oninput="saveGeminiKey" style="flex:1">
+            <input type="password" class="form-input" id="s-gemini-key" placeholder="Paste your Gemini API key (AIza…)" autocomplete="off" oninput="saveGeminiKey(this.value)" data-oninput="saveGeminiKey" style="flex:1">
             <button class="btn btn-outline btn-sm" data-action="testGeminiKey" style="flex-shrink:0;white-space:nowrap">Test Key</button>
           </div>
           <div style="font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5">AI writes unique confessionals, exit speeches, and interactions before you see them. Key stored on your device only.</div>
@@ -490,20 +490,20 @@
 </div>
 
 <div id="notification" class="notification"></div>
-<script src="js/data.js?v=1779609400"></script>
-<script src="js/state.js?v=1779609400"></script>
-<script src="js/portraits.js?v=1779609400"></script>
-<script src="js/memory.js?v=1779609400"></script>
-<script src="js/evolution.js?v=1779609400"></script>
-<script src="js/engine.js?v=1779609400"></script>
-<script src="js/ui.js?v=1779609400"></script>
-<script src="js/features.js?v=1779609400"></script>
-<script src="js/save.js?v=1779609400"></script>
-<script src="js/producer.js?v=1779609400"></script>
-<script src="js/script_gen.js?v=1779609400"></script>
-<script src="js/story.js?v=1779609400"></script>
-<script src="js/ai.js?v=1779609400"></script>
-<script src="js/sound.js?v=1779609400"></script>
-<script src="js/main.js?v=1779609400"></script>
+<script src="js/data.js?v=1779626796"></script>
+<script src="js/state.js?v=1779626796"></script>
+<script src="js/portraits.js?v=1779626796"></script>
+<script src="js/memory.js?v=1779626796"></script>
+<script src="js/evolution.js?v=1779626796"></script>
+<script src="js/engine.js?v=1779626796"></script>
+<script src="js/ui.js?v=1779626796"></script>
+<script src="js/features.js?v=1779626796"></script>
+<script src="js/save.js?v=1779626796"></script>
+<script src="js/producer.js?v=1779626796"></script>
+<script src="js/script_gen.js?v=1779626796"></script>
+<script src="js/story.js?v=1779626796"></script>
+<script src="js/ai.js?v=1779626796"></script>
+<script src="js/sound.js?v=1779626796"></script>
+<script src="js/main.js?v=1779626796"></script>
 </body>
 </html>

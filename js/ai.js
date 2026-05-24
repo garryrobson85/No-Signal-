@@ -5,8 +5,15 @@
 const GEMINI_KEY_STORE='nosignal_gemini_key';
 function showGeminiHelp(){openModal('modal-gemini-help');}
 async function testGeminiKey(){
-  const key=getGeminiKey();
+  // Read from localStorage first, fall back to input field value
+  let key=getGeminiKey();
+  if(!key){
+    const el=document.getElementById('s-gemini-key');
+    if(el) key=el.value.trim();
+  }
   if(!key){notify('Paste your API key first');return;}
+  // If we got key from field but not storage, save it now
+  saveGeminiKey(key);
   notify('Testing key…');
   const models=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-preview-04-17'];
   const errors=[];
@@ -31,7 +38,16 @@ function saveGeminiKey(val){
   try{val=val.trim();if(val)localStorage.setItem(GEMINI_KEY_STORE,val);else localStorage.removeItem(GEMINI_KEY_STORE);}catch(e){}
 }
 function getGeminiKey(){
-  try{return localStorage.getItem(GEMINI_KEY_STORE)||'';}catch(e){return '';}
+  try{
+    const stored=localStorage.getItem(GEMINI_KEY_STORE)||'';
+    if(stored) return stored;
+  }catch(e){}
+  // Fallback: read directly from input field (handles Brave/Firefox strict mode)
+  try{
+    const el=document.getElementById('s-gemini-key');
+    if(el&&el.value.trim()) return el.value.trim();
+  }catch(e){}
+  return '';
 }
 function initGeminiKeyField(){
   const el=document.getElementById('s-gemini-key');
