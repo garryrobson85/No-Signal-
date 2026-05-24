@@ -57,6 +57,7 @@ function buildNotice(emoji, title, body, bgColor='var(--win-light)', borderColor
 // ===== STAGED RENDER =====
 
 function renderStage(idx){
+  if(typeof sfxNav==='function'&&idx>0){sfxNav();if(typeof hapticAdv==='function')hapticAdv();}
   try {
   G.stageIndex=idx;
   const ep=G.currentEpData;
@@ -738,6 +739,7 @@ function buildStageNav(ep,idx){
 
 
 function revealElimination(){
+  if(typeof sfxBtn==='function')sfxBtn();
   const ep=G.currentEpData;
   renderStage(4);
   // Show fullscreen after a brief delay so stage renders first
@@ -762,6 +764,7 @@ function nextEpisode(){
 
 // ===== HOST ACTION HELPERS =====
 function addDramaEvent(){
+  if(typeof sfxToggle==='function')sfxToggle();
   const line=pick(DRAMA_EVENTS);
   G.dramaLevel=Math.min(G.dramaLevel+1,5);
   const ep=G.currentEpData;
@@ -771,6 +774,7 @@ function addDramaEvent(){
 }
 
 function hostPlantIdol(){
+  if(typeof sfxSelect==='function')sfxSelect();
   const pool=getActive().filter(c=>!G.idolHolders.includes(c.id));
   if(!pool.length){notify('Everyone already has an idol!');return;}
   const lucky=pick(pool);
@@ -781,6 +785,7 @@ function hostPlantIdol(){
 }
 
 function hostGrantImmunity(){
+  if(typeof sfxSelect==='function')sfxSelect();
   const active=getActive();
   if(!active.length) return;
   // Show picker
@@ -812,6 +817,7 @@ function applyHostImmunity(id){
 }
 
 function revealAllVotes(){
+  if(typeof sfxAdv==='function')sfxAdv();
   const ep=G.currentEpData;
   if(!ep.voteResult||!_orderedVotes.length) return;
   while(_voteRevealIdx<_totalVotes){
@@ -922,6 +928,7 @@ function answerTribalQuestion(optIdx,qId){
 
 // ===== JURY PANEL MODAL =====
 function showJuryPanel(){
+  if(typeof sfxNav==='function')sfxNav();
   const modal=document.getElementById('modal-cast-content');
   const doc=document.querySelector('.modal-title');
   if(doc) doc.textContent='🏛️ The Jury';
@@ -1236,6 +1243,7 @@ function kickRaceBarsInOverlay(isTribal){
 }
 
 function closeChallengeRaceOverlay(){
+  if(typeof sfxAdv==='function')sfxAdv();if(typeof hapticAdv==='function')hapticAdv();
   const overlay=document.getElementById('challenge-race-overlay');
   if(overlay){
     overlay.classList.remove('cro-visible');
