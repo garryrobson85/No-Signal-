@@ -592,8 +592,12 @@ function runChallengeWithChoice(chosenChallenge){
   // Fallback: if no key or AI fails → render immediately with engine templates.
   const _aiKey = typeof getGeminiKey === 'function' && getGeminiKey();
   if(_aiKey){
+    // Scroll to top BEFORE swapping content so user lands on the generation screen
+    const _evPre=document.querySelector('.ep-view');
+    if(_evPre){_evPre.scrollTop=0;}
+    window.scrollTo(0,0);
     const _c = document.getElementById('ep-view-container');
-    if(_c) _c.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:16px;min-height:200px">
+    if(_c) _c.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:16px;min-height:200px">
       <div style="font-size:36px;animation:pulse-fire 1.5s ease-in-out infinite">✨<\/div>
       <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:0.05em;color:var(--fire)">Writing Episode ${ep.ep}…<\/div>
       <div id="ai-progress-msg" style="font-size:13px;color:var(--text2)">Contacting Gemini…<\/div>
@@ -601,6 +605,9 @@ function runChallengeWithChoice(chosenChallenge){
     generateAIDialogueForEp(ep, msg => {
       const el = document.getElementById('ai-progress-msg');
       if(el) el.textContent = msg;
+      // Keep user at top while generation progresses
+      const _ev=document.querySelector('.ep-view');
+      if(_ev) _ev.scrollTop=0;
     }).then(() => {
       renderStage(1);
       setTimeout(()=>{ if(typeof showChallengeRaceOverlay==='function') showChallengeRaceOverlay(); }, 300);
