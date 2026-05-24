@@ -147,19 +147,30 @@ ${eliminated?`CONFESSIONALS/INTERACTIONS: Recorded BEFORE tribal. Must NOT refer
 CONTINUITY: Only reference events that have already happened in episodes 1-${ep.ep}.`;
 
   return `Reality TV writer for "${G.settings.name||'No Signal'}" (Survivor-style, ${G.settings.theme||'remote island'}).
-Ep${ep.ep}/${G.settings.mergeEpisode||6} — ${G.merged?'POST-MERGE':'PRE-MERGE'} — ${active.length} remain.
+Ep${ep.ep} — ${G.merged?'POST-MERGE':'PRE-MERGE'} — ${active.length} players remain.
 ${ep.mergeHappened?'*** THE MERGE HAPPENED THIS EPISODE ***\n':''}
-== SEASON SO FAR ==
-${recentSummaries||'Season premiere — no prior episodes.'}
 
-== KEY EVENTS IN PLAYER MEMORIES ==
-${keyMemories||'None yet.'}
+== STRICT EPISODE FACT SHEET (these are the ONLY facts you may reference) ==
+Episode number: ${ep.ep}
+Phase: ${G.merged?'Post-merge (individual game)':'Pre-merge (tribal game)'}
+Active players: ${active.map(p=>p.name.split(' ')[0]).join(', ')}
+Challenge winner / immune: ${ep.challengeResult?.winner?.name||'None'}
+Losing tribe this episode: ${ep.loseTeam!=null&&G.teams[ep.loseTeam]?G.teams[ep.loseTeam].name:'N/A'}
+Vote tally: ${voteLines||'No vote this episode.'}
+Eliminated this episode: ${eliminated?`${eliminated.name} (${eliminated.archetype})`:'Nobody'}
+Idol played: ${ep.idolPlay?`${ep.idolPlay.idolPlayer.name} played their idol`:'No'}
+Twists this episode: ${ep.twist?.name||'None'}
+Recent context (last 3 eps only): ${recentSummaries||'Season premiere.'}
+Key recent memories: ${keyMemories||'None.'}
+Active alliances: ${allianceDesc||'None.'}
 
-== THIS EPISODE ==
-${ep.summary||''}
-
-== ACTIVE ALLIANCES ==
-${allianceDesc||'No alliances yet.'}
+== HARD RULES — VIOLATIONS WILL BREAK THE GAME ==
+1. CONFESSIONALS and INTERACTIONS were recorded BEFORE tribal council.
+   They MUST NOT reference: who was voted out, the vote count, tonight's result, or any future event.
+2. Only the exitSpeech and exitFinalWords sections may reference the elimination.
+3. Do NOT mention: future episodes, upcoming swaps/merges beyond ep ${ep.ep}, players not yet in the game, or any event after tribal council.
+4. Do NOT invent alliances, idol plays, or events not listed in the fact sheet above.
+5. Reference ONLY players listed in "Active players" above.
 
 == CONFESSIONALS NEEDED ==
 - ${confPlayers||'None'}
@@ -167,35 +178,30 @@ ${allianceDesc||'No alliances yet.'}
 == INTERACTION PAIRS ==
 - ${interPlayers||'None'}
 
-== TRIBAL VOTE RESULT ==
-${voteLines||'No vote this episode.'}
-${eliminated?`Eliminated: ${eliminated.name} (${eliminated.archetype}, ${eliminated.personality})`:''}
-
 ${ep1Rules}
 ${spoilerRule}
 
 == WRITING RULES ==
 1. VARY sentence openings and structure. No two confessionals can start the same way.
-2. BANNED PHRASES — never use: "one crack and we're done", "stay tight", "numbers game", "at the end of the day", "moving forward", "it is what it is", "stay the course", "keep our heads down". These are overused and kill authenticity.
-3. SPECIFICITY — every line must reference actual names, archetypes, or events from this episode's data. No generic Survivor filler.
-4. GRAMMAR — match subject/verb correctly: "votes were cast" not "votes was cast". Plural alliances take plural verbs.
-5. CHARACTER VOICE — a Strategist sounds calculating; a Sweetheart sounds earnest; a Villain sounds self-aware and unapologetic; a Goofball sounds self-deprecating. Don't swap these.
-6. CONTINUITY — if recentSummaries mentions a rivalry or idol play, characters can reference it. Don't contradict established events.
-7. LENGTH — confessionals: 2-3 sentences. Interactions: 1-2 sentences. Exit speech: 2-3 sentences. Final words: 3-4 sentences. Host comment: 1 sentence.
+2. BANNED PHRASES — never use: "one crack and we're done", "stay tight", "numbers game", "at the end of the day", "moving forward", "it is what it is", "stay the course", "keep our heads down".
+3. SPECIFICITY — every line must reference actual names, archetypes, or events from the fact sheet above. No generic filler.
+4. GRAMMAR — match subject/verb correctly. Plural alliances take plural verbs.
+5. CHARACTER VOICE — Strategist: calculating. Sweetheart: earnest. Villain: self-aware, unapologetic. Goofball: self-deprecating.
+6. LENGTH — confessionals: 2-3 sentences. Interactions: 1-2 sentences. Exit speech: 2-3 sentences. Final words: 3-4 sentences. Host comment: 1 sentence.
 
 Write ONLY a JSON object — no markdown, no backticks, no preamble:
 {
-  "openingNarration": "${isEp1?`A 2-3 sentence "welcome to a new season" intro for ${G.settings.name||'this season'}. Mention the ${active.length} contestants and tribes by name. Set the tone — first impressions, everything to prove.`:`A 2-3 sentence "Previously On" recap referencing what actually happened last episode (use recentSummaries above). End with one line setting up tonight.`}",
-  "beforeTribal": "${eliminated?'A 2-sentence host transition setting up tribal council. Reference the actual tension in the air — who feels safe, who is on the block, what the mood is. Do not name who goes home.':'A 2-sentence transition for an episode with no elimination — keep tension high without spoiling the outcome.'}",
+  "openingNarration": "${isEp1?`A 2-3 sentence "welcome to a new season" intro. Mention the ${active.length} contestants and tribe names. Set the tone.`:`A 2-3 sentence "Previously On" recap referencing ONLY what happened in the recent context above. End with one line setting up tonight.`}",
+  "beforeTribal": "${eliminated?'A 2-sentence host transition to tribal council. Reference actual tension — who feels safe, who is on the block. Do NOT name who goes home.':'A 2-sentence transition for an episode with no elimination.'}",
   "confessionals": [
     { "playerId": "...", "text": "..." }
   ],
   "interactions": [
     { "playerIds": ["...", "..."], "text": "..." }
   ],
-  "exitSpeech": "2-3 sentence spoken exit speech from ${eliminated?`${eliminated.name} (${eliminated.archetype}, ${eliminated.personality})`:'the eliminated player'} at tribal council, addressing the remaining players and host directly. Must reference SPECIFIC people by first name — who they trusted, who voted them out if they can tell, any ally they want to acknowledge. Voice must match their archetype. No generic lines.",
-  "exitFinalWords": "2-3 sentence private final words to camera after leaving tribal. More honest and raw than the speech — they can reveal a secret plan, name who they think will win, express real anger or real gratitude. Must reference actual events from this episode and their time in the game. In character — a Villain stays unapologetic, a Sweetheart stays warm even if hurt, an Underdog stays defiant.",
-  "hostComment": "Chip's one-liner reacting specifically to how tonight's vote played out"
+  "exitSpeech": "2-3 sentence spoken exit speech from ${eliminated?`${eliminated.name} (${eliminated.archetype}, ${eliminated.personality})`:'the eliminated player'}. Address remaining players and host directly. Reference SPECIFIC people by first name. Voice must match archetype.",
+  "exitFinalWords": "2-3 sentence private final words. More raw and honest. Reference actual events from this episode. Stay in character.",
+  "hostComment": "Chip's one-liner reacting to tonight's specific vote result"
 }
 
 Player IDs for confessionals: ${(ep.confessionals||[]).map(c=>c.who.id).join(', ')}

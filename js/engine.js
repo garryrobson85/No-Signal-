@@ -302,7 +302,9 @@ function checkIdolPlay(eliminated,pool){
   G.idolHolders=G.idolHolders.filter(id=>id!==eliminated.id); eliminated.idolPlayed=true;
   const newPool=pool.filter(p=>p.id!==eliminated.id&&!p.immunity&&!p.eliminated);
   if(!newPool.length) return null;
-  return{idolPlayer:eliminated,newElim:pick(newPool)};
+  // Return null for newElim — caller (runChallengeWithChoice) resolves via tally
+  // pick(newPool) was a random fallback; caller now always uses sortedByTally first
+  return{idolPlayer:eliminated,newElim:newPool[0]||null};
 }
 function getTwist(){
   if(seededRandom()*100>G.settings.twistFreq) return null;

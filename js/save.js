@@ -27,7 +27,7 @@ function loadQuickDemo(){
 }
 
 // ===== SAVE / LOAD =====
-const SAVE_VERSION=19;
+const SAVE_SCHEMA_VERSION=19; // Save schema version — increment on breaking save changes
 const SAVE_KEY='nosignal_save_v19';
 // All known past key names — scanned in order newest→oldest so we always prefer the freshest.
 const LEGACY_SAVE_KEYS=[
@@ -56,7 +56,7 @@ function stripRuntimeFields(contestant){
 }
 function buildSavePayload(){
   return {
-    app:'No Signal', version:SAVE_VERSION, schema:'nosignal-season-save',
+    app:'No Signal', version:SAVE_SCHEMA_VERSION, schema:'nosignal-season-save',
     cast:G.cast.map(stripRuntimeFields), teams:G.teams, settings:G.settings, twists:[...G.twists],
     relationships:G.relationships||{}, rngState:G.rngState,
     episode:G.episode, merged:G.merged, jury:G.jury.map(j=>j.id),
@@ -157,7 +157,7 @@ function migrateSaveIfNeeded(raw){
   save.fanSavePlayer = save.fanSavePlayer||null;
   save.rngState = save.rngState||null;
 
-  save._migrated = (save.version < SAVE_VERSION); // flag so loadGame can show a notice
+  save._migrated = (save.version < SAVE_SCHEMA_VERSION); // flag so loadGame can show a notice
   return save;
 }
 function downloadTextFile(filename, text, mime='application/json'){
@@ -249,7 +249,7 @@ function loadGame(){
       const oldVersion = save.version || '?';
       const castCount = (G.cast||[]).length;
       const ep = G.episode||1;
-      notify(`⬆️ Older save migrated (v${oldVersion} → v${SAVE_VERSION}). ${castCount} cast, Episode ${ep}. Saved under current version.`,'win');
+      notify(`⬆️ Older save migrated (v${oldVersion} → v${SAVE_SCHEMA_VERSION}). ${castCount} cast, Episode ${ep}. Saved under current version.`,'win');
       // Export a backup automatically so the user has the migrated save as a file
       setTimeout(()=>{
         try { exportSaveFile(); notify('💾 Backup exported — keep this file safe','win'); } catch(e){}
@@ -302,7 +302,7 @@ function importSaveFile(event){
       localStorage.setItem(SAVE_KEY,JSON.stringify(save));
       applyLoadedSave(save);
       updateContinueButton();
-      const wasLegacy = save._migrated || (save.version && save.version < SAVE_VERSION);
+      const wasLegacy = save._migrated || (save.version && save.version < SAVE_SCHEMA_VERSION);
       const castCount = (G.cast||[]).length;
       if(wasLegacy){
         notify(`⬆️ Older save imported & migrated (v${save.version||'?'}). ${castCount} cast loaded — click Resume to continue.`,'win');

@@ -262,52 +262,133 @@ const CHALLENGE_DATA = [
 // ep._aiOpeningNarration / ep._aiBeforeTribal.
 
 function buildOpeningNarration(ep){
-  // Episode 1: welcome to the season
+  const seasonName=G.settings.name||'No Signal';
+  const theme=G.settings.theme||'a remote location';
+  const castSize=G.cast.length;
+  const teams=G.teams||[];
+  const active=getActive();
+  const prev=(G.episodeLog||[]).filter(e=>e.ep<ep.ep).slice(-1)[0];
+
+  // Episode 1
   if(ep.ep===1){
-    const seasonName = G.settings.name || 'No Signal';
-    const theme = G.settings.theme || 'a remote location';
-    const castSize = G.cast.length;
-    const teams = G.teams || [];
-    const tribeLine = teams.length
-      ? teams.map((t,i)=>{
-          const count = G.cast.filter(c=>c.team===i).length;
-          // Avoid "Tribe Tribe Fang" if the team name already starts with "Tribe"
-          const tname = t.name.replace(/^tribe\s+/i,'');
-          return `Tribe ${tname} (${count})`;
-        }).join(' against ')
-      : `${castSize} contestants`;
-    const intros = [
-      `A new group of contestants has arrived with one goal: survive the vote and take control of the game. Tonight is about first impressions, first mistakes, and the first signs of who may be built for this. ${tribeLine} begin the season with everything still to prove.`,
-      `Welcome to ${seasonName}. ${castSize} strangers, one location, and only one will leave with everything. Tonight, the alliances haven't formed, the targets haven't been drawn, and nobody knows who they can trust. ${tribeLine} step into the unknown.`,
-      `The torches are lit. The cameras are rolling. ${castSize} contestants have come to ${theme} to play the game of their lives. ${tribeLine} — by the end of tonight, one tribe will be down a player, and the season will officially begin.`
-    ];
-    return pick(intros);
+    const tribeLine=teams.length
+      ?teams.map((t,i)=>{const count=G.cast.filter(c=>c.team===i).length;const tname=t.name.replace(/^tribe\s+/i,'');return `Tribe ${tname} (${count})`;}).join(' vs ')
+      :`${castSize} contestants`;
+    return pick([
+      `${castSize} strangers. One location. Zero alliances. Tonight the game begins on ${theme}, and nobody is safe. ${tribeLine} — and by the end of the night, someone will already be questioning every decision they've made.`,
+      `Welcome to ${seasonName}. They came from different worlds, they've never met, and one of them is going to win. The question is — who's actually built for this? ${tribeLine} find out tonight.`,
+      `The torches are lit on ${theme}. ${castSize} players, two agendas — survive the elements, and survive each other. First impressions decide early alliances. Early alliances decide everything else. ${tribeLine} step into the unknown.`,
+      `Day one. Nobody has a target yet. Nobody has an enemy yet. That changes fast. ${tribeLine} arrive on ${theme} with the same thought in every head: I can win this. Tonight we find out who means it.`,
+      `There's always a moment right at the start where the game is completely fair. Everyone equal, nothing decided, anything possible. That moment ends tonight. ${tribeLine} are about to find out what this really costs.`,
+    ]);
   }
-  // Episode 2+: previously on recap
-  const prev = (G.episodeLog||[]).filter(e=>e.ep<ep.ep).slice(-1)[0];
-  if(!prev) return '';
-  const recapBits = [];
-  if(prev.eliminated) recapBits.push(`${prev.eliminated.name} was sent home`);
-  if(prev.idolPlay) recapBits.push(`a hidden immunity idol was played`);
-  if(prev.mergeHappened) recapBits.push(`the tribes merged`);
-  if(prev.twist) recapBits.push(`${prev.twist.name} shook up the game`);
-  if(!recapBits.length) recapBits.push(`tensions began to surface around camp`);
-  const lead = `Previously on ${G.settings.name||'No Signal'}…`;
-  const middle = recapBits.join(', and ');
-  return `${lead} ${middle}. Tonight, the survivors must keep moving — every decision now carries weight.`;
+
+  // Merge episode
+  if(ep.mergeHappened){
+    return pick([
+      `Previously on ${seasonName}… the tribes dissolved. ${active.length} players remain — former enemies now sharing a beach, former allies now calculating exits. Individual immunity changes everything.`,
+      `The merge. The moment the game becomes personal. ${active.length} players made it this far — but now every vote is against someone you've had to look in the eye for weeks. Welcome to the hardest part.`,
+      `Previously on ${seasonName}… the tribes came together. Now it's every player for themselves — which means every handshake at the merge fire might be the last one you can trust. ${active.length} remain.`,
+    ]);
+  }
+
+  // Returnee episode
+  if(ep.isRejoinEpisode){
+    return pick([
+      `Previously on ${seasonName}… someone who thought their game was over gets another shot. A second chance is rare out here. What they do with it is the only thing that matters now.`,
+      `The game doesn't always end when you think it does. Tonight, a player comes back — and everyone still in the game has to decide very quickly whether that changes their plans.`,
+    ]);
+  }
+
+  // Recent idol play
+  if(prev?.idolPlay&&prev?.eliminated){
+    return pick([
+      `Previously on ${seasonName}… an idol changed everything. ${prev.idolPlay.idolPlayer.name} played it — ${prev.eliminated.name} went home instead. The camp is still trying to understand what just happened. Tonight, the fallout begins.`,
+      `A hidden immunity idol. A blindside nobody expected. ${prev.eliminated.name} is gone and the game just reset itself. Previously on ${seasonName}… and tonight, someone pays for what happened at that tribal.`,
+    ]);
+  }
+
+  // Recent betrayal
+  const recentBetrayal=(G.memories||[]).find(m=>m.type==='betrayal'&&m.episode===ep.ep-1);
+  if(recentBetrayal){
+    const subj=G.cast.find(c=>c.id===recentBetrayal.subject);
+    const obj=G.cast.find(c=>c.id===recentBetrayal.object);
+    if(subj&&obj) return pick([
+      `Previously on ${seasonName}… ${subj.name.split(' ')[0]} made a move. ${obj.name.split(' ')[0]} didn't see it coming. Tonight is the direct result of that decision — and not everyone's going to handle it well.`,
+      `${obj.name.split(' ')[0]} trusted ${subj.name.split(' ')[0]}. They shouldn't have. Previously on ${seasonName}… and the damage from last tribal is about to ripple through everything tonight.`,
+    ]);
+  }
+
+  // Approaching finale
+  if(active.length<=G.settings.finaleSize+2){
+    return pick([
+      `Previously on ${seasonName}… ${prev?.eliminated?prev.eliminated.name+' was eliminated. ':''} ${active.length} players remain. The end is close enough to feel — which means paranoia is at an all-time high and every vote counts double.`,
+      `${active.length} left. The jury is watching every move. Previously on ${seasonName}… and tonight, someone's path to the finals gets a lot clearer — or a lot shorter.`,
+      `We are down to ${active.length}. The game has been brutal, the votes have been surprising, and someone is going to win this whole thing. Tonight, the endgame truly begins.`,
+    ]);
+  }
+
+  // Standard recap
+  const recapBits=[];
+  if(prev?.eliminated) recapBits.push(`${prev.eliminated.name} was voted out`);
+  if(prev?.idolPlay) recapBits.push(`an idol was played`);
+  if(prev?.twist) recapBits.push(`${prev.twist.name} shook up the game`);
+  if(!recapBits.length) recapBits.push(`the pressure around camp began to show`);
+  const recap=recapBits.join(', and ');
+  return pick([
+    `Previously on ${seasonName}… ${recap}. Tonight, the game keeps moving — and the players who don't adjust will be the next ones watching from the jury.`,
+    `${recap}. That was last time. Tonight on ${seasonName}, the question is: who learned something from it, and who's still playing the same game that just got someone sent home?`,
+    `Previously on ${seasonName}… ${recap}. Episode ${ep.ep} begins right now — and somebody in that camp has already made a decision that's about to cost them everything.`,
+    `Last time on ${seasonName}… ${recap}. The alliances are shifting, the targets are shifting, and tonight at least one player is about to find out their read was completely wrong.`,
+    `Previously on ${seasonName}… ${recap}. The survivors return to camp with their loyalties tested and one more vote standing between them and safety. Episode ${ep.ep} starts now.`,
+  ]);
 }
 
 function buildBeforeTribalNarration(ep){
-  const losingTribeName = (!G.merged && ep.loseTeam!=null && G.teams && G.teams[ep.loseTeam])
-    ? G.teams[ep.loseTeam].name
-    : (G.merged ? 'the remaining players' : 'the losing tribe');
-  const pool = G.merged ? `${ep.votePool?.length||0} players` : losingTribeName;
-  const lines = [
-    `${G.merged?'The merged tribe':'Tribe '+losingTribeName} returns to camp with one job: decide who will not make it through the night. Nobody knows the final vote yet, and that uncertainty is where the game becomes dangerous.`,
-    `The torches are waiting. ${G.merged?'Every player':'Tribe '+losingTribeName} has the same problem — someone has to go, and everyone is hoping it isn't them. Whispers, glances, last-minute promises. The vote is rarely decided until the parchment is in hand.`,
-    `${losingTribeName==='the remaining players'?'They':'Tribe '+losingTribeName} walks into tribal council with plans in their heads and doubts in their stomachs. One vote can rewrite the season. Tonight, somebody's game ends.`
-  ];
-  return pick(lines);
+  const losingTribeName=(!G.merged&&ep.loseTeam!=null&&G.teams&&G.teams[ep.loseTeam])
+    ?G.teams[ep.loseTeam].name
+    :(G.merged?'the tribe':'the losing tribe');
+  const immune=getActive().find(p=>p.immunity);
+  const immuneLine=immune?`${immune.name.split(' ')[0]} is immune. Everyone else is fair game.`:'Nobody is safe tonight.';
+  const hasIdolInPlay=G.idolHolders.length>0&&getActive().length>6;
+  const highDrama=G.dramaLevel>60;
+  const merged=G.merged;
+
+  if(hasIdolInPlay){
+    return pick([
+      `${merged?'The tribe':'Tribe '+losingTribeName} heads to tribal council, but there's something nobody's saying out loud: somewhere in this game, a hidden idol exists. ${immuneLine} Plans are made. Idols rewrite them.`,
+      `${immuneLine} And somewhere out there, a hidden idol could flip this entire vote on its head. The players heading to tribal tonight know that. What they don't know is who has it.`,
+      `Tribal council. ${immuneLine} And a hidden idol that could make every single plan irrelevant. The most dangerous moment in this game isn't the vote — it's the second before someone pulls out a necklace.`,
+    ]);
+  }
+
+  if(merged){
+    const jurySoFar=G.jury.length;
+    return pick([
+      `${immuneLine} The jury is watching — ${jurySoFar} member${jurySoFar!==1?'s':''} already seated, every vote adding another witness to how this game is really being played. Tonight, the vote is personal whether anyone admits it or not.`,
+      `Individual immunity is everything now. One player is safe. The rest have to trust somebody — and out here, trust is the most dangerous thing you can give away. ${immuneLine}`,
+      `The merged tribe walks into tribal council. Alliances that felt solid last week have been stress-tested. ${immuneLine} One vote changes the entire shape of the game from here.`,
+      `Post-merge tribal. No tribe loyalty to hide behind. ${immuneLine} Just people who've been lying to each other for weeks, deciding who to believe for one more night.`,
+      `${immuneLine} At this point in the game, everybody knows too much about everybody else. The question is: who's going to use what they know tonight — and who's going to find out they waited too long?`,
+    ]);
+  }
+
+  if(highDrama){
+    return pick([
+      `Tribe ${losingTribeName} heads to tribal — and the mood at camp has been toxic. ${immuneLine} When a tribe is this fractured, the vote is never simple. Someone's about to get exactly what they had coming.`,
+      `The tension inside Tribe ${losingTribeName} has been building for days. Tonight it breaks. ${immuneLine} Whatever happens at that fire, this tribe won't look the same afterwards.`,
+      `Tribe ${losingTribeName} is falling apart. ${immuneLine} A tribe that doesn't trust each other going into a vote is a tribe that surprises itself. Expect the unexpected tonight.`,
+    ]);
+  }
+
+  return pick([
+    `Tribe ${losingTribeName} lost the challenge. Now they head to tribal with one job: cut someone loose. ${immuneLine} The whisper campaigns start the moment the challenge ends.`,
+    `${immuneLine} Tribe ${losingTribeName} has to vote someone out tonight — and in a tribe this size, everyone is having a very different private conversation about who that should be.`,
+    `The torches are waiting. Tribe ${losingTribeName} returns to camp knowing one of their own won't make it through the night. ${immuneLine} Last-minute deals are made. Somebody's deal won't hold.`,
+    `Tribe ${losingTribeName} goes to tribal council. ${immuneLine} The game looks very different depending on which side of this vote you end up on.`,
+    `One tribe. One vote. One person goes home. Tribe ${losingTribeName} heads to tribal knowing exactly what's at stake — and exactly how little control any of them actually have. ${immuneLine}`,
+    `${immuneLine} Nobody on Tribe ${losingTribeName} is going to sleep well tonight regardless of how the vote goes. That's what this game does to you. Welcome to tribal council.`,
+  ]);
 }
 
 // ===== EXIT SPEECH =====

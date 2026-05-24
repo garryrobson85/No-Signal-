@@ -4,12 +4,12 @@
 // ===== STATE =====
 // Centralized project version — used in seed hashing and any place that needs it.
 // Bump on actual schema changes, not casual edits.
-const PROJECT_VERSION = 'no-signal-v4';
+const RNG_VERSION = 4; // Seeded RNG version — increment if RNG algorithm changes
 
 // Display version shown to users in the UI. Completely separate from SAVE_VERSION
 // (which tracks save schema compatibility and must not be changed lightly).
 // Bump this whenever you ship a meaningful update.
-const APP_VERSION = 'v1.1.2';
+const APP_VERSION = '1.1.2'; // Semver — shown in UI
 
 function updateStatusTicker(msg) {
   const el = document.getElementById('status-ticker');
@@ -44,7 +44,7 @@ function hashSeed(str){
 }
 function seededRandom(){
   if(!G.settings||!G.settings.seed) return Math.random();
-  if(G.rngState==null) G.rngState=hashSeed(G.settings.seed+'|'+(G.episode||1)+'|'+PROJECT_VERSION);
+  if(G.rngState==null) G.rngState=hashSeed(G.settings.seed+'|'+(G.episode||1)+'|v'+RNG_VERSION);
   G.rngState=(Math.imul(1664525,G.rngState)+1013904223)>>>0;
   return G.rngState/4294967296;
 }
