@@ -32,6 +32,7 @@ document.addEventListener('click', function(e){
     // Navigation
     case 'goHome':            goHome(); break;
     case 'goSetup':           goSetup(); break;
+    case 'initTeams':          initTeams(); break;
     case 'startSeason':       startSeason(); break;
     case 'loadQuickDemo':     loadQuickDemo(); break;
 
@@ -144,4 +145,34 @@ document.addEventListener('keydown',e=>{
       e.preventDefault(); exportSaveFile();
     }
   }
+});
+
+// ─── SINGLE DOMContentLoaded ─────────────────────────────────────────────────
+// Consolidated from ai.js + sound.js — controls load order and eliminates races
+document.addEventListener('DOMContentLoaded',()=>{
+  // 1. Apply theme from localStorage (sound.js)
+  document.documentElement.classList.add('dark');
+  try{const t=localStorage.getItem('ns_theme');if(t&&typeof _themes!=='undefined'&&_themes[t])setTheme(t);}catch(e){}
+
+  // 2. Sync drawer toggle states (sound.js)
+  if(typeof NS!=='undefined'){
+    Object.keys(NS).forEach(key=>{
+      const el=document.getElementById('ns-t-'+key);
+      if(el) el.classList.toggle('on',NS[key]);
+    });
+  }
+  if(typeof applyScanlinesState==='function') applyScanlinesState();
+
+  // 3. Stamp version label (ai.js + sound.js — merged)
+  const vl=document.getElementById('app-version-label');
+  if(vl&&typeof APP_VERSION!=='undefined') vl.textContent=APP_VERSION;
+
+  // 4. Init Gemini key field (ai.js)
+  if(typeof initGeminiKeyField==='function') initGeminiKeyField();
+
+  // 5. Show resume button if save exists (ai.js)
+  if(typeof updateContinueButton==='function') updateContinueButton();
+
+  // 6. Show home screen — must run last after all UI is ready
+  if(typeof _showOnlyScreen==='function') _showOnlyScreen('screen-home');
 });

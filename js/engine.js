@@ -135,20 +135,73 @@ function pickVoteReason(voter,target,allies){
  *   allianceStr=0.5 → 60% strategic  (balanced)
  *   allianceStr=1.0 → 95% strategic  (alliance-locked)
  */
+/**
+ * generateVotingPlans — before tribal, build majority/minority target plans
+ * Returns {majority:{target,members,confidence}, minority:{target,members,confidence}, swing:[]}
+ * runVote uses these to make voting feel coordinated rather than individual.
+ */
+function generateVotingPlans(pool, immune=null){
+  const eligible=pool.filter(p=>!immune||p.id!==immune.id);
+  const allianceStr=G.settings.allianceStr/100;
+
+  // Score every candidate from every voter's perspective, aggregate
+  const globalScore={};
+  eligible.forEach(candidate=>{
+    globalScore[candidate.id]=0;
+    pool.forEach(voter=>{
+      if(voter.id===candidate.id) return;
+      const allies=getVoterAllies(voter);
+      if(allies.includes(candidate.id)) return; // never target allies in plan
+      globalScore[candidate.id]+=targetScore(voter,candidate,allies,allianceStr,pool);
+    });
+  });
+
+  // Sort candidates by aggregate threat score
+  const ranked=eligible.slice().sort((a,b)=>(globalScore[b.id]||0)-(globalScore[a.id]||0));
+  if(!ranked.length) return{majority:null,minority:null,swing:[]};
+
+  const majorityTarget=ranked[0];
+  const minorityTarget=ranked.length>1?ranked[1]:null;
+
+  // Assign each voter to a plan based on their alliances + loyalty
+  const majorityMembers=[],minorityMembers=[],swing=[];
+  pool.forEach(voter=>{
+    const allies=getVoterAllies(voter);
+    const loyaltyRoll=seededRandom();
+    // If voter is allied with the majority target, they'll likely oppose
+    if(allies.includes(majorityTarget.id)){
+      if(minorityTarget&&!allies.includes(minorityTarget.id)) minorityMembers.push(voter.id);
+      else swing.push(voter.id);
+    } else if(loyaltyRoll<allianceStr*0.7+0.25){
+      majorityMembers.push(voter.id);
+    } else {
+      swing.push(voter.id);
+    }
+  });
+
+  const majorityConfidence=Math.min(0.95, majorityMembers.length/pool.length+0.1);
+  const minorityConfidence=minorityMembers.length/pool.length;
+
+  return{
+    majority:{target:majorityTarget, members:majorityMembers, confidence:majorityConfidence},
+    minority:minorityTarget?{target:minorityTarget, members:minorityMembers, confidence:minorityConfidence}:null,
+    swing
+  };
+}
+
 function runVote(pool,immune=null){
   const eligible=pool.filter(p=>!immune||p.id!==immune.id);
   if(!eligible.length) return{eliminated:pool[0],tally:{},individualVotes:[],tied:false,tiebreakerApplied:''};
   const tally={};eligible.forEach(p=>tally[p.id]=0);
   const individualVotes=[],allianceStr=G.settings.allianceStr/100; // normalised 0–1
 
+  // Generate coordinated voting plans — makes alliances feel intentional
+  const plans=generateVotingPlans(eligible,null);
+
   pool.forEach(voter=>{
     const allies=getVoterAllies(voter);
     const candidates=eligible.filter(p=>p.id!==voter.id);
-    // Every voter MUST cast a vote — guarantee with fallback
-    if(!candidates.length){
-      // Voter has no one to vote for (only target is themselves) — skip
-      return;
-    }
+    if(!candidates.length) return;
 
     // Score each candidate
     const scored=candidates
@@ -157,16 +210,25 @@ function runVote(pool,immune=null){
 
     let target=null;
     const loyaltyRoll=seededRandom();
-    // allianceStr is already 0-1; use directly
-    // High loyalty = vote top-scored almost always; low = more randomness
-    if(loyaltyRoll<allianceStr*0.7+0.25){
-      target=scored[0].p; // strategic consensus
+
+    // Check if voter is in a voting plan
+    const inMajority=plans.majority?.members.includes(voter.id);
+    const inMinority=plans.minority?.members.includes(voter.id);
+
+    if(inMajority&&loyaltyRoll<plans.majority.confidence){
+      // Follow majority plan — but check if plan target is valid candidate
+      const planTarget=candidates.find(c=>c.id===plans.majority.target.id);
+      target=planTarget||scored[0].p;
+    } else if(inMinority&&plans.minority&&loyaltyRoll<plans.minority.confidence+0.1){
+      const planTarget=candidates.find(c=>c.id===plans.minority.target.id);
+      target=planTarget||scored[0].p;
+    } else if(loyaltyRoll<allianceStr*0.7+0.25){
+      target=scored[0].p; // individual strategic consensus
     } else if(scored.length>=2&&loyaltyRoll<0.85){
       target=scored[rng(0,Math.min(2,scored.length-1))].p; // top-3 noise
     } else {
       target=pick(candidates); // chaos flip
     }
-    // Final safety net — should never be null at this point but guard anyway
     if(!target) target=pick(candidates);
 
     const reason=pickVoteReason(voter,target,allies);

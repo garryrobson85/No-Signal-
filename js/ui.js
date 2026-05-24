@@ -76,7 +76,7 @@ function renderStage(idx){
     container.innerHTML=`<div class="ep-view">${html}<\/div>`;
     capturePlacementSnapshot(ep);
     G.episodeLog.push(ep);
-    setTimeout(()=>{const gm=document.querySelector('.game-main');if(gm)gm.scrollTo({top:0,behavior:'instant'});},50);
+    setTimeout(()=>{const ev=document.querySelector('.ep-view');if(ev)ev.scrollTop=0;window.scrollTo(0,0);},50);
     updateGameSidebar();
     return;
   }
@@ -104,8 +104,9 @@ function renderStage(idx){
     if(typeof kickRaceBars==='function') kickRaceBars();
   }, 80);
   setTimeout(()=>{
-    const gm=document.querySelector('.game-main');
-    if(gm) gm.scrollTo({top:0,behavior:'instant'});
+    const ev=document.querySelector('.ep-view');
+    if(ev) ev.scrollTop=0;
+    window.scrollTo(0,0);
   },50);
   updateGameSidebar();
   } catch(err) {
@@ -741,8 +742,18 @@ function revealElimination(){
     setTimeout(()=>showElimFullscreen(ep.eliminated,ep),600);
   }
 }
-function nextEpisode(){G.episode++;G.cast.forEach(c=>c.immunity=false);saveGame(true);computeAndStartEpisode();}
-function nextAction(){nextEpisode();}
+function nextEpisode(){
+  G.episode++;
+  G.cast.forEach(c=>c.immunity=false);
+  saveGame(true);
+  // Scroll to top before new episode renders
+  const ev=document.getElementById('ep-view-container');
+  const ep=document.querySelector('.ep-view');
+  if(ep) ep.scrollTop=0;
+  if(ev) ev.scrollTop=0;
+  window.scrollTo(0,0);
+  computeAndStartEpisode();
+}
 
 // ===== CAST STATUS =====
 
@@ -958,44 +969,6 @@ function showSeasonStats(){
       <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--win)">${p.challengeWins} win${p.challengeWins!==1?'s':''}<\/span>
     <\/div>`).join('')}`:''}`;
   openModal('modal-cast-status');
-}
-
-// ===== ALLIANCE WEB =====
-function showAllianceWeb(){
-  const active=getActive();
-  const size=320,center=size/2;
-  const angleStep=(2*Math.PI)/Math.max(active.length,1);
-  const positions={};
-  active.forEach((p,i)=>{
-    const a=angleStep*i-Math.PI/2, r=110;
-    positions[p.id]={x:center+Math.cos(a)*r, y:center+Math.sin(a)*r};
-  });
-  let svg=`<svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:360px;display:block;margin:0 auto">`;
-  // Draw alliance lines
-  G.alliances.forEach(al=>{
-    const members=al.members.filter(id=>active.find(p=>p.id===id));
-    for(let i=0;i<members.length;i++) for(let j=i+1;j<members.length;j++){
-      const a=positions[members[i]],b=positions[members[j]];
-      if(a&&b) svg+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#9333EA" stroke-width="1.5" stroke-opacity="0.35" stroke-dasharray="4,3"/>`;
-    }
-  });
-  // Draw players
-  active.forEach(p=>{
-    const pos=positions[p.id]; if(!pos) return;
-    const hasIdol=G.idolHolders.includes(p.id);
-    svg+=`<g transform="translate(${pos.x},${pos.y})">
-      <circle cx="0" cy="0" r="18" fill="${p.color}" opacity="0.15"/>
-      <circle cx="0" cy="0" r="14" fill="${p.color}"/>
-      <text x="0" y="4" text-anchor="middle" font-size="9" font-weight="700" fill="white" font-family="'Bebas Neue',cursive">${p.initials}<\/text>
-      ${hasIdol?`<text x="14" y="-10" font-size="10">💎<\/text>`:''}
-      ${p.immunity?`<text x="-14" y="-10" font-size="10">🛡️<\/text>`:''}
-      <text x="0" y="28" text-anchor="middle" font-size="8" fill="#57534E">${p.name.split(' ')[0]}<\/text>
-    <\/g>`;
-  });
-  svg+=`<\/svg>`;
-  svg+=`<div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--text2)"><span style="display:inline-block;width:24px;height:2px;background:#9333EA;border-top:1px dashed #9333EA"><\/span> Alliance connection<\/div>`;
-  document.getElementById('modal-player-content').innerHTML=`<div style="font-size:16px;font-weight:600;margin-bottom:14px">🕸️ Alliance Web — Ep ${G.episode}<\/div>${svg}`;
-  openModal('modal-player-detail');
 }
 
 function showPlayerDetail(id){

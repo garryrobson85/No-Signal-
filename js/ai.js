@@ -117,10 +117,18 @@ EP1 MODE — No tribal council has occurred yet. Confessionals must focus ONLY o
 - What the player is thinking heading into the game
 DO NOT mention votes, betrayals, blindsides, alliances being broken, or anything that hasn't happened yet.`:'';
 
-  // --- Spoiler-prevention rule ---
-  const spoilerRule=eliminated?
-    `SPOILER PREVENTION: Confessionals and interactions were recorded BEFORE tribal council. They must NOT reference who was eliminated, how the vote went, or the outcome. Only the exit speech and host comment may reference the elimination.`
-    :`SPOILER PREVENTION: No elimination this episode. Confessionals should not anticipate or spoil any outcome.`;
+  // --- Strict fact sheet + forbidden topics ---
+  const nextEp=ep.ep+1;
+  const futureNames=G.cast.filter(c=>!c.eliminated).map(c=>c.name.split(' ')[0]);
+  const spoilerRule=`STRICT FACT SHEET — EPISODE ${ep.ep} ONLY.
+FORBIDDEN: Do not mention, foreshadow, or reference ANY of the following:
+- Who gets eliminated BEFORE the exit speech/final words sections
+- Upcoming tribe swaps, merges, or twists not yet announced (merge happens ep ${G.settings.mergeEpisode||6})
+- Future immunity challenges or episode numbers beyond ${ep.ep}
+- Players returning, quitting, or being medevac'd (unless it happened THIS episode)
+- Any event that occurs AFTER tribal council in confessionals/interactions
+${eliminated?`CONFESSIONALS/INTERACTIONS: Recorded BEFORE tribal. Must NOT reference ${eliminated.name} going home, the vote count, or tonight's result. Only exit speech + host comment sections may reference the elimination.`:'CONFESSIONALS/INTERACTIONS: No elimination this episode. Do not hint at future votes or outcomes.'}
+CONTINUITY: Only reference events that have already happened in episodes 1-${ep.ep}.`;
 
   return `Reality TV writer for "${G.settings.name||'No Signal'}" (Survivor-style, ${G.settings.theme||'remote island'}).
 Ep${ep.ep}/${G.settings.mergeEpisode||6} — ${G.merged?'POST-MERGE':'PRE-MERGE'} — ${active.length} remain.
@@ -300,29 +308,4 @@ async function generateAIEpisodeScript(epNum){
     if(btn){btn.disabled=false;btn.textContent='✨ Generate with AI — Retry';}
   }
 }
-
-// ===== DARK MODE =====
-function toggleDarkMode(){
-  const isDark=document.documentElement.classList.toggle('dark');
-  document.getElementById('dark-toggle-btn').textContent=isDark?'☀️':'🌙';
-  try{localStorage.setItem('nosignal_darkmode',isDark?'1':'0');}catch(e){}
-}
-function initDarkMode(){
-  let pref='0';
-  try{pref=localStorage.getItem('nosignal_darkmode')||'0';}catch(e){}
-  if(pref==='0'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches) pref='1';
-  if(pref==='1'){
-    document.documentElement.classList.add('dark');
-    const btn=document.getElementById('dark-toggle-btn');
-    if(btn) btn.textContent='☀️';
-  }
-}
-
-document.addEventListener('DOMContentLoaded',()=>{
-  initGeminiKeyField();
-  const verLabel = document.getElementById('app-version-label');
-  if(verLabel && typeof APP_VERSION !== 'undefined') verLabel.textContent = APP_VERSION;
-  updateContinueButton();
-  // Force home screen visible, all others hidden — using inline styles to beat any CSS issue
-  if(typeof _showOnlyScreen==='function') _showOnlyScreen('screen-home');
-});
+// DOMContentLoaded consolidated into main.js

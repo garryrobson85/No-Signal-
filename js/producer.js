@@ -69,10 +69,6 @@ function initProducerPowers() {
   });
 }
 
-function producerPowerUsed(id) {
-  if(!G.producerPowers) initProducerPowers();
-  return (G.producerPowers[id] || 0) <= 0;
-}
 
 function useProducerPower(id) {
   if(!G.producerPowers) initProducerPowers();

@@ -208,18 +208,4 @@ function toggleSidebar() {
 // Drawer CSS is in components.css — no JS injection needed
 
 // ═══ INIT ═══
-document.addEventListener('DOMContentLoaded', () => {
-  Object.keys(NS).forEach(key => {
-    const el = document.getElementById('ns-t-'+key);
-    if (el) el.classList.toggle('on', NS[key]);
-  });
-  applyScanlinesState();
-  try {
-    const t = localStorage.getItem('ns_theme');
-    if (t && _themes[t]) setTheme(t);
-  } catch(e) {}
-  document.documentElement.classList.add('dark');
-  // Stamp version
-  const vl = document.getElementById('app-version-label');
-  if (vl && typeof APP_VERSION !== 'undefined') vl.textContent = APP_VERSION;
-});
+// DOMContentLoaded consolidated into main.js

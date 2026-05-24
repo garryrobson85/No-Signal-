@@ -314,17 +314,6 @@ function showOneProfile(id){
   openV19Modal(`👤 ${c.name}`,html);
 }
 
-
-function showV19Relationships(){
-  const pairs=v19TopPairs();
-  const strongest=pairs.slice(0,8), weakest=pairs.slice(-8).reverse();
-  let html=`<div class="v19-help">Relationship scores are generated from alliances, personality matches and social stats. You can use this as a production board for storylines and future vote logic.<\/div>`;
-  html+=`<h3 style="font-size:15px;margin:12px 0 6px">Strongest Bonds<\/h3>`;
-  strongest.forEach(p=>{html+=`<div class="v19-rel-row"><strong>${v19PlayerName(p.a)}<\/strong><div class="v19-rel-meter"><div class="v19-rel-fill" style="width:${p.score}%"><\/div><\/div><strong style="text-align:right">${v19PlayerName(p.b)}<\/strong><div style="grid-column:1/-1;font-size:11px;color:var(--text2)">Bond score ${p.score}/100<\/div><\/div>`});
-  html+=`<h3 style="font-size:15px;margin:18px 0 6px">Weakest Bonds / Rivalries<\/h3>`;
-  weakest.forEach(p=>{html+=`<div class="v19-rel-row"><strong>${v19PlayerName(p.a)}<\/strong><div class="v19-rel-meter"><div class="v19-rel-fill" style="width:${p.score}%;background:var(--elim)"><\/div><\/div><strong style="text-align:right">${v19PlayerName(p.b)}<\/strong><div style="grid-column:1/-1;font-size:11px;color:var(--text2)">Bond score ${p.score}/100<\/div><\/div>`});
-  openV19Modal('🕸️ v19 Relationship Board',html);
-}
 function buildV19SeasonReport(){
   const lines=[];
   lines.push(`${G.settings.name||'No Signal Season'} — v19 Report`);

@@ -25,7 +25,6 @@ function loadQuickDemo(){
   showGameScreen(); computeAndStartEpisode();
   notify('Demo season loaded! ⚡','win');
 }
-function continueGame(){showGameScreen();if(G.currentEpData)renderStage(G.stageIndex||0);}
 
 // ===== SAVE / LOAD =====
 const SAVE_VERSION=19;
@@ -333,7 +332,4 @@ let _autosaveTimer=null;
 function queueAutosave(reason='change'){
   clearTimeout(_autosaveTimer);
   _autosaveTimer=setTimeout(()=>saveGame(true),700);
-}
-function markDirty(reason='change'){
-  queueAutosave(reason);
 }

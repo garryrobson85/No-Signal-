@@ -196,7 +196,6 @@ function getPortrait(c){
   }
   return c._portrait;
 }
-function updateContestantPortrait(c){c._portraitKey=null;}
 function addContestant(){const c=makeContestant();G.cast.push(c);renderCastList();updateCastNavCount();}
 function generateRandomCast(n=12){G.cast=[];resetNamePool();for(let i=0;i<n;i++)G.cast.push(makeContestant());renderCastList();updateCastNavCount();notify(`Generated ${n} contestants! ✨`);}
 function removeContestant(id){G.cast=G.cast.filter(c=>c.id!==id);renderCastList();updateCastNavCount();updateTeamsPanel();}
